@@ -1,4 +1,4 @@
-# Created by https://www.toptal.com/developers/gitignore/api/c++,visualstudio,cmake
+﻿# Created by https://www.toptal.com/developers/gitignore/api/c++,visualstudio,cmake
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,visualstudio,cmake
 
 ### C++ ###
@@ -446,6 +446,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# build folder
+/build
 
 # JetBrains Rider
 *.sln.iml
