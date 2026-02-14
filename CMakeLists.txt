@@ -8,8 +8,18 @@ endif()
 
 project ("reverse-planning")
 
+file(GLOB_RECURSE SOURCES "src/sources/*.cpp" "src/sources/*.c")
+file(GLOB_RECURSE HEADERS "src/header/*.h" "src/header/*.hpp")
+
 # 이 프로젝트의 실행 파일에 소스를 추가합니다.
-add_executable (main "main.cpp" "IOManager.h" "Server.h")
+add_executable(main ${SOURCES} ${HEADERS})
+
+target_include_directories(main
+    PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/header  # 루트 기준 절대경로
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/sources  # 소스 내부 헤더용
+)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET main PROPERTY CXX_STANDARD 20)
