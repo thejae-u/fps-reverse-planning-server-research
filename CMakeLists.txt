@@ -29,4 +29,5 @@ endif()
 
 find_package(asio CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-target_link_libraries(main PRIVATE asio::asio spdlog::spdlog)
+find_package(stduuid CONFIG REQUIRED)
+target_link_libraries(main PRIVATE asio::asio spdlog::spdlog_header_only stduuid)
