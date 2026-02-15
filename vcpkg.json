@@ -2,6 +2,7 @@
   "name": "vcpkg",
   "version-string": "1.0.0",
   "dependencies": [
-    "asio"
+    "asio",
+    "spdlog"
   ]
 }

@@ -28,4 +28,5 @@ endif()
 # TODO: 필요한 경우 테스트를 추가하고 대상을 설치합니다.
 
 find_package(asio CONFIG REQUIRED)
-target_link_libraries(main PRIVATE asio::asio)
+find_package(spdlog CONFIG REQUIRED)
+target_link_libraries(main PRIVATE asio::asio spdlog::spdlog)
