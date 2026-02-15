@@ -30,4 +30,25 @@ endif()
 find_package(asio CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(stduuid CONFIG REQUIRED)
-target_link_libraries(main PRIVATE asio::asio spdlog::spdlog_header_only stduuid)
+
+add_definitions(-DUUID_SYSTEM_GENERATOR)
+
+# 플랫폼 별 uuid system generator의 사용 설정
+if(WIN32)
+    set(PLATFORM_LIBS Bcrypt)
+elseif(APPLE)
+    find_library(CORE_FOUNDATION_LIB CoreFoundation)
+    set(PLATFORM_LIBS ${CORE_FOUNDATION_LIB})
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(UUID REQUIRED uuid)
+    set(PLATFORM_LIBS ${UUID_LIBRARIES})
+    target_include_directories(main PRIVATE ${UUID_INCLUDE_DIRS})
+endif()
+
+target_link_libraries(main PRIVATE 
+    asio::asio 
+    spdlog::spdlog_header_only 
+    stduuid 
+    ${PLATFORM_LIBS}
+)
