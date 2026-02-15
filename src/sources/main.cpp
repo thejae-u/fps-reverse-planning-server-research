@@ -1,8 +1,8 @@
 ﻿#include <iostream>
 #include <thread>
 
-#include "IOManager.h"
-#include "Server.h"
+#include "IOManager.hpp"
+#include "Server.hpp"
 
 // Test port
 constexpr std::uint16_t SERVER_PORT = 52800;

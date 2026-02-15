@@ -3,34 +3,29 @@
 #include <asio.hpp>
 #include <iostream>
 #include <memory>
+#include <spdlog/spdlog.h>
 #include <thread>
 #include <vector>
-#include <spdlog/spdlog.h>
 
 class IOManager
 {
 private:
-    struct SecretKey
-    {
-    };
+    struct SecretKey {};
 
 public:
     explicit IOManager(SecretKey, std::string name, std::size_t threadCount)
-        : _name(name), _guard(asio::make_work_guard(_io)), _threadCount(threadCount) {}
-
-    ~IOManager()
+    : _name(name), _guard(asio::make_work_guard(_io)), _threadCount(threadCount)
     {
-        spdlog::info("IO Manager {} destroyed", _name);
     }
+
+    ~IOManager() { spdlog::info("IO Manager {} destroyed", _name); }
 
     static std::shared_ptr<IOManager> Create(std::string name, std::size_t threadCount)
     {
         auto newIOManager = std::make_shared<IOManager>(SecretKey{}, name, threadCount);
-        for (auto i = 0; i < threadCount; ++i)
+        for(auto i = 0; i < threadCount; ++i)
         {
-            newIOManager->_workers.emplace_back(
-                [newIOManager]()
-                { newIOManager->_io.run(); });
+            newIOManager->_workers.emplace_back([newIOManager]() { newIOManager->_io.run(); });
         }
 
         return newIOManager;
@@ -38,7 +33,7 @@ public:
 
 public:
     template <typename CompletionHandler>
-    auto RegisterWork(CompletionHandler &&handler)
+    auto RegisterWork(CompletionHandler&& handler)
     {
         return asio::post(_io, std::forward<CompletionHandler>(handler));
     }
@@ -48,9 +43,9 @@ public:
         _io.stop();
         _guard.reset();
 
-        for (auto &w : _workers)
+        for(auto& w : _workers)
         {
-            if (w.joinable())
+            if(w.joinable())
                 w.join();
         }
 
@@ -58,7 +53,7 @@ public:
     }
 
 public:
-    asio::io_context &GetIoContext() { return _io; }
+    asio::io_context& GetIoContext() { return _io; }
 
 private:
     std::string _name;
