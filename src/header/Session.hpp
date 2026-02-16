@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <asio.hpp>
 #include <memory>
 #include <spdlog/spdlog.h>
+#include <uuid.h>
 
 class Session : public std::enable_shared_from_this<Session>
 {
@@ -10,12 +11,16 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Session(SecretKey, asio::io_context& io);
-    ~Session();
-
-    static std::shared_ptr<Session> Create(asio::io_context& io)
+    explicit Session(SecretKey, asio::io_context& io, uuids::uuid sessionId) : _socketPtr(std::make_shared<asio::ip::tcp::socket>(io)), _id(sessionId)
     {
-        auto newSession = std::make_shared<Session>(SecretKey{}, io);
+        spdlog::info("empty session created");
+    }
+
+    ~Session() { spdlog::warn("Session destroyed: {}", uuids::to_string(_id)); }
+
+    static std::shared_ptr<Session> Create(asio::io_context& io, uuids::uuid sessionId)
+    {
+        auto newSession = std::make_shared<Session>(SecretKey{}, io, sessionId);
         return newSession;
     }
 
@@ -26,13 +31,15 @@ public:
     void Start();
     void Stop();
 
-    std::string GetId() { return _id; }
-    std::string GetRoomId() { return _roomId; }
+    void SetRoom();
+
+    uuids::uuid GetId() const { return _id; }
+    uuids::uuid GetRoomId() const { return _roomId; }
 
 private:
     std::shared_ptr<asio::ip::tcp::socket> _socketPtr;
 
     // Set by first handshaking
-    std::string _id;
-    std::string _roomId;
+    uuids::uuid _id;
+    uuids::uuid _roomId;
 };
