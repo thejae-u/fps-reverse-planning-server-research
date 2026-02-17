@@ -2,8 +2,8 @@
 #include <thread>
 
 #include "IOManager.hpp"
-#include "Server.hpp"
 #include "Matching.hpp"
+#include "Server.hpp"
 
 // Test Server Port
 constexpr std::uint16_t SERVER_PORT = 52800;
@@ -18,9 +18,12 @@ int main()
     server->Start();
     server->Test();
 
+    ioManager->RegisterWork([matching]() { matching->MatchMaking(); });
+
     std::string tmp;
     std::cin >> tmp;
 
+    matching->Stop();
     server->Stop();
     ioManager->Stop();
     return 0;

@@ -1,9 +1,9 @@
 ﻿#pragma once
 
-#include <memory>
-#include <queue>
-#include <mutex>
 #include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <queue>
 
 #include <uuid.h>
 
@@ -18,7 +18,10 @@ private:
 
 public:
     explicit Matching(SecretKey, std::shared_ptr<IOManager> ioManager) : _ioManager(ioManager) {}
-    ~Matching() {}
+    ~Matching()
+    {
+        spdlog::info("Matching Destroyed");
+    }
     static std::shared_ptr<Matching> Create(std::shared_ptr<IOManager> ioManager)
     {
         auto newMatching = std::make_shared<Matching>(SecretKey{}, ioManager);
@@ -27,6 +30,8 @@ public:
 
 public:
     void AddWaitSession(uuids::uuid waitSessionInfo);
+    void Start();
+    void Stop();
     void MatchMaking();
 
 private:
@@ -35,4 +40,6 @@ private:
     std::queue<uuids::uuid> _waitingQueue;
     std::mutex _waitingQueueMutex;
     std::condition_variable _waitingCv;
+
+    std::atomic<bool> _isRunning;
 };
