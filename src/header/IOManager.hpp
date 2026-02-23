@@ -16,10 +16,10 @@ public:
     explicit IOManager(SecretKey, std::string name, std::size_t threadCount)
     : _name(name), _guard(asio::make_work_guard(_io)), _threadCount(threadCount)
     {
-        spdlog::info("IO Manager {} Created", _name);
+        spdlog::info("IO manager {} created", _name);
     }
 
-    ~IOManager() { spdlog::info("IO Manager {} destroyed", _name); }
+    ~IOManager() { spdlog::info("IO manager {} destroyed", _name); }
 
     static std::shared_ptr<IOManager> Create(std::string name, std::size_t threadCount)
     {
@@ -50,7 +50,7 @@ public:
                 w->join();
         }
 
-        spdlog::info("IO Manager Stop Complete\n");
+        spdlog::info("IO manager stop complete\n");
     }
 
 public:

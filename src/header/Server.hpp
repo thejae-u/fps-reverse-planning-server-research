@@ -19,7 +19,7 @@ private:
 
 public:
     explicit Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port);
-    ~Server() { spdlog::info("Server Successfully Destroyed"); }
+    ~Server() { spdlog::info("server successfully destroyed"); }
 
     static std::shared_ptr<Server> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port)
     {
