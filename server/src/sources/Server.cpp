@@ -8,13 +8,13 @@
 Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port)
 : _ioManager(ioManager), _serverEp(asio::ip::tcp::v4(), port), _acceptor(ioManager->GetIoContext(), _serverEp)
 {
-    spdlog::info("Server Object Created");
+    spdlog::info("server object created");
 }
 
 void Server::Test() 
 {
     auto self(shared_from_this());
-    spdlog::info("Server Test Message called");
+    spdlog::info("server test message called");
     _ioManager->RegisterWork([self]() {
         spdlog::info("called from io handler, use_count: {}", self.use_count());
     });
@@ -22,14 +22,14 @@ void Server::Test()
 
 void Server::Start()
 {
-    spdlog::info("server Started...");
+    spdlog::info("server started...");
     AcceptAsync();
 }
 
 void Server::Stop() 
 { 
     _acceptor.cancel();
-    spdlog::info("server Stoped...\n"); 
+    spdlog::info("server stoped...\n"); 
 }
 
 void Server::AcceptAsync()
@@ -53,7 +53,6 @@ void Server::AcceptAsync()
         auto sessionAddrStr = newSession->GetEndpoint().address().to_string();
         auto sessionId = newSession->GetId();
 
-        // restrict lock area
         {
             std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
             if(self->_sessions.find(sessionId) != self->_sessions.end())
@@ -65,7 +64,8 @@ void Server::AcceptAsync()
         }
 
         // push to match-making waiting queue
-        self->_matching->AddWaitSession(sessionId);
+        // move session ownership to Matching
+        self->_matching->AddWaitSession(sessionId, std::move(newSession));
 
         // new session create for accept other client
         self->AcceptAsync();

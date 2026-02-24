@@ -1,33 +1,39 @@
 ﻿#include "Matching.hpp"
+#include "Session.hpp"
 
-void Matching::AddWaitSession(uuids::uuid waitSessionInfo)
+void Matching::AddWaitSession(uuids::uuid waitSessionInfo, std::shared_ptr<Session> session)
 {
     std::lock_guard<std::mutex> queueLock(_waitingQueueMutex);
-    _waitingQueue.push(waitSessionInfo);
+    _waitingQueue.push({ waitSessionInfo, session });
 }
 
 void Matching::Start()
 {
     auto selfWeak(weak_from_this());
+    _isRunning = true;
 
     _ioManager->RegisterWork([selfWeak]() {
         if(auto selfShared = selfWeak.lock())
             selfShared->MatchMaking();
     });
-
-    _isRunning = true;
 }
 
 void Matching::Stop()
 {
-    spdlog::info("Stop sign complete");
-    {
-        std::lock_guard<std::mutex> queueLock(_waitingQueueMutex);
-        _isRunning = false;
-    }
+    std::lock_guard<std::mutex> queueLock(_waitingQueueMutex);
+    _isRunning = false;
 
     _waitingCv.notify_all();
-    spdlog::info("notifying complete");
+
+    while(!_waitingQueue.empty())
+    {
+        auto [id, session] = _waitingQueue.front();
+        session->Stop();
+
+        _waitingQueue.pop();
+    }
+
+    spdlog::info("matching stopped");
 }
 
 void Matching::MatchMaking()
@@ -35,7 +41,7 @@ void Matching::MatchMaking()
     auto selfWeak(weak_from_this());
     std::unique_lock<std::mutex> queueLock(_waitingQueueMutex);
 
-    spdlog::info("Match Making Waiting...");
+    spdlog::info("match making waiting...");
 
     // waiting for matching player
     _waitingCv.wait(queueLock, [selfWeak]() -> bool {

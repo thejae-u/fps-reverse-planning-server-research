@@ -15,6 +15,7 @@ int main()
     auto matching = Matching::Create(ioManager);
     auto server = Server::Create(ioManager, matching, SERVER_PORT);
 
+    matching->Start();
     server->Start();
     server->Test();
 
