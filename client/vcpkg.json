@@ -1,0 +1,12 @@
+﻿{
+  "name": "vcpkg",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "asio",
+    "spdlog",
+    "stduuid",
+    "glfw3",
+    "glad",
+    "imgui"
+  ]
+}
