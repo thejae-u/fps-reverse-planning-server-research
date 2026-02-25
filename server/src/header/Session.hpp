@@ -1,7 +1,8 @@
 ﻿#pragma once
 
-#include <asio.hpp>
 #include <memory>
+#include <functional>
+#include <asio.hpp>
 #include <spdlog/spdlog.h>
 #include <uuid.h>
 
@@ -36,10 +37,22 @@ public:
     uuids::uuid GetId() const { return _id; }
     uuids::uuid GetRoomId() const { return _roomId; }
 
+    using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
+    void SetNotifyDisconnectCallback(NotifyDisconnectCallback callback);
+
 private:
     std::shared_ptr<asio::ip::tcp::socket> _socketPtr;
 
     // Set by first handshaking
     uuids::uuid _id;
     uuids::uuid _roomId;
+
+    std::uint32_t _readSize;
+    std::uint32_t _readNetSize;
+    std::string _readBuffer;
+
+    NotifyDisconnectCallback _disconnectCallback;
+
+private:
+    void AsyncRead();
 };

@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <stack>
 
 #include <uuid.h>
 
@@ -19,7 +20,7 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Matching(SecretKey, std::shared_ptr<IOManager> ioManager) : _ioManager(ioManager) {}
+    explicit Matching(SecretKey, std::shared_ptr<IOManager> ioManager) : _ioManager(ioManager), _isRunning(false) {}
     ~Matching()
     {
         spdlog::info("matching destroyed");
@@ -37,9 +38,13 @@ public:
     void MatchMaking();
 
 private:
+    void RemoveSession(std::shared_ptr<Session> removeSession);
+
+
+private:
     std::shared_ptr<IOManager> _ioManager;
 
-    std::queue<std::pair<uuids::uuid,std::shared_ptr<Session>>> _waitingQueue;
+    std::deque<std::pair<uuids::uuid,std::shared_ptr<Session>>> _waitingQueue;
     std::mutex _waitingQueueMutex;
     std::condition_variable _waitingCv;
 

@@ -17,9 +17,6 @@ int main()
 
     matching->Start();
     server->Start();
-    server->Test();
-
-    ioManager->RegisterWork([matching]() { matching->MatchMaking(); });
 
     std::string tmp;
     std::cin >> tmp;

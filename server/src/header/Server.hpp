@@ -33,9 +33,6 @@ public:
 
     void AcceptAsync();
 
-    // Test Area
-    void Test();
-
 private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<Matching> _matching;
