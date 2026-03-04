@@ -6,7 +6,7 @@ void Matching::AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session
 {
     std::lock_guard<std::mutex> queueLock(_waitingQueueMutex);
     _waitingQueue.push_back({ waitSessionId, session });
-    spdlog::info("waiting queue is added {}", uuids::to_string(waitSessionId));
+    spdlog::info("matching: waiting queue is added {}", uuids::to_string(waitSessionId));
 
     session->SetNotifyDisconnectCallback([weakSelf = weak_from_this()](const std::shared_ptr<Session>& removeSession) {
         if(auto self = weakSelf.lock())
@@ -28,6 +28,7 @@ void Matching::Start()
 
 void Matching::Stop()
 {
+    spdlog::info("matching: matching stopped");
     std::lock_guard<std::mutex> queueLock(_waitingQueueMutex);
     _isRunning = false;
 
@@ -53,14 +54,12 @@ void Matching::Stop()
 
     _registerRoomToServerHandler = nullptr;
     _removeRoomFromServerHandler = nullptr;
-
-    spdlog::info("matching stopped");
 }
 
 void Matching::MatchMaking()
 {
     std::unique_lock<std::mutex> queueLock(_waitingQueueMutex);
-    spdlog::info("match making waiting...");
+    spdlog::info("mathching: match making waiting...");
 
     // waiting for matching player
     _waitingCv.wait(queueLock, [weakSelf = weak_from_this()]() -> bool {
@@ -71,7 +70,7 @@ void Matching::MatchMaking()
 
     if(!_isRunning)
     {
-        spdlog::info("server is off cancel matchmaking");
+        spdlog::info("matching: server is off cancel matchmaking");
         return;
     }
 
@@ -94,6 +93,8 @@ void Matching::MatchMaking()
     std::lock_guard<std::mutex> roomsLock(_activeRoomsMutex);
     _activeRooms.push_back({ newRoom->GetId(), newRoom });
     _registerRoomToServerHandler(newRoom);
+
+    spdlog::info("matching: new matching complete room {}", uuids::to_string(newRoom->GetId()));
 
     auto weakSelf(weak_from_this());
 
@@ -131,7 +132,7 @@ void Matching::RemoveSession(std::shared_ptr<Session> removeSession)
         return;
 
     _waitingQueue.erase(it);
-    spdlog::info("removed session {} from waiting queue", uuids::to_string(removeId));
+    spdlog::info("matching: removed session {} from waiting queue", uuids::to_string(removeId));
 
     _waitingCv.notify_one();
 }
@@ -144,11 +145,11 @@ void Matching::RemoveRoom(std::shared_ptr<Room> removeRoom)
 
     if(it == _activeRooms.end())
     {
-        spdlog::error("invalid room id: no room {} in active rooms", uuids::to_string(removeId));
+        spdlog::error("matching: no room {} in active rooms", uuids::to_string(removeId));
         return;
     }
 
     _activeRooms.erase(it);
     _removeRoomFromServerHandler(removeRoom);
-    spdlog::info("removed room {} from active rooms", uuids::to_string(removeId));
+    spdlog::info("matching: removed room {} from active rooms", uuids::to_string(removeId));
 }

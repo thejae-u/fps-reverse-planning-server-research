@@ -27,13 +27,13 @@ void Room::AddSession(uuids::uuid sessionId, std::shared_ptr<Session> session)
 void Room::RemoveSession(std::shared_ptr<Session> removeSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    spdlog::info("room {} remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
+    spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
     _sessions.erase(removeSession->GetId());
 
     if(!_sessions.empty())
         return;
 
-    spdlog::info("room {} is empty", uuids::to_string(_roomId));
+    spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
     _removeRoomFromMatchingHandler(shared_from_this());
 }
 
@@ -41,7 +41,7 @@ void Room::Broadcast()
 {
     for(auto& [id, session] : _sessions)
     {
-        spdlog::info("session {} send", uuids::to_string(session->GetId()));
+        spdlog::info("room: session {} send", uuids::to_string(session->GetId()));
     }
 }
 

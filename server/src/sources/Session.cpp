@@ -4,7 +4,7 @@ void Session::Start()
 {
     if(_disconnectCallback == nullptr)
     {
-        spdlog::error("session {} : disconnect callback not set", uuids::to_string(GetId()));
+        spdlog::error("session {}: disconnect callback not set", uuids::to_string(GetId()));
         return;
     }
 
@@ -41,11 +41,11 @@ void Session::ReadAsync()
             {
                 if(netSizeErrorCode == asio::error::connection_aborted || netSizeErrorCode == asio::error::operation_aborted || netSizeErrorCode == asio::error::eof)
                 {
-                    spdlog::info("{} aborted... disconnect", uuids::to_string(self->GetId()));
+                    spdlog::info("session {}: aborted... disconnect", uuids::to_string(self->GetId()));
                 }
                 else
                 {
-                    spdlog::info("{} read error... disconnect", uuids::to_string(self->GetId()));
+                    spdlog::info("session {}: read error... disconnect", uuids::to_string(self->GetId()));
                 }
 
                 self->Stop();

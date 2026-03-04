@@ -10,7 +10,7 @@ Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<
   _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0))
 {
     _udpEndpoint = _udpSocket.local_endpoint();
-    spdlog::info("server object created: port {}", _udpEndpoint.port());
+    spdlog::info("server object created: tcp port {}, udp port {}", _tcpEndpoint.port(), _udpEndpoint.port());
 }
 
 void Server::Start()
@@ -52,11 +52,11 @@ void Server::AcceptAsync()
             if(ec == asio::error::connection_aborted ||
                ec == asio::error::operation_aborted)
             {
-                spdlog::info("acceptor aborted");
+                spdlog::info("server: acceptor aborted");
                 return;
             }
 
-            spdlog::error("accept error occured: {}", ec.message());
+            spdlog::error("server: accept error occured({})", ec.message());
             return;
         }
 
@@ -68,7 +68,7 @@ void Server::AcceptAsync()
             std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
             if(self->_sessions.find(sessionId) != self->_sessions.end())
             {
-                spdlog::error("invalid session id (session is already exsist): {}", uuids::to_string(sessionId));
+                spdlog::error("server: invalid session id {} is already exists", uuids::to_string(sessionId));
                 self->AcceptAsync();
                 return;
             }
@@ -92,11 +92,11 @@ void Server::ReceiveAsyncByUdp()
         {
             if(ec == asio::error::operation_aborted)
             {
-                spdlog::info("udp socket close complete");
+                spdlog::info("server: udp socket close complete");
                 return;
             }
 
-            spdlog::warn("udp error occurred: {}", ec.message());
+            spdlog::warn("server: udp error occurred({})", ec.message());
             if(auto self = weakSelf.lock())
             {
                 self->ReceiveAsyncByUdp();
@@ -118,7 +118,7 @@ void Server::AddRoom(std::shared_ptr<Room> room)
     auto roomId = room->GetId();
     _rooms[roomId] = room;
 
-    spdlog::info("add room {} to server", uuids::to_string(roomId));
+    spdlog::info("server: add room {} to server", uuids::to_string(roomId));
 }
 
 void Server::RemoveRoom(std::shared_ptr<Room> room)
@@ -130,5 +130,5 @@ void Server::RemoveRoom(std::shared_ptr<Room> room)
         _rooms.erase(removeId);
     }
 
-    spdlog::info("remove room {} from server", uuids::to_string(removeId));
+    spdlog::info("server: remove room {} from server", uuids::to_string(removeId));
 }

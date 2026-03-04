@@ -12,10 +12,7 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Session(SecretKey, asio::io_context& io, uuids::uuid sessionId) : _socketPtr(std::make_shared<asio::ip::tcp::socket>(io)), _id(sessionId)
-    {
-        spdlog::info("empty session created");
-    }
+    explicit Session(SecretKey, asio::io_context& io, uuids::uuid sessionId) : _socketPtr(std::make_shared<asio::ip::tcp::socket>(io)), _id(sessionId) {}
 
     ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
