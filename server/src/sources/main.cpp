@@ -10,6 +10,7 @@ constexpr std::uint16_t SERVER_PORT = 52800;
 
 int main()
 {
+    spdlog::info("type 'quit' to stop server");
     auto threadCount = std::thread::hardware_concurrency() * 2;
     auto ioManager = IOManager::Create("first manager", threadCount);
     auto matching = Matching::Create(ioManager);
@@ -19,7 +20,11 @@ int main()
     server->Start();
 
     std::string tmp;
-    std::cin >> tmp;
+    while(std::cin >> tmp)
+    {
+        if(tmp == "quit")
+            break;
+    }
 
     matching->Stop();
     server->Stop();

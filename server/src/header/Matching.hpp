@@ -9,6 +9,7 @@
 #include <uuid.h>
 
 #include "IOManager.hpp"
+#include "Room.hpp"
 
 class Session;
 
@@ -32,7 +33,7 @@ public:
     }
 
 public:
-    void AddWaitSession(uuids::uuid waitSessionInfo, std::shared_ptr<Session> session);
+    void AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session> session);
     void Start();
     void Stop();
     void MatchMaking();
@@ -40,13 +41,18 @@ public:
 private:
     void RemoveSession(std::shared_ptr<Session> removeSession);
 
-
 private:
     std::shared_ptr<IOManager> _ioManager;
+    uuids::uuid_system_generator _uuidGen;
 
-    std::deque<std::pair<uuids::uuid,std::shared_ptr<Session>>> _waitingQueue;
+    // waiting sessions
+    std::deque<std::pair<uuids::uuid, std::shared_ptr<Session>>> _waitingQueue;
     std::mutex _waitingQueueMutex;
     std::condition_variable _waitingCv;
+
+    // matched rooms
+    std::deque<std::pair<uuids::uuid, std::shared_ptr<Room>>> _activeRooms;
+    std::mutex _activeRoomsMutex;
 
     std::atomic<bool> _isRunning;
 };

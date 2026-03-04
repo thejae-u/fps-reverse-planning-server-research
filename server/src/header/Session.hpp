@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include <memory>
-#include <functional>
 #include <asio.hpp>
+#include <functional>
+#include <memory>
 #include <spdlog/spdlog.h>
 #include <uuid.h>
 
@@ -32,7 +32,7 @@ public:
     void Start();
     void Stop();
 
-    void SetRoom();
+    void SetRoom(uuids::uuid roomId);
 
     uuids::uuid GetId() const { return _id; }
     uuids::uuid GetRoomId() const { return _roomId; }

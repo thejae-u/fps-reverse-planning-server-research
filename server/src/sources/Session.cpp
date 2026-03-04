@@ -2,7 +2,7 @@
 
 void Session::Start()
 {
-    if (_disconnectCallback == nullptr)
+    if(_disconnectCallback == nullptr)
     {
         spdlog::error("session {} : disconnect callback not set", uuids::to_string(GetId()));
         return;
@@ -14,11 +14,15 @@ void Session::Start()
 void Session::Stop()
 {
     _socketPtr->close();
+    if(_disconnectCallback == nullptr)
+        return;
+
     _disconnectCallback(shared_from_this());
 }
 
-void Session::SetRoom()
+void Session::SetRoom(uuids::uuid roomId)
 {
+    _roomId = roomId;
 }
 
 void Session::SetNotifyDisconnectCallback(NotifyDisconnectCallback callback)
@@ -32,25 +36,25 @@ void Session::AsyncRead()
     _socketPtr->async_read_some(asio::buffer(&_readNetSize, sizeof(_readNetSize)), [weakSelf](const std::error_code& netSizeErrorCode, std::size_t) {
         if(netSizeErrorCode)
         {
-            if(auto sharedSelf = weakSelf.lock())
+            if(auto self = weakSelf.lock())
             {
                 if(netSizeErrorCode == asio::error::connection_aborted || netSizeErrorCode == asio::error::operation_aborted || netSizeErrorCode == asio::error::eof)
                 {
-                    spdlog::warn("{} aborted... disconnect", uuids::to_string(sharedSelf->GetId()));
+                    spdlog::warn("{} aborted... disconnect", uuids::to_string(self->GetId()));
                 }
                 else
                 {
-                    spdlog::error("{} read error... disconnect", uuids::to_string(sharedSelf->GetId()));
+                    spdlog::error("{} read error... disconnect", uuids::to_string(self->GetId()));
                 }
 
-                sharedSelf->Stop();
+                self->Stop();
             }
 
             return;
         }
 
         spdlog::info("read complete");
-        if(auto shreadSelf = weakSelf.lock())
+        if(auto self = weakSelf.lock())
             weakSelf.lock()->AsyncRead();
     });
 }
