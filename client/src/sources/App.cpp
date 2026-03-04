@@ -1,4 +1,4 @@
-﻿#include "App.hpp"
+#include "App.hpp"
 
 App::App() {}
 
@@ -33,6 +33,10 @@ bool App::Init() {
 
     ImGui_ImplGlfw_InitForOpenGL(_window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    _networkClient.SetMessageCallback([this](const std::string& msg) {
+        OnMessage(msg);
+    });
 
     return true;
 }
@@ -78,6 +82,44 @@ void App::RenderUI() {
     ImGui::Text("Status: %s", _networkClient.IsConnected() ? "Connected" : "Disconnected");
     ImGui::End();
 
+    ImGui::Begin("Test Functions");
+    if (ImGui::Button("Send Match Request")) {
+        _networkClient.Send("111");
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Matchmaking Stress Test");
+    ImGui::InputInt("Client Count", &_testClientCount);
+    if (_testClientCount < 1) _testClientCount = 1;
+
+    if (ImGui::Button("Start Test")) {
+        StartMatchmakingTest(_testClientCount);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stop Test")) {
+        StopMatchmakingTest();
+    }
+
+    ImGui::Text("Active Test Clients: %zu", _testClients.size());
+    int connectedCount = 0;
+    for (const auto& client : _testClients) {
+        if (client->IsConnected()) connectedCount++;
+    }
+    ImGui::Text("Connected Test Clients: %d", connectedCount);
+
+    ImGui::End();
+
+    ImGui::Begin("Received Messages");
+    {
+        std::lock_guard<std::mutex> lock(_messagesMutex);
+        for (const auto& msg : _receivedMessages) {
+            ImGui::Text("%s", msg.c_str());
+        }
+    }
+    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+        ImGui::SetScrollHereY(1.0f);
+    ImGui::End();
+
     ImGui::Begin("Logs");
     for (const auto& log : _networkClient.GetLogs()) {
         ImVec4 color = ImVec4(1, 1, 1, 1);
@@ -91,7 +133,38 @@ void App::RenderUI() {
     ImGui::End();
 }
 
+void App::StartMatchmakingTest(int count) {
+    StopMatchmakingTest();
+
+    for (int i = 0; i < count; ++i) {
+        auto client = std::make_unique<NetworkClient>();
+        client->SetMessageCallback([this, i](const std::string& msg) {
+            OnMessage("Test Client [" + std::to_string(i) + "]: " + msg);
+        });
+        client->Connect(_host, (uint16_t)_port);
+        _testClients.push_back(std::move(client));
+    }
+    spdlog::info("Started matchmaking test with {} clients", count);
+}
+
+void App::StopMatchmakingTest() {
+    if (_testClients.empty()) return;
+
+    for (auto& client : _testClients) {
+        client->Disconnect();
+    }
+    _testClients.clear();
+    spdlog::info("Stopped matchmaking test");
+}
+
+void App::OnMessage(const std::string& message) {
+    std::lock_guard<std::mutex> lock(_messagesMutex);
+    _receivedMessages.push_back(message);
+}
+
 void App::Shutdown() {
+    StopMatchmakingTest();
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

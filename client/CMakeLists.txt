@@ -7,7 +7,6 @@ find_package(stduuid CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 
-
 if(WIN32)
     set(PLATFORM_LIBS Bcrypt)
 elseif(APPLE)
@@ -17,6 +16,7 @@ else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(UUID REQUIRED uuid)
     set(PLATFORM_LIBS ${UUID_LIBRARIES})
+    target_include_directories(main PRIVATE ${UUID_INCLUDE_DIRS})
 endif()
 
 # Source and Header files
@@ -47,7 +47,6 @@ target_link_libraries(client_main PRIVATE
     stduuid
     glfw
     glad::glad
-
     ${PLATFORM_LIBS}
 )
 
