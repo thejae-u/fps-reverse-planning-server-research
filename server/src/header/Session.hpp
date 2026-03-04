@@ -17,7 +17,7 @@ public:
         spdlog::info("empty session created");
     }
 
-    ~Session() { spdlog::warn("session destroyed: {}", uuids::to_string(_id)); }
+    ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
     static std::shared_ptr<Session> Create(asio::io_context& io, uuids::uuid sessionId)
     {
@@ -54,5 +54,5 @@ private:
     NotifyDisconnectCallback _disconnectCallback;
 
 private:
-    void AsyncRead();
+    void ReadAsync();
 };

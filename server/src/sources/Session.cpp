@@ -8,7 +8,7 @@ void Session::Start()
         return;
     }
 
-    AsyncRead();
+    ReadAsync();
 }
 
 void Session::Stop()
@@ -30,7 +30,7 @@ void Session::SetNotifyDisconnectCallback(NotifyDisconnectCallback callback)
     _disconnectCallback = std::move(callback);
 }
 
-void Session::AsyncRead()
+void Session::ReadAsync()
 {
     auto weakSelf(weak_from_this());
     _socketPtr->async_read_some(asio::buffer(&_readNetSize, sizeof(_readNetSize)), [weakSelf](const std::error_code& netSizeErrorCode, std::size_t) {
@@ -40,11 +40,11 @@ void Session::AsyncRead()
             {
                 if(netSizeErrorCode == asio::error::connection_aborted || netSizeErrorCode == asio::error::operation_aborted || netSizeErrorCode == asio::error::eof)
                 {
-                    spdlog::warn("{} aborted... disconnect", uuids::to_string(self->GetId()));
+                    spdlog::info("{} aborted... disconnect", uuids::to_string(self->GetId()));
                 }
                 else
                 {
-                    spdlog::error("{} read error... disconnect", uuids::to_string(self->GetId()));
+                    spdlog::info("{} read error... disconnect", uuids::to_string(self->GetId()));
                 }
 
                 self->Stop();
@@ -53,8 +53,7 @@ void Session::AsyncRead()
             return;
         }
 
-        spdlog::info("read complete");
         if(auto self = weakSelf.lock())
-            weakSelf.lock()->AsyncRead();
+            self->ReadAsync();
     });
 }
