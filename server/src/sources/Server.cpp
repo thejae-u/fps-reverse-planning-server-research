@@ -1,26 +1,30 @@
 ﻿#include "Server.hpp"
 
 #include "IOManager.hpp"
+#include "Matching.hpp"
 #include "Room.hpp"
 #include "Session.hpp"
-#include "Matching.hpp"
 
 Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port)
-: _ioManager(ioManager), _matching(matching), _serverEp(asio::ip::tcp::v4(), port), _acceptor(ioManager->GetIoContext(), _serverEp)
+: _ioManager(ioManager), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
+  _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0))
 {
-    spdlog::info("server object created");
+    _udpEndpoint = _udpSocket.local_endpoint();
+    spdlog::info("server object created: port {}", _udpEndpoint.port());
 }
 
 void Server::Start()
 {
     spdlog::info("server started...");
     AcceptAsync();
+    ReceiveAsyncByUdp();
 }
 
-void Server::Stop() 
-{ 
-    _acceptor.cancel();
-    spdlog::info("server stoped...\n"); 
+void Server::Stop()
+{
+    _acceptor.close();
+    _udpSocket.close();
+    spdlog::info("server stoped...\n");
 }
 
 void Server::AcceptAsync()
@@ -30,10 +34,10 @@ void Server::AcceptAsync()
     _acceptor.async_accept(*newSession->GetSocket(), [weakSelf, newSession](std::error_code ec) {
         if(ec)
         {
-            if (ec == asio::error::connection_aborted ||
-                ec == asio::error::operation_aborted)
+            if(ec == asio::error::connection_aborted ||
+               ec == asio::error::operation_aborted)
             {
-                spdlog::warn("acceptor aborted");
+                spdlog::info("acceptor aborted");
                 return;
             }
 
@@ -62,5 +66,33 @@ void Server::AcceptAsync()
             // new session create for accept other client
             self->AcceptAsync();
         }
+    });
+}
+
+void Server::ReceiveAsyncByUdp()
+{
+    std::array<char, BUF_SIZE> receiveBuffer;
+    _udpSocket.async_receive_from(asio::buffer(receiveBuffer), _udpEndpoint, [weakSelf = weak_from_this(), receiveBuffer](const std::error_code ec, const std::size_t bytesRead) {
+        if(ec)
+        {
+            if(ec == asio::error::operation_aborted)
+            {
+                spdlog::info("udp socket close complete");
+                return;
+            }
+
+            spdlog::warn("udp error occurred: {}", ec.message());
+            if(auto self = weakSelf.lock())
+            {
+                self->ReceiveAsyncByUdp();
+                return;
+            }
+        }
+
+        // send to room
+        // client must have own room id and session id
+
+        if(auto self = weakSelf.lock())
+            self->ReceiveAsyncByUdp();
     });
 }

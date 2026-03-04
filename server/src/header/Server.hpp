@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <array>
 #include <asio.hpp>
 #include <memory>
 #include <spdlog/spdlog.h>
@@ -11,6 +12,8 @@
 class IOManager;
 class Matching;
 class Room;
+
+constexpr std::uint16_t BUF_SIZE = 65535;
 
 class Server : public std::enable_shared_from_this<Server>
 {
@@ -34,11 +37,17 @@ public:
     void AcceptAsync();
 
 private:
+    void ReceiveAsyncByUdp();
+
+private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<Matching> _matching;
 
-    asio::ip::tcp::endpoint _serverEp;
+    asio::ip::tcp::endpoint _tcpEndpoint;
     asio::ip::tcp::acceptor _acceptor;
+
+    asio::ip::udp::socket _udpSocket;
+    asio::ip::udp::endpoint _udpEndpoint;
 
     uuids::uuid_system_generator _uuidGen;
 
