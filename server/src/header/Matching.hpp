@@ -11,6 +11,7 @@
 #include "IOManager.hpp"
 #include "Room.hpp"
 
+class Server;
 class Session;
 
 constexpr std::uint8_t MATCHING_PLAYERS = 10;
@@ -38,8 +39,13 @@ public:
     void Stop();
     void MatchMaking();
 
+    using RoomCallback = std::function<void(const std::shared_ptr<Room>&)>;
+    void SetRegisterRoomCallback(RoomCallback handler);
+    void SetRemoveRoomCallback(RoomCallback handler);
+
 private:
     void RemoveSession(std::shared_ptr<Session> removeSession);
+    void RemoveRoom(std::shared_ptr<Room> removeRoom);
 
 private:
     std::shared_ptr<IOManager> _ioManager;
@@ -53,6 +59,8 @@ private:
     // matched rooms
     std::deque<std::pair<uuids::uuid, std::shared_ptr<Room>>> _activeRooms;
     std::mutex _activeRoomsMutex;
+    RoomCallback _registerRoomToServerHandler;
+    RoomCallback _removeRoomFromServerHandler;
 
     std::atomic<bool> _isRunning;
 };

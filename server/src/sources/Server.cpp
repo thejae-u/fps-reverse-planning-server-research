@@ -16,12 +16,27 @@ Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<
 void Server::Start()
 {
     spdlog::info("server started...");
+
+    _matching->SetRegisterRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& room) {
+        if(auto self = weakSelf.lock())
+            self->AddRoom(room);
+    });
+
+    _matching->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& room) {
+        if(auto self = weakSelf.lock())
+            self->RemoveRoom(room);
+    });
+
     AcceptAsync();
     ReceiveAsyncByUdp();
+
+    _matching->Start();
 }
 
 void Server::Stop()
 {
+    _matching->Stop();
+    _rooms.clear();
     _acceptor.close();
     _udpSocket.close();
     spdlog::info("server stoped...\n");
@@ -95,4 +110,25 @@ void Server::ReceiveAsyncByUdp()
         if(auto self = weakSelf.lock())
             self->ReceiveAsyncByUdp();
     });
+}
+
+void Server::AddRoom(std::shared_ptr<Room> room)
+{
+    std::lock_guard<std::mutex> roomsLock(_roomsMutex);
+    auto roomId = room->GetId();
+    _rooms[roomId] = room;
+
+    spdlog::info("add room {} to server", uuids::to_string(roomId));
+}
+
+void Server::RemoveRoom(std::shared_ptr<Room> room)
+{
+    std::lock_guard<std::mutex> roomsLock(_roomsMutex);
+    auto removeId = room->GetId();
+    if(_rooms.find(removeId) != _rooms.end())
+    {
+        _rooms.erase(removeId);
+    }
+
+    spdlog::info("remove room {} from server", uuids::to_string(removeId));
 }

@@ -35,6 +35,8 @@ public:
     void Stop();
 
     void AcceptAsync();
+    void AddRoom(std::shared_ptr<Room> room);
+    void RemoveRoom(std::shared_ptr<Room> room);
 
 private:
     void ReceiveAsyncByUdp();

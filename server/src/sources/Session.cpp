@@ -18,6 +18,7 @@ void Session::Stop()
         return;
 
     _disconnectCallback(shared_from_this());
+    _disconnectCallback = nullptr;
 }
 
 void Session::SetRoom(uuids::uuid roomId)
