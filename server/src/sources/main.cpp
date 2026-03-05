@@ -25,7 +25,6 @@ int main()
             break;
     }
 
-    matching->Stop();
     server->Stop();
     ioManager->Stop();
     return 0;

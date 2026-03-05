@@ -94,7 +94,7 @@ void Matching::MatchMaking()
     _activeRooms.push_back({ newRoom->GetId(), newRoom });
     _registerRoomToServerHandler(newRoom);
 
-    spdlog::info("matching: new matching complete room {}", uuids::to_string(newRoom->GetId()));
+    spdlog::info("matching: new matching complete room {}, active room ({})", uuids::to_string(newRoom->GetId()), _activeRooms.size());
 
     auto weakSelf(weak_from_this());
 
@@ -151,5 +151,5 @@ void Matching::RemoveRoom(std::shared_ptr<Room> removeRoom)
 
     _activeRooms.erase(it);
     _removeRoomFromServerHandler(removeRoom);
-    spdlog::info("matching: removed room {} from active rooms", uuids::to_string(removeId));
+    spdlog::info("matching: removed room {} from active rooms, active rooms count ({})", uuids::to_string(removeId), _activeRooms.size());
 }
