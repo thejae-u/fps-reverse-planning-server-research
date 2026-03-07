@@ -26,6 +26,7 @@ private:
     void OnMessage(const std::string& message);
     void StartMatchmakingTest(int count);
     void StopMatchmakingTest();
+    void StartUdpStressTest(int count, int packetSize);
 
     GLFWwindow* _window = nullptr;
     NetworkClient _networkClient;
@@ -33,9 +34,13 @@ private:
 
     char _host[128] = "127.0.0.1";
     int _port = 52800;
+    int _udpPort = 52801;
     int _testClientCount = 10;
+    int _udpPacketSize = 64;
 
-    char _messageToSend[256] = {0};
+    char _messageToSend[256] = "Test Message";
+    char _udpMessageToSend[256] = "UDP Test Message";
     std::vector<std::string> _receivedMessages;
     std::mutex _messagesMutex;
+    bool _useUdpForTest = false;
 };
