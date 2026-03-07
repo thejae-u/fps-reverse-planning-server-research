@@ -40,6 +40,7 @@ public:
 
 private:
     void ReceiveAsyncByUdp();
+    void ProcessPacketAsync(std::shared_ptr<std::vector<unsigned char>> data);
 
 private:
     std::shared_ptr<IOManager> _ioManager;

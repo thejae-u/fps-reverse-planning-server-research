@@ -86,8 +86,9 @@ void Server::AcceptAsync()
 
 void Server::ReceiveAsyncByUdp()
 {
-    std::array<char, BUF_SIZE> receiveBuffer;
-    _udpSocket.async_receive_from(asio::buffer(receiveBuffer), _udpEndpoint, [weakSelf = weak_from_this(), receiveBuffer](const std::error_code ec, const std::size_t bytesRead) {
+    auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
+    auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
+    _udpSocket.async_receive_from(asio::buffer(*receiveBuffer), *senderEndpoint, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code ec, const std::size_t bytesRead) {
         if(ec)
         {
             if(ec == asio::error::operation_aborted)
@@ -104,12 +105,51 @@ void Server::ReceiveAsyncByUdp()
             }
         }
 
+        if(bytesRead < sizeof(std::uint16_t))
+        {
+            spdlog::error("server: bad size received (size {})", bytesRead);
+            if(auto self = weakSelf.lock())
+                self->ReceiveAsyncByUdp();
+
+            return;
+        }
+
+        // first 2 bytes are data length header
+        std::uint16_t expectedSize;
+        std::memcpy(&expectedSize, receiveBuffer->data(), sizeof(expectedSize));
+        expectedSize = ntohs(expectedSize);
+
+        std::size_t realSize = bytesRead - sizeof(std::uint16_t);
+
+        if(expectedSize != realSize)
+        {
+            spdlog::error("server: bad data received (expected {}, real {})", expectedSize, realSize);
+            if(auto self = weakSelf.lock())
+                self->ReceiveAsyncByUdp();
+
+            return;
+        }
+
+        if(auto self = weakSelf.lock())
+        {
+            self->_ioManager->RegisterWork([weakSelf, receiveBuffer]() {
+                if(auto self = weakSelf.lock())
+                    self->ProcessPacketAsync(receiveBuffer);
+            });
+        }
+
         // send to room
         // client must have own room id and session id
 
         if(auto self = weakSelf.lock())
             self->ReceiveAsyncByUdp();
     });
+}
+
+void Server::ProcessPacketAsync(std::shared_ptr<std::vector<unsigned char>> data)
+{
+    std::string dataStr(data->begin(), data->end());
+    spdlog::info("server: receive ({})", dataStr);
 }
 
 void Server::AddRoom(std::shared_ptr<Room> room)
