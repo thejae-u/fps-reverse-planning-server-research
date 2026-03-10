@@ -2,6 +2,7 @@
   "name": "vcpkg",
   "version-string": "1.0.0",
   "dependencies": [
+    "protobuf",
     "asio",
     "spdlog",
     "stduuid"
