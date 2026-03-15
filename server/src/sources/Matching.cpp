@@ -14,13 +14,15 @@ void Matching::AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session
     });
 
     _waitingCv.notify_one();
+
+    session->Start();
 }
 
 void Matching::Start()
 {
     _isRunning = true;
 
-    _ioManager->RegisterWork([weakSelf = weak_from_this()]() {
+    _ioManager->RegisterAsyncWork([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
             self->MatchMaking();
     });
@@ -86,6 +88,7 @@ void Matching::MatchMaking()
         auto [nextSessionId, nextSession] = _waitingQueue.front();
         newRoom->AddSession(nextSessionId, nextSession);
         nextSession->SetRoom(newRoom->GetId());
+        nextSession->StartHandShaking();
 
         _waitingQueue.pop_front();
     }
@@ -102,7 +105,7 @@ void Matching::MatchMaking()
     if(auto self = weakSelf.lock())
     {
         // register MatchMaking function (lambda)
-        self->_ioManager->RegisterWork([weakSelf]() {
+        self->_ioManager->RegisterAsyncWork([weakSelf]() {
             if(auto self = weakSelf.lock())
             {
                 self->MatchMaking();

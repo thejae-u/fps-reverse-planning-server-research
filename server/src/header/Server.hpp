@@ -43,6 +43,9 @@ private:
     void ProcessPacketAsync(std::shared_ptr<std::vector<unsigned char>> data);
 
 private:
+    void UdpReceiveHandler(std::error_code ec, std::size_t bytesRead);
+
+private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<Matching> _matching;
 

@@ -12,7 +12,8 @@ int main()
 {
     spdlog::info("type 'quit' to stop server");
     auto threadCount = std::thread::hardware_concurrency() * 2;
-    auto ioManager = IOManager::Create("first manager", threadCount);
+    auto blockingThreadCount = std::thread::hardware_concurrency();
+    auto ioManager = IOManager::Create("first manager", threadCount, blockingThreadCount);
     auto matching = Matching::Create(ioManager);
     auto server = Server::Create(ioManager, matching, SERVER_PORT);
 

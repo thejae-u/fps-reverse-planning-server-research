@@ -6,19 +6,25 @@
 #include <spdlog/spdlog.h>
 #include <uuid.h>
 
+#include "IOManager.hpp"
+#include "Packet.pb.h"
+
+using namespace Protocol;
+
 class Session : public std::enable_shared_from_this<Session>
 {
 private:
     struct SecretKey {};
 
 public:
-    explicit Session(SecretKey, asio::io_context& io, uuids::uuid sessionId) : _socketPtr(std::make_shared<asio::ip::tcp::socket>(io)), _id(sessionId) {}
+    explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid sessionId, std::uint16_t udpPort)
+    : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _serverUdpPort(udpPort), _id(sessionId), _readSize(0), _readNetSize(0) {}
 
     ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
-    static std::shared_ptr<Session> Create(asio::io_context& io, uuids::uuid sessionId)
+    static std::shared_ptr<Session> Create(std::shared_ptr<IOManager> ioManager, uuids::uuid sessionId, std::uint16_t udpPort)
     {
-        auto newSession = std::make_shared<Session>(SecretKey{}, io, sessionId);
+        auto newSession = std::make_shared<Session>(SecretKey{}, ioManager, sessionId, udpPort);
         return newSession;
     }
 
@@ -29,6 +35,8 @@ public:
     void Start();
     void Stop();
 
+    void StartHandShaking();
+
     void SetRoom(uuids::uuid roomId);
 
     uuids::uuid GetId() const { return _id; }
@@ -38,7 +46,10 @@ public:
     void SetNotifyDisconnectCallback(NotifyDisconnectCallback callback);
 
 private:
+    std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<asio::ip::tcp::socket> _socketPtr;
+    std::uint16_t _serverUdpPort;
+    std::uint16_t _clientUdpPort;
 
     // Set by first handshaking
     uuids::uuid _id;
@@ -46,10 +57,15 @@ private:
 
     std::uint32_t _readSize;
     std::uint32_t _readNetSize;
-    std::string _readBuffer;
+    const std::uint16_t MAX_BUF_SIZE = 65535;
+    std::vector<unsigned char> _readBuffer;
 
     NotifyDisconnectCallback _disconnectCallback;
 
 private:
     void ReadAsync();
+    void SendAsync();
+
+    // Handshaking Functions
+    void ExchangeUdpPort();
 };
