@@ -161,6 +161,40 @@ void App::RenderUI()
 
     ImGui::End();
 
+    ImGui::Begin("Client List");
+    if (ImGui::BeginTable("ClientsTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+    {
+        ImGui::TableSetupColumn("Client");
+        ImGui::TableSetupColumn("Status");
+        ImGui::TableSetupColumn("UDP Port");
+        ImGui::TableHeadersRow();
+
+        // Main Client
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Main Client");
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextColored(_networkClient.IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
+                           _networkClient.IsConnected() ? "Connected" : "Disconnected");
+        ImGui::TableSetColumnIndex(2);
+        ImGui::Text("%u", _networkClient.GetClientUdpPort());
+
+        // Test Clients
+        for (size_t i = 0; i < _testClients.size(); ++i)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("Test Client [%zu]", i);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextColored(_testClients[i]->IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
+                               _testClients[i]->IsConnected() ? "Connected" : "Disconnected");
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%u", _testClients[i]->GetClientUdpPort());
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+
     ImGui::Begin("Received Messages");
     {
         std::lock_guard<std::mutex> lock(_messagesMutex);

@@ -9,6 +9,10 @@
 #include <string>
 #include <thread>
 
+#include "Packet.pb.h"
+
+using namespace Protocol;
+
 class NetworkClient
 {
 public:
@@ -18,6 +22,7 @@ public:
     void Connect(const std::string& host, uint16_t port);
     void Disconnect();
     bool IsConnected() const { return _connected; }
+    std::uint16_t GetClientUdpPort() const { return _clientUdpPort; }
 
     void Send(const std::string& message);
     void SendUdpCorrect(const std::string& message, const std::string& host, uint16_t port);
@@ -44,13 +49,18 @@ private:
     void AsyncReadUdp();
     void EnsureIOThreadStarted();
 
+    void Handshake();
+
     asio::io_context _ioContext;
     std::shared_ptr<asio::ip::tcp::socket> _socket;
     asio::ip::udp::socket _udpSocket;
     asio::ip::udp::endpoint _udpRemoteEndpoint;
-    std::unique_ptr<std::thread> _contextThread;
+
+    std::uint16_t _serverUdpPort = 0;
+    std::uint16_t _clientUdpPort = 0;
 
     bool _connected = false;
+    std::unique_ptr<std::thread> _contextThread;
     std::deque<LogMessage> _logs;
     mutable std::mutex _logMutex;
 
