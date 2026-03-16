@@ -7,8 +7,8 @@ Re-planning and implementing Overwatch's server system
 
 ## Environments
 - language : C++
-  - version : c++20
-- libraries : Asio, 
-- OS : Windows-first cross-platform
-- IDE : Visual Studio
-- Build Systems : CMake
+  - version : c++20↑
+- server libraries : Asio, Protobuf, spdlog, stduuid
+- OS : cross-platform
+- IDE : Visual Studio, Visual Studio Code
+- Build Systems : CMake with Ninja
