@@ -92,11 +92,11 @@ void Session::ExchangeUdpPort()
     std::error_code ec;
 
     // first send size
-    _socketPtr->send(asio::buffer(&netSize, sizeof(netSize)), 0, ec);
+    _socketPtr->write_some(asio::buffer(&netSize, sizeof(netSize)), ec);
 
     // send port data
     if(!ec)
-        _socketPtr->send(asio::buffer(sendData), 0, ec);
+        _socketPtr->write_some(asio::buffer(sendData), ec);
 
     // receive data size
     if(!ec)
@@ -118,7 +118,6 @@ void Session::ExchangeUdpPort()
 
         // disconnect immediately
         Stop();
-        _disconnectCallback(shared_from_this());
         return;
     }
 
@@ -127,7 +126,6 @@ void Session::ExchangeUdpPort()
     {
         spdlog::error("session {} error occured: failed parse data", uuids::to_string(_id));
         Stop();
-        _disconnectCallback(shared_from_this());
         return;
     }
 
