@@ -8,6 +8,7 @@ void Matching::AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session
     _waitingQueue.push_back({ waitSessionId, session });
     spdlog::info("matching: waiting queue is added {}", uuids::to_string(waitSessionId));
 
+    session->StartHandShaking();
     session->SetNotifyDisconnectCallback([weakSelf = weak_from_this()](const std::shared_ptr<Session>& removeSession) {
         if(auto self = weakSelf.lock())
             self->RemoveSession(removeSession);
@@ -77,7 +78,7 @@ void Matching::MatchMaking()
     }
 
     // Matching Sequence (match 10 sessions at the front)
-    auto newRoom = Room::Create(_uuidGen());
+    auto newRoom = Room::Create(_ioManager, _uuidGen());
     newRoom->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& removeRoom) {
         if(auto self = weakSelf.lock())
             self->RemoveRoom(removeRoom);
@@ -88,7 +89,6 @@ void Matching::MatchMaking()
         auto [nextSessionId, nextSession] = _waitingQueue.front();
         newRoom->AddSession(nextSessionId, nextSession);
         nextSession->SetRoom(newRoom->GetId());
-        nextSession->StartHandShaking();
 
         _waitingQueue.pop_front();
     }
