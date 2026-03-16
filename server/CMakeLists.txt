@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.10)
+cmake_minimum_required (VERSION 3.22)
 
 # 지원되는 경우 MSVC 컴파일러에 대해 핫 다시 로드 사용하도록 설정합니다.
 if (POLICY CMP0141)
@@ -8,7 +8,7 @@ endif()
 
 project ("reverse-planning")
 
-file(GLOB_RECURSE SOURCES "src/sources/*.cpp" "src/sources/*.c")
+file(GLOB_RECURSE SOURCES "src/sources/*.cpp" "src/sources/*.c" "src/sources/*.cc")
 file(GLOB_RECURSE HEADERS "src/header/*.h" "src/header/*.hpp")
 
 # 이 프로젝트의 실행 파일에 소스를 추가합니다.
@@ -27,6 +27,7 @@ endif()
 
 # TODO: 필요한 경우 테스트를 추가하고 대상을 설치합니다.
 
+find_package(protobuf CONFIG REQUIRED)
 find_package(asio CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(stduuid CONFIG REQUIRED)
@@ -47,6 +48,7 @@ else()
 endif()
 
 target_link_libraries(main PRIVATE 
+    protobuf::libprotobuf
     asio::asio 
     spdlog::spdlog_header_only 
     stduuid 

@@ -45,7 +45,9 @@ void Server::Stop()
 void Server::AcceptAsync()
 {
     auto weakSelf(weak_from_this());
-    auto newSession = Session::Create(_ioManager->GetIoContext(), _uuidGen());
+    auto newSession = Session::Create(_ioManager, _uuidGen(), _udpEndpoint.port());
+
+    // async accept new client
     _acceptor.async_accept(*newSession->GetSocket(), [weakSelf, newSession](std::error_code ec) {
         if(ec)
         {
@@ -60,6 +62,7 @@ void Server::AcceptAsync()
             return;
         }
 
+        // session information
         auto sessionAddrStr = newSession->GetEndpoint().address().to_string();
         auto sessionId = newSession->GetId();
 
@@ -73,10 +76,9 @@ void Server::AcceptAsync()
                 return;
             }
 
-            // push to match-making waiting queue
-            // move session ownership to Matching
-            self->_matching->AddWaitSession(sessionId, newSession);
-            newSession->Start();
+            // add to matchmaking queue
+            // move session ownership to Matching 
+            self->_matching->AddWaitSession(sessionId, std::move(newSession));
 
             // new session create for accept other client
             self->AcceptAsync();
@@ -132,7 +134,7 @@ void Server::ReceiveAsyncByUdp()
 
         if(auto self = weakSelf.lock())
         {
-            self->_ioManager->RegisterWork([weakSelf, receiveBuffer]() {
+            self->_ioManager->RegisterAsyncWork([weakSelf, receiveBuffer]() {
                 if(auto self = weakSelf.lock())
                     self->ProcessPacketAsync(receiveBuffer);
             });

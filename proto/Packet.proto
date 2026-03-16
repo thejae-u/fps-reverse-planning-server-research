@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package Protocol;
+
+enum PacketType {
+    // status response
+    Ok = 0;
+    InvalidData = 1;
+    ErrorOccured = 2;
+
+    // Tcp
+    PortHandshake = 100;
+    Ping = 101;
+
+    // Udp
+    Ingame = 200;
+    Autentication = 201;
+}
+
+enum IngameType {
+    IngameOk = 0;
+}
+
+enum AuthenticationType {
+    AuthenticationOk = 0;
+}
+
+message Packet{
+    PacketType type = 1;
+    string data = 2;
+}
+
+//message IngamePacket {
+//} 
+
+//message AutenticationPacket {
+//}

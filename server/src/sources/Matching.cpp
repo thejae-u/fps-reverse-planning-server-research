@@ -8,19 +8,22 @@ void Matching::AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session
     _waitingQueue.push_back({ waitSessionId, session });
     spdlog::info("matching: waiting queue is added {}", uuids::to_string(waitSessionId));
 
+    session->StartHandShaking();
     session->SetNotifyDisconnectCallback([weakSelf = weak_from_this()](const std::shared_ptr<Session>& removeSession) {
         if(auto self = weakSelf.lock())
             self->RemoveSession(removeSession);
     });
 
     _waitingCv.notify_one();
+
+    session->Start();
 }
 
 void Matching::Start()
 {
     _isRunning = true;
 
-    _ioManager->RegisterWork([weakSelf = weak_from_this()]() {
+    _ioManager->RegisterAsyncWork([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
             self->MatchMaking();
     });
@@ -75,7 +78,7 @@ void Matching::MatchMaking()
     }
 
     // Matching Sequence (match 10 sessions at the front)
-    auto newRoom = Room::Create(_uuidGen());
+    auto newRoom = Room::Create(_ioManager, _uuidGen());
     newRoom->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& removeRoom) {
         if(auto self = weakSelf.lock())
             self->RemoveRoom(removeRoom);
@@ -102,7 +105,7 @@ void Matching::MatchMaking()
     if(auto self = weakSelf.lock())
     {
         // register MatchMaking function (lambda)
-        self->_ioManager->RegisterWork([weakSelf]() {
+        self->_ioManager->RegisterAsyncWork([weakSelf]() {
             if(auto self = weakSelf.lock())
             {
                 self->MatchMaking();

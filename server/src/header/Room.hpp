@@ -16,7 +16,7 @@ private:
     struct SecretKey {};
 
 public:
-    Room(SecretKey, uuids::uuid roomId) : _roomId(roomId) {}
+    explicit Room(SecretKey, uuids::uuid roomId) : _roomId(roomId) {}
     ~Room()
     {
         spdlog::info("room {} destroyed", uuids::to_string(_roomId));
@@ -33,6 +33,7 @@ public:
     void AddSession(uuids::uuid sessionId, std::shared_ptr<Session> session);
     void RemoveSession(std::shared_ptr<Session> removeSession);
     void Broadcast(/*packet*/);
+
     uuids::uuid GetId()
     {
         return _roomId;

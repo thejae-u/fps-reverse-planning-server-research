@@ -1,8 +1,21 @@
 #include "NetworkClient.hpp"
 
-NetworkClient::NetworkClient() : _socket(std::make_shared<asio::ip::tcp::socket>(_ioContext)), _udpSocket(_ioContext, asio::ip::udp::v4())
+NetworkClient::NetworkClient() : _socket(std::make_shared<asio::ip::tcp::socket>(_ioContext)), _udpSocket(_ioContext)
 {
-    _udpSocket.set_option(asio::socket_base::reuse_address(true));
+    std::error_code ec;
+    _udpSocket.open(asio::ip::udp::v4(), ec);
+    if (ec) {
+        spdlog::error("Failed to open UDP socket: {}", ec.message());
+    } else {
+        _udpSocket.set_option(asio::socket_base::reuse_address(true));
+        _udpSocket.bind(asio::ip::udp::endpoint(asio::ip::udp::v4(), 0), ec);
+        if (ec) {
+            spdlog::error("Failed to bind UDP socket: {}", ec.message());
+        } else {
+            _clientUdpPort = _udpSocket.local_endpoint().port();
+            spdlog::info("Client UDP socket initialized on port {}", _clientUdpPort);
+        }
+    }
 }
 
 NetworkClient::~NetworkClient()
@@ -43,7 +56,12 @@ void NetworkClient::Connect(const std::string& host, uint16_t port)
             {
                 _connected = true;
                 AddLog("Connected to " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
-                AsyncRead(); // Start reading from server
+
+                // Start Handshake instead of AsyncRead directly
+                std::thread([this]() {
+                    Handshake();
+                })
+                .detach();
             }
             else
             {
@@ -77,10 +95,20 @@ void NetworkClient::Disconnect()
 
     // Create new sockets for next connection
     _socket = std::make_shared<asio::ip::tcp::socket>(_ioContext);
-    _udpSocket = asio::ip::udp::socket(_ioContext, asio::ip::udp::v4());
-    _udpSocket.set_option(asio::socket_base::reuse_address(true));
+    
+    // Re-initialize UDP socket
+    _udpSocket = asio::ip::udp::socket(_ioContext);
+    _udpSocket.open(asio::ip::udp::v4(), ec);
+    if (!ec) {
+        _udpSocket.set_option(asio::socket_base::reuse_address(true));
+        _udpSocket.bind(asio::ip::udp::endpoint(asio::ip::udp::v4(), 0), ec);
+        if (!ec) {
+            _clientUdpPort = _udpSocket.local_endpoint().port();
+        }
+    }
+    _serverUdpPort = 0;
 
-    AddLog("Disconnected");
+    AddLog("Disconnected. Re-initialized UDP Port: " + std::to_string(_clientUdpPort));
 }
 
 void NetworkClient::Send(const std::string& message)
@@ -245,4 +273,89 @@ void NetworkClient::AddLog(const std::string& msg, spdlog::level::level_enum lev
         _logs.pop_front();
     }
     spdlog::log(level, msg);
+}
+
+void NetworkClient::Handshake()
+{
+    AddLog("Handshake started...");
+
+    std::error_code ec;
+    
+    // Ensure UDP socket is bound and we have the port
+    if (!_udpSocket.is_open()) {
+        _udpSocket.open(asio::ip::udp::v4(), ec);
+    }
+    
+    _clientUdpPort = _udpSocket.local_endpoint().port();
+    if (_clientUdpPort == 0) {
+        _udpSocket.bind(asio::ip::udp::endpoint(asio::ip::udp::v4(), 0), ec);
+        _clientUdpPort = _udpSocket.local_endpoint().port();
+    }
+    
+    AddLog("Client UDP Port for handshake: " + std::to_string(_clientUdpPort));
+
+    // 1. Receive server's UDP port
+    uint16_t netSize;
+    asio::read(*_socket, asio::buffer(&netSize, sizeof(netSize)), ec);
+    if(ec)
+    {
+        AddLog("Handshake error (receive size): " + ec.message(), spdlog::level::err);
+        Disconnect();
+        return;
+    }
+
+    uint16_t size = ntohs(netSize);
+    std::vector<char> receiveData(size);
+    asio::read(*_socket, asio::buffer(receiveData), ec);
+    if(ec)
+    {
+        AddLog("Handshake error (receive data): " + ec.message(), spdlog::level::err);
+        Disconnect();
+        return;
+    }
+
+    Packet receivePacket;
+    if(!receivePacket.ParseFromArray(receiveData.data(), static_cast<int>(size)))
+    {
+        AddLog("Handshake error: Failed to parse server packet", spdlog::level::err);
+        Disconnect();
+        return;
+    }
+
+    if(receivePacket.type() != PacketType::PortHandshake)
+    {
+        AddLog("Handshake error: Unexpected packet type", spdlog::level::err);
+        Disconnect();
+        return;
+    }
+
+    _serverUdpPort = static_cast<uint16_t>(std::stoi(receivePacket.data()));
+    AddLog("Received Server UDP Port: " + std::to_string(_serverUdpPort));
+
+    // 2. Send client's UDP port
+    Packet sendPacket;
+    sendPacket.set_type(PacketType::PortHandshake);
+    sendPacket.set_data(std::to_string(_clientUdpPort));
+
+    std::string sendData;
+    sendPacket.SerializeToString(&sendData);
+
+    uint16_t sendNetSize = htons(static_cast<uint16_t>(sendData.size()));
+    asio::write(*_socket, asio::buffer(&sendNetSize, sizeof(sendNetSize)), ec);
+    if(!ec)
+    {
+        asio::write(*_socket, asio::buffer(sendData), ec);
+    }
+
+    if(ec)
+    {
+        AddLog("Handshake error (send): " + ec.message(), spdlog::level::err);
+        Disconnect();
+        return;
+    }
+
+    AddLog("Handshake success! Client UDP Port: " + std::to_string(_clientUdpPort));
+
+    // 3. Start normal async read
+    AsyncRead();
 }

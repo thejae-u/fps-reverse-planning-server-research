@@ -1,11 +1,13 @@
-﻿# client/CMakeLists.txt
-cmake_minimum_required (VERSION 3.10)
+# client/CMakeLists.txt
+cmake_minimum_required (VERSION 3.21)
+project(client)
 
 find_package(asio CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(stduuid CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
+find_package(protobuf CONFIG REQUIRED)
 
 if(WIN32)
     set(PLATFORM_LIBS Bcrypt)
@@ -16,11 +18,11 @@ else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(UUID REQUIRED uuid)
     set(PLATFORM_LIBS ${UUID_LIBRARIES})
-    target_include_directories(main PRIVATE ${UUID_INCLUDE_DIRS})
+    target_include_directories(client_main PRIVATE ${UUID_INCLUDE_DIRS})
 endif()
 
 # Source and Header files
-file(GLOB_RECURSE CLIENT_SOURCES "src/sources/*.cpp")
+file(GLOB_RECURSE CLIENT_SOURCES "src/sources/*.cpp" "src/sources/*.cc")
 file(GLOB_RECURSE CLIENT_HEADERS "src/header/*.hpp" "src/header/*.h")
 
 file(GLOB IMGUI_SOURCES
@@ -47,6 +49,7 @@ target_link_libraries(client_main PRIVATE
     stduuid
     glfw
     glad::glad
+    protobuf::libprotobuf
     ${PLATFORM_LIBS}
 )
 
