@@ -18,7 +18,8 @@ private:
 
 public:
     explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid sessionId, std::uint16_t udpPort)
-    : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _serverUdpPort(udpPort), _id(sessionId), _readSize(0), _readNetSize(0) {}
+    : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _serverUdpPort(udpPort), _clientUdpPort(0),
+        _id(sessionId), _readSize(0), _readNetSize(0) {}
 
     ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
