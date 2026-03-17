@@ -78,7 +78,7 @@ void Matching::MatchMaking()
     }
 
     // Matching Sequence (match 10 sessions at the front)
-    auto newRoom = Room::Create(_ioManager, _uuidGen());
+    auto newRoom = Room::Create(_uuidGen());
     newRoom->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& removeRoom) {
         if(auto self = weakSelf.lock())
             self->RemoveRoom(removeRoom);
