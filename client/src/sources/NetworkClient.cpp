@@ -1,4 +1,4 @@
-#include "NetworkClient.hpp"
+﻿#include "NetworkClient.hpp"
 
 NetworkClient::NetworkClient() : _socket(std::make_shared<asio::ip::tcp::socket>(_ioContext)), _udpSocket(_ioContext)
 {
@@ -107,6 +107,9 @@ void NetworkClient::Disconnect()
         }
     }
     _serverUdpPort = 0;
+    _roomId.clear();
+    _sessionId.clear();
+    _isMatching = false;
 
     AddLog("Disconnected. Re-initialized UDP Port: " + std::to_string(_clientUdpPort));
 }
@@ -116,10 +119,11 @@ void NetworkClient::Send(const std::string& message)
     if(!_connected)
         return;
 
-    uint32_t size = static_cast<uint32_t>(message.size());
-    std::vector<char> buffer(sizeof(size) + message.size());
-    std::memcpy(buffer.data(), &size, sizeof(size));
-    std::memcpy(buffer.data() + sizeof(size), message.data(), message.size());
+    uint16_t size = static_cast<uint16_t>(message.size());
+    uint16_t netSize = htons(size);
+    std::vector<char> buffer(sizeof(netSize) + message.size());
+    std::memcpy(buffer.data(), &netSize, sizeof(netSize));
+    std::memcpy(buffer.data() + sizeof(netSize), message.data(), message.size());
 
     asio::async_write(*_socket, asio::buffer(buffer), [this, buffer](std::error_code ec, std::size_t /*length*/) {
         if(ec)
@@ -209,21 +213,52 @@ void NetworkClient::SetUdpMessageCallback(MessageCallback callback)
 
 void NetworkClient::AsyncRead()
 {
-    // Read the size of the message
-    asio::async_read(*_socket, asio::buffer(&_readSize, sizeof(_readSize)), [this](std::error_code ec, std::size_t /*length*/) {
+    // Read the size of the message (2 bytes for uint16_t with ntohs)
+    asio::async_read(*_socket, asio::buffer(&_readNetSize, sizeof(_readNetSize)), [this](std::error_code ec, std::size_t /*length*/) {
         if(!ec)
         {
+            _readSize = ntohs(_readNetSize);
+
             // Now read the message content
             asio::async_read(*_socket, _readBuffer, asio::transfer_exactly(_readSize), [this](std::error_code ec, std::size_t length) {
                 if(!ec)
                 {
-                    std::string message(asio::buffers_begin(_readBuffer.data()), asio::buffers_begin(_readBuffer.data()) + length);
+                    std::string data(asio::buffers_begin(_readBuffer.data()), asio::buffers_begin(_readBuffer.data()) + length);
                     _readBuffer.consume(length);
 
-                    if(_messageCallback)
+                    Packet packet;
+                    if (packet.ParseFromString(data))
                     {
-                        _messageCallback(message);
+                        if (packet.type() == PacketType::InfoHandshake)
+                        {
+                            // Parse comma-separated "roomId,sessionId"
+                            std::string info = packet.data();
+                            size_t commaPos = info.find(',');
+                            if (commaPos != std::string::npos)
+                            {
+                                _roomId = info.substr(0, commaPos);
+                                _sessionId = info.substr(commaPos + 1);
+                                _isMatching = false;
+                                AddLog("Matching complete! Room: " + _roomId + ", Session: " + _sessionId);
+                            }
+                        }
+
+                        if (_messageCallback)
+                        {
+                            // For backward compatibility with UI displaying text, we can convert back or handle differently
+                            // For now, let's just pass the data or some representation
+                            _messageCallback(packet.data());
+                        }
                     }
+                    else
+                    {
+                        // Fallback if not a protobuf packet (e.g. raw text from some tests)
+                        if (_messageCallback)
+                        {
+                            _messageCallback(data);
+                        }
+                    }
+                    
                     AsyncRead(); // Read the next message
                 }
                 else

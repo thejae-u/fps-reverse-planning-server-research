@@ -24,6 +24,11 @@ public:
     bool IsConnected() const { return _connected; }
     std::uint16_t GetClientUdpPort() const { return _clientUdpPort; }
 
+    const std::string& GetRoomId() const { return _roomId; }
+    const std::string& GetSessionId() const { return _sessionId; }
+    bool IsMatching() const { return _isMatching; }
+    void SetMatching(bool matching) { _isMatching = matching; }
+
     void Send(const std::string& message);
     void SendUdpCorrect(const std::string& message, const std::string& host, uint16_t port);
     void SendUdpMalformed(const std::string& message, const std::string& host, uint16_t port, int errorType);
@@ -60,12 +65,17 @@ private:
     std::uint16_t _clientUdpPort = 0;
 
     bool _connected = false;
+    bool _isMatching = false;
+    std::string _roomId;
+    std::string _sessionId;
+
     std::unique_ptr<std::thread> _contextThread;
     std::deque<LogMessage> _logs;
     mutable std::mutex _logMutex;
 
     // Read-related members
-    uint32_t _readSize;
+    uint16_t _readNetSize;
+    uint16_t _readSize;
     asio::streambuf _readBuffer;
     MessageCallback _messageCallback;
     MessageCallback _udpMessageCallback;

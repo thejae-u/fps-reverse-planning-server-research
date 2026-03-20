@@ -1,4 +1,4 @@
-#include "App.hpp"
+﻿#include "App.hpp"
 
 App::App() {}
 
@@ -111,6 +111,7 @@ void App::RenderUI()
     }
     if(ImGui::Button("Send Match Request (111)"))
     {
+        _networkClient.SetMatching(true);
         _networkClient.Send("111");
     }
 
@@ -162,10 +163,13 @@ void App::RenderUI()
     ImGui::End();
 
     ImGui::Begin("Client List");
-    if (ImGui::BeginTable("ClientsTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+    if (ImGui::BeginTable("ClientsTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
     {
         ImGui::TableSetupColumn("Client");
         ImGui::TableSetupColumn("Status");
+        ImGui::TableSetupColumn("Match Status");
+        ImGui::TableSetupColumn("Room ID");
+        ImGui::TableSetupColumn("Session ID");
         ImGui::TableSetupColumn("UDP Port");
         ImGui::TableHeadersRow();
 
@@ -173,10 +177,30 @@ void App::RenderUI()
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         ImGui::Text("Main Client");
+
         ImGui::TableSetColumnIndex(1);
         ImGui::TextColored(_networkClient.IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
                            _networkClient.IsConnected() ? "Connected" : "Disconnected");
+
         ImGui::TableSetColumnIndex(2);
+        if (_networkClient.IsConnected()) {
+            if (_networkClient.IsMatching())
+                ImGui::TextColored(ImVec4(1, 1, 0, 1), "매칭 중");
+            else if (!_networkClient.GetRoomId().empty())
+                ImGui::TextColored(ImVec4(0, 1, 1, 1), "매칭 완료");
+            else
+                ImGui::Text("대기");
+        } else {
+            ImGui::Text("-");
+        }
+
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%s", _networkClient.GetRoomId().empty() ? "-" : _networkClient.GetRoomId().c_str());
+
+        ImGui::TableSetColumnIndex(4);
+        ImGui::Text("%s", _networkClient.GetSessionId().empty() ? "-" : _networkClient.GetSessionId().c_str());
+
+        ImGui::TableSetColumnIndex(5);
         ImGui::Text("%u", _networkClient.GetClientUdpPort());
 
         // Test Clients
@@ -185,10 +209,25 @@ void App::RenderUI()
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("Test Client [%zu]", i);
+            
             ImGui::TableSetColumnIndex(1);
             ImGui::TextColored(_testClients[i]->IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
                                _testClients[i]->IsConnected() ? "Connected" : "Disconnected");
+
             ImGui::TableSetColumnIndex(2);
+            if (_testClients[i]->IsConnected()) {
+                if (_testClients[i]->IsMatching()) ImGui::Text("Matching...");
+                else if (!_testClients[i]->GetRoomId().empty()) ImGui::Text("Matched");
+                else ImGui::Text("Wait...");
+            } else { ImGui::Text("-"); }
+
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%s", _testClients[i]->GetRoomId().empty() ? "-" : _testClients[i]->GetRoomId().substr(0, 8).c_str()); // 너무 길면 생략
+
+            ImGui::TableSetColumnIndex(4);
+            ImGui::Text("%s", _testClients[i]->GetSessionId().empty() ? "-" : _testClients[i]->GetSessionId().substr(0, 8).c_str());
+
+            ImGui::TableSetColumnIndex(5);
             ImGui::Text("%u", _testClients[i]->GetClientUdpPort());
         }
         ImGui::EndTable();
