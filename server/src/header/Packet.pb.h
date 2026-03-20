@@ -53,6 +53,9 @@ struct TableStruct_Packet_2eproto {
 extern const ::google::protobuf::internal::DescriptorTable
     descriptor_table_Packet_2eproto;
 namespace Protocol {
+class IngamePacket;
+struct IngamePacketDefaultTypeInternal;
+extern IngamePacketDefaultTypeInternal _IngamePacket_default_instance_;
 class Packet;
 struct PacketDefaultTypeInternal;
 extern PacketDefaultTypeInternal _Packet_default_instance_;
@@ -98,6 +101,10 @@ inline bool PacketType_Parse(absl::string_view name, PacketType* value) {
 }
 enum IngameType : int {
   IngameOk = 0,
+  Move = 1,
+  Jump = 2,
+  Shoot = 3,
+  Hit = 4,
   IngameType_INT_MIN_SENTINEL_DO_NOT_USE_ =
       std::numeric_limits<::int32_t>::min(),
   IngameType_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -107,8 +114,8 @@ enum IngameType : int {
 bool IngameType_IsValid(int value);
 extern const uint32_t IngameType_internal_data_[];
 constexpr IngameType IngameType_MIN = static_cast<IngameType>(0);
-constexpr IngameType IngameType_MAX = static_cast<IngameType>(0);
-constexpr int IngameType_ARRAYSIZE = 0 + 1;
+constexpr IngameType IngameType_MAX = static_cast<IngameType>(4);
+constexpr int IngameType_ARRAYSIZE = 4 + 1;
 const ::google::protobuf::EnumDescriptor*
 IngameType_descriptor();
 template <typename T>
@@ -121,7 +128,7 @@ const std::string& IngameType_Name(T value) {
 template <>
 inline const std::string& IngameType_Name(IngameType value) {
   return ::google::protobuf::internal::NameOfDenseEnum<IngameType_descriptor,
-                                                 0, 0>(
+                                                 0, 4>(
       static_cast<int>(value));
 }
 inline bool IngameType_Parse(absl::string_view name, IngameType* value) {
@@ -315,7 +322,7 @@ class Packet final : public ::google::protobuf::Message
     kDataFieldNumber = 2,
     kTypeFieldNumber = 1,
   };
-  // string data = 2;
+  // bytes data = 2;
   void clear_data() ;
   const std::string& data() const;
   template <typename Arg_ = const std::string&, typename... Args_>
@@ -347,7 +354,7 @@ class Packet final : public ::google::protobuf::Message
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<
       1, 2, 0,
-      28, 2>
+      0, 2>
       _table_;
 
   friend class ::google::protobuf::MessageLite;
@@ -366,6 +373,250 @@ class Packet final : public ::google::protobuf::Message
                           const Packet& from_msg);
     ::google::protobuf::internal::ArenaStringPtr data_;
     int type_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_Packet_2eproto;
+};
+// -------------------------------------------------------------------
+
+class IngamePacket final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:Protocol.IngamePacket) */ {
+ public:
+  inline IngamePacket() : IngamePacket(nullptr) {}
+  ~IngamePacket() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(IngamePacket* msg, std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(IngamePacket));
+  }
+#endif
+
+  template <typename = void>
+  explicit PROTOBUF_CONSTEXPR IngamePacket(
+      ::google::protobuf::internal::ConstantInitialized);
+
+  inline IngamePacket(const IngamePacket& from) : IngamePacket(nullptr, from) {}
+  inline IngamePacket(IngamePacket&& from) noexcept
+      : IngamePacket(nullptr, std::move(from)) {}
+  inline IngamePacket& operator=(const IngamePacket& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline IngamePacket& operator=(IngamePacket&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields()
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::google::protobuf::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::google::protobuf::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const IngamePacket& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const IngamePacket* internal_default_instance() {
+    return reinterpret_cast<const IngamePacket*>(
+        &_IngamePacket_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 1;
+  friend void swap(IngamePacket& a, IngamePacket& b) { a.Swap(&b); }
+  inline void Swap(IngamePacket* other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(IngamePacket* other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  IngamePacket* New(::google::protobuf::Arena* arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<IngamePacket>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const IngamePacket& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const IngamePacket& from) { IngamePacket::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(
+      ::google::protobuf::MessageLite& to_msg,
+      const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  static ::uint8_t* _InternalSerialize(
+      const MessageLite& msg, ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream);
+
+  public:
+  ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  ::size_t ByteSizeLong() const final;
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  int GetCachedSize() const { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(IngamePacket* other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(
+      ::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "Protocol.IngamePacket"; }
+
+ protected:
+  explicit IngamePacket(::google::protobuf::Arena* arena);
+  IngamePacket(::google::protobuf::Arena* arena, const IngamePacket& from);
+  IngamePacket(::google::protobuf::Arena* arena, IngamePacket&& from) noexcept
+      : IngamePacket(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* GetClassData() const PROTOBUF_FINAL;
+  static void* PlacementNew_(const void*, void* mem,
+                             ::google::protobuf::Arena* arena);
+  static constexpr auto InternalNewImpl_();
+  static const ::google::protobuf::internal::ClassDataFull _class_data_;
+
+ public:
+  ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kRoomIdFieldNumber = 1,
+    kSessionIdFieldNumber = 2,
+    kDataFieldNumber = 4,
+    kMethodFieldNumber = 3,
+  };
+  // bytes roomId = 1;
+  void clear_roomid() ;
+  const std::string& roomid() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_roomid(Arg_&& arg, Args_... args);
+  std::string* mutable_roomid();
+  PROTOBUF_NODISCARD std::string* release_roomid();
+  void set_allocated_roomid(std::string* value);
+
+  private:
+  const std::string& _internal_roomid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_roomid(
+      const std::string& value);
+  std::string* _internal_mutable_roomid();
+
+  public:
+  // bytes sessionId = 2;
+  void clear_sessionid() ;
+  const std::string& sessionid() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_sessionid(Arg_&& arg, Args_... args);
+  std::string* mutable_sessionid();
+  PROTOBUF_NODISCARD std::string* release_sessionid();
+  void set_allocated_sessionid(std::string* value);
+
+  private:
+  const std::string& _internal_sessionid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_sessionid(
+      const std::string& value);
+  std::string* _internal_mutable_sessionid();
+
+  public:
+  // bytes data = 4;
+  void clear_data() ;
+  const std::string& data() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_data(Arg_&& arg, Args_... args);
+  std::string* mutable_data();
+  PROTOBUF_NODISCARD std::string* release_data();
+  void set_allocated_data(std::string* value);
+
+  private:
+  const std::string& _internal_data() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_data(
+      const std::string& value);
+  std::string* _internal_mutable_data();
+
+  public:
+  // .Protocol.IngameType method = 3;
+  void clear_method() ;
+  ::Protocol::IngameType method() const;
+  void set_method(::Protocol::IngameType value);
+
+  private:
+  ::Protocol::IngameType _internal_method() const;
+  void _internal_set_method(::Protocol::IngameType value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:Protocol.IngamePacket)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<
+      2, 4, 0,
+      0, 2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(
+        ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena);
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena, const Impl_& from,
+                          const IngamePacket& from_msg);
+    ::google::protobuf::internal::ArenaStringPtr roomid_;
+    ::google::protobuf::internal::ArenaStringPtr sessionid_;
+    ::google::protobuf::internal::ArenaStringPtr data_;
+    int method_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -411,7 +662,7 @@ inline void Packet::_internal_set_type(::Protocol::PacketType value) {
   _impl_.type_ = value;
 }
 
-// string data = 2;
+// bytes data = 2;
 inline void Packet::clear_data() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.data_.ClearToEmpty();
@@ -425,7 +676,7 @@ template <typename Arg_, typename... Args_>
 inline PROTOBUF_ALWAYS_INLINE void Packet::set_data(Arg_&& arg,
                                                      Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.data_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  _impl_.data_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:Protocol.Packet.data)
 }
 inline std::string* Packet::mutable_data() ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -457,6 +708,176 @@ inline void Packet::set_allocated_data(std::string* value) {
     _impl_.data_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:Protocol.Packet.data)
+}
+
+// -------------------------------------------------------------------
+
+// IngamePacket
+
+// bytes sessionId = 2;
+inline void IngamePacket::clear_sessionid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.ClearToEmpty();
+}
+inline const std::string& IngamePacket::sessionid() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Protocol.IngamePacket.sessionId)
+  return _internal_sessionid();
+}
+template <typename Arg_, typename... Args_>
+inline PROTOBUF_ALWAYS_INLINE void IngamePacket::set_sessionid(Arg_&& arg,
+                                                     Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:Protocol.IngamePacket.sessionId)
+}
+inline std::string* IngamePacket::mutable_sessionid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_sessionid();
+  // @@protoc_insertion_point(field_mutable:Protocol.IngamePacket.sessionId)
+  return _s;
+}
+inline const std::string& IngamePacket::_internal_sessionid() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.sessionid_.Get();
+}
+inline void IngamePacket::_internal_set_sessionid(const std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.Set(value, GetArena());
+}
+inline std::string* IngamePacket::_internal_mutable_sessionid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.sessionid_.Mutable( GetArena());
+}
+inline std::string* IngamePacket::release_sessionid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:Protocol.IngamePacket.sessionId)
+  return _impl_.sessionid_.Release();
+}
+inline void IngamePacket::set_allocated_sessionid(std::string* value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.sessionid_.IsDefault()) {
+    _impl_.sessionid_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:Protocol.IngamePacket.sessionId)
+}
+
+// bytes roomId = 1;
+inline void IngamePacket::clear_roomid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.roomid_.ClearToEmpty();
+}
+inline const std::string& IngamePacket::roomid() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Protocol.IngamePacket.roomId)
+  return _internal_roomid();
+}
+template <typename Arg_, typename... Args_>
+inline PROTOBUF_ALWAYS_INLINE void IngamePacket::set_roomid(Arg_&& arg,
+                                                     Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.roomid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:Protocol.IngamePacket.roomId)
+}
+inline std::string* IngamePacket::mutable_roomid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_roomid();
+  // @@protoc_insertion_point(field_mutable:Protocol.IngamePacket.roomId)
+  return _s;
+}
+inline const std::string& IngamePacket::_internal_roomid() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.roomid_.Get();
+}
+inline void IngamePacket::_internal_set_roomid(const std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.roomid_.Set(value, GetArena());
+}
+inline std::string* IngamePacket::_internal_mutable_roomid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.roomid_.Mutable( GetArena());
+}
+inline std::string* IngamePacket::release_roomid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:Protocol.IngamePacket.roomId)
+  return _impl_.roomid_.Release();
+}
+inline void IngamePacket::set_allocated_roomid(std::string* value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.roomid_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.roomid_.IsDefault()) {
+    _impl_.roomid_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:Protocol.IngamePacket.roomId)
+}
+
+// .Protocol.IngameType method = 3;
+inline void IngamePacket::clear_method() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.method_ = 0;
+}
+inline ::Protocol::IngameType IngamePacket::method() const {
+  // @@protoc_insertion_point(field_get:Protocol.IngamePacket.method)
+  return _internal_method();
+}
+inline void IngamePacket::set_method(::Protocol::IngameType value) {
+  _internal_set_method(value);
+  // @@protoc_insertion_point(field_set:Protocol.IngamePacket.method)
+}
+inline ::Protocol::IngameType IngamePacket::_internal_method() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::Protocol::IngameType>(_impl_.method_);
+}
+inline void IngamePacket::_internal_set_method(::Protocol::IngameType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.method_ = value;
+}
+
+// bytes data = 4;
+inline void IngamePacket::clear_data() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.data_.ClearToEmpty();
+}
+inline const std::string& IngamePacket::data() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Protocol.IngamePacket.data)
+  return _internal_data();
+}
+template <typename Arg_, typename... Args_>
+inline PROTOBUF_ALWAYS_INLINE void IngamePacket::set_data(Arg_&& arg,
+                                                     Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.data_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:Protocol.IngamePacket.data)
+}
+inline std::string* IngamePacket::mutable_data() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_data();
+  // @@protoc_insertion_point(field_mutable:Protocol.IngamePacket.data)
+  return _s;
+}
+inline const std::string& IngamePacket::_internal_data() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.data_.Get();
+}
+inline void IngamePacket::_internal_set_data(const std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.data_.Set(value, GetArena());
+}
+inline std::string* IngamePacket::_internal_mutable_data() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.data_.Mutable( GetArena());
+}
+inline std::string* IngamePacket::release_data() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:Protocol.IngamePacket.data)
+  return _impl_.data_.Release();
+}
+inline void IngamePacket::set_allocated_data(std::string* value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.data_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.data_.IsDefault()) {
+    _impl_.data_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:Protocol.IngamePacket.data)
 }
 
 #ifdef __GNUC__

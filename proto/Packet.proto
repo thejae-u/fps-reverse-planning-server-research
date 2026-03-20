@@ -20,6 +20,10 @@ enum PacketType {
 
 enum IngameType {
     IngameOk = 0;
+    Move = 1;
+    Jump = 2;
+    Shoot = 3;
+    Hit = 4;
 }
 
 enum AuthenticationType {
@@ -28,11 +32,15 @@ enum AuthenticationType {
 
 message Packet{
     PacketType type = 1;
-    string data = 2;
+    bytes data = 2;
 }
 
-//message IngamePacket {
-//} 
+message IngamePacket {
+   bytes sessionId = 2;
+   bytes roomId = 1; 
+   IngameType method = 3;
+   bytes data = 4;
+} 
 
 //message AutenticationPacket {
 //}
