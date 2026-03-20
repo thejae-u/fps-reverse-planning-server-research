@@ -64,8 +64,9 @@ private:
     NotifyDisconnectCallback _disconnectCallback;
 
 private:
-    void ReadAsync();
-    void SendAsync();
+    void ReadSizeAsync();
+    void ReadDataAsync(const std::uint16_t& dataSize);
+    void SendAsync(const std::shared_ptr<Packet> data);
 
     // Handshaking Functions
     void ExchangeUdpPort();

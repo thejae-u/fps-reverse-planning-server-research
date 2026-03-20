@@ -37,7 +37,7 @@ void Room::RemoveSession(std::shared_ptr<Session> removeSession)
     _removeRoomFromMatchingHandler(shared_from_this());
 }
 
-void Room::Broadcast()
+void Room::Broadcast(std::shared_ptr<Packet> packet)
 {
     for(auto& [id, session] : _sessions)
     {

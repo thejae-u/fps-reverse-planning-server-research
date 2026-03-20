@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <uuid.h>
 
+#include "Packet.pb.h"
+using namespace Protocol;
+
 class Session;
 
 class Room : public std::enable_shared_from_this<Room>
@@ -32,9 +35,9 @@ public:
     void Stop();
     void AddSession(uuids::uuid sessionId, std::shared_ptr<Session> session);
     void RemoveSession(std::shared_ptr<Session> removeSession);
-    void Broadcast(/*packet*/);
+    void Broadcast(std::shared_ptr<Packet> packet);
 
-    uuids::uuid GetId()
+    uuids::uuid GetId() const
     {
         return _roomId;
     }
