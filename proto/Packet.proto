@@ -1,4 +1,4 @@
-syntax = "proto3";
+﻿syntax = "proto3";
 
 package Protocol;
 
@@ -10,7 +10,8 @@ enum PacketType {
 
     // Tcp
     PortHandshake = 100;
-    Ping = 101;
+    InfoHandshake = 101;
+    Ping = 102;
 
     // Udp
     Ingame = 200;

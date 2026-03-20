@@ -68,7 +68,8 @@ enum PacketType : int {
   InvalidData = 1,
   ErrorOccured = 2,
   PortHandshake = 100,
-  Ping = 101,
+  InfoHandshake = 101,
+  Ping = 102,
   Ingame = 200,
   Autentication = 201,
   PacketType_INT_MIN_SENTINEL_DO_NOT_USE_ =

@@ -83,18 +83,18 @@ const char descriptor_table_protodef_Packet_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     protodesc_cold) = {
     "\n\014Packet.proto\022\010Protocol\":\n\006Packet\022\"\n\004ty"
     "pe\030\001 \001(\0162\024.Protocol.PacketType\022\014\n\004data\030\002"
-    " \001(\t*u\n\nPacketType\022\006\n\002Ok\020\000\022\017\n\013InvalidDat"
-    "a\020\001\022\020\n\014ErrorOccured\020\002\022\021\n\rPortHandshake\020d"
-    "\022\010\n\004Ping\020e\022\013\n\006Ingame\020\310\001\022\022\n\rAutentication"
-    "\020\311\001*\032\n\nIngameType\022\014\n\010IngameOk\020\000**\n\022Authe"
-    "nticationType\022\024\n\020AuthenticationOk\020\000b\006pro"
-    "to3"
+    " \001(\t*\210\001\n\nPacketType\022\006\n\002Ok\020\000\022\017\n\013InvalidDa"
+    "ta\020\001\022\020\n\014ErrorOccured\020\002\022\021\n\rPortHandshake\020"
+    "d\022\021\n\rInfoHandshake\020e\022\010\n\004Ping\020f\022\013\n\006Ingame"
+    "\020\310\001\022\022\n\rAutentication\020\311\001*\032\n\nIngameType\022\014\n"
+    "\010IngameOk\020\000**\n\022AuthenticationType\022\024\n\020Aut"
+    "henticationOk\020\000b\006proto3"
 };
 static ::absl::once_flag descriptor_table_Packet_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_Packet_2eproto = {
     false,
     false,
-    283,
+    303,
     descriptor_table_protodef_Packet_2eproto,
     "Packet.proto",
     &descriptor_table_Packet_2eproto_once,
@@ -113,7 +113,7 @@ const ::google::protobuf::EnumDescriptor* PacketType_descriptor() {
   return file_level_enum_descriptors_Packet_2eproto[0];
 }
 PROTOBUF_CONSTINIT const uint32_t PacketType_internal_data_[] = {
-    196608u, 262144u, 200u, 101u, 201u, 100u, };
+    196608u, 327680u, 200u, 101u, 201u, 100u, 102u, };
 bool PacketType_IsValid(int value) {
   return ::_pbi::ValidateEnum(value, PacketType_internal_data_);
 }
