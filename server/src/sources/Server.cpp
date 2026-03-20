@@ -132,26 +132,56 @@ void Server::ReceiveAsyncByUdp()
             return;
         }
 
-        if(auto self = weakSelf.lock())
-        {
-            self->_ioManager->RegisterAsyncWork([weakSelf, receiveBuffer]() {
-                if(auto self = weakSelf.lock())
-                    self->ProcessPacketAsync(receiveBuffer);
-            });
-        }
+        const unsigned char* realData = receiveBuffer->data() + 2;
 
         // send to room
         // client must have own room id and session id
+        if(auto self = weakSelf.lock())
+        {
+            self->_ioManager->RegisterAsyncWork([weakSelf, receiveBuffer, realData, realSize]() {
+                if(auto self = weakSelf.lock())
+                    self->ProcessPacketAsync(realSize, realData);
+            });
+        }
 
         if(auto self = weakSelf.lock())
             self->ReceiveAsyncByUdp();
     });
 }
 
-void Server::ProcessPacketAsync(std::shared_ptr<std::vector<unsigned char>> data)
+void Server::ProcessPacketAsync(std::uint16_t size, const unsigned char* data)
 {
-    std::string dataStr(data->begin(), data->end());
-    spdlog::info("server: receive ({})", dataStr);
+    Packet packet;
+    if(!packet.ParseFromArray(data, size))
+    {
+        spdlog::error("server: parsing udp real data error");
+        return;
+    }
+
+    if(packet.type() != PacketType::Ingame)
+    {
+        spdlog::error("server: invalid packet income");
+        return;
+    }
+
+    auto ingamePacket = std::make_shared<IngamePacket>();
+    if(!ingamePacket->ParseFromString(packet.data()))
+    {
+        spdlog::error("server: parsing ingame packet error");
+        return;
+    }
+
+    auto roomId = uuids::uuid::from_string(ingamePacket->roomid());
+
+    std::lock_guard<std::mutex> roomsLock(_roomsMutex);
+    if(auto room = _rooms.find(roomId.value()); room != _rooms.end())
+    {
+        room->second->EnqueuePacket(std::move(ingamePacket));
+        return;
+    }
+
+    spdlog::error("server: invalid room id ({})", ingamePacket->roomid());
+    return;
 }
 
 void Server::AddRoom(std::shared_ptr<Room> room)

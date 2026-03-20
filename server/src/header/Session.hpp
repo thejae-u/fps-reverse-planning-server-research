@@ -2,7 +2,10 @@
 
 #include <asio.hpp>
 #include <functional>
+#include <queue>
 #include <memory>
+#include <mutex>
+#include <condition_variable>
 #include <spdlog/spdlog.h>
 #include <uuid.h>
 
@@ -19,7 +22,7 @@ private:
 public:
     explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid sessionId, std::uint16_t udpPort)
     : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _serverUdpPort(udpPort), _clientUdpPort(0),
-        _id(sessionId), _readSize(0), _readNetSize(0) {}
+      _id(sessionId), _readSize(0), _readNetSize(0) {}
 
     ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
@@ -63,10 +66,18 @@ private:
 
     NotifyDisconnectCallback _disconnectCallback;
 
+    std::queue<std::shared_ptr<Packet>> _sendQueue;
+    std::mutex _sendQueueMutex;
+    std::condition_variable _sendQueueCv;
+
+public:
+    void EnqueueSendPacket(const std::shared_ptr<Packet> data);
+    void DequeueSendPacket();
+
 private:
+    void SendAsync(const std::shared_ptr<Packet> data);
     void ReadSizeAsync();
     void ReadDataAsync(const std::uint16_t& dataSize);
-    void SendAsync(const std::shared_ptr<Packet> data);
 
     // Handshaking Functions
     void ExchangeUdpPort();

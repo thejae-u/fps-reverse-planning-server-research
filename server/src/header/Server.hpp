@@ -40,10 +40,7 @@ public:
 
 private:
     void ReceiveAsyncByUdp();
-    void ProcessPacketAsync(std::shared_ptr<std::vector<unsigned char>> data);
-
-private:
-    void UdpReceiveHandler(std::error_code ec, std::size_t bytesRead);
+    void ProcessPacketAsync(std::uint16_t size, const unsigned char* data);
 
 private:
     std::shared_ptr<IOManager> _ioManager;

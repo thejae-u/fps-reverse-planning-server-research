@@ -108,6 +108,34 @@ void Session::ReadDataAsync(const std::uint16_t& dataSize)
     });
 }
 
+void Session::EnqueueSendPacket(const std::shared_ptr<Packet> data)
+{
+    std::lock_guard<std::mutex> sendQueueLock(_sendQueueMutex);
+    _sendQueue.push(data);
+
+    _sendQueueCv.notify_one();
+}
+
+void Session::DequeueSendPacket()
+{
+    std::unique_lock<std::mutex> sendQueueLock(_sendQueueMutex);
+    _sendQueueCv.wait(sendQueueLock, [&] {
+        return !_sendQueue.empty();
+    });
+
+    auto packet = _sendQueue.front();
+    _sendQueue.pop();
+
+    SendAsync(std::move(packet));
+
+    _ioManager->RegisterBlockingWork([weakSelf = weak_from_this()]() {
+        if (auto self = weakSelf.lock())
+        {
+            self->DequeueSendPacket();
+        }
+    });
+}
+
 void Session::SendAsync(const std::shared_ptr<Packet> packet)
 {
     // 1. serialize packet
@@ -227,4 +255,10 @@ void Session::ExchangeUdpPort()
 
     // Tcp read open
     ReadSizeAsync();
+
+    // send work register
+    _ioManager->RegisterBlockingWork([weakSelf = weak_from_this()]() {
+        if(auto self = weakSelf.lock())
+            self->DequeueSendPacket(); 
+    });
 }
