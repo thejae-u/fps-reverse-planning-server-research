@@ -28,6 +28,7 @@ enum IngameType {
 
 enum AuthenticationType {
     AuthenticationOk = 0;
+    UdpHolePunching = 1;
 }
 
 message Packet{
@@ -36,11 +37,15 @@ message Packet{
 }
 
 message IngamePacket {
-   bytes sessionId = 2;
-   bytes roomId = 1; 
+   bytes sessionId = 1;
+   bytes roomId = 2; 
    IngameType method = 3;
    bytes data = 4;
 } 
 
-//message AutenticationPacket {
-//}
+message AuthenticationPacket {
+    bytes sessionId = 1;
+    bytes roomId = 2;
+    AuthenticationType method = 3;
+    bytes data = 4;
+}

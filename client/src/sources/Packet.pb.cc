@@ -56,10 +56,10 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 
 inline constexpr IngamePacket::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
-      : roomid_(
+      : sessionid_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        sessionid_(
+        roomid_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         data_(
@@ -87,6 +87,40 @@ struct IngamePacketDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 IngamePacketDefaultTypeInternal _IngamePacket_default_instance_;
+
+inline constexpr AuthenticationPacket::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : sessionid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        roomid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        data_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        method_{static_cast< ::Protocol::AuthenticationType >(0)},
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR AuthenticationPacket::AuthenticationPacket(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct AuthenticationPacketDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR AuthenticationPacketDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~AuthenticationPacketDefaultTypeInternal() {}
+  union {
+    AuthenticationPacket _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 AuthenticationPacketDefaultTypeInternal _AuthenticationPacket_default_instance_;
 }  // namespace Protocol
 static const ::_pb::EnumDescriptor* file_level_enum_descriptors_Packet_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor**
@@ -116,43 +150,60 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::Protocol::IngamePacket, _impl_.roomid_),
         PROTOBUF_FIELD_OFFSET(::Protocol::IngamePacket, _impl_.method_),
         PROTOBUF_FIELD_OFFSET(::Protocol::IngamePacket, _impl_.data_),
+        ~0u,  // no _has_bits_
+        PROTOBUF_FIELD_OFFSET(::Protocol::AuthenticationPacket, _internal_metadata_),
+        ~0u,  // no _extensions_
+        ~0u,  // no _oneof_case_
+        ~0u,  // no _weak_field_map_
+        ~0u,  // no _inlined_string_donated_
+        ~0u,  // no _split_
+        ~0u,  // no sizeof(Split)
+        PROTOBUF_FIELD_OFFSET(::Protocol::AuthenticationPacket, _impl_.sessionid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::AuthenticationPacket, _impl_.roomid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::AuthenticationPacket, _impl_.method_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::AuthenticationPacket, _impl_.data_),
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, -1, -1, sizeof(::Protocol::Packet)},
         {10, -1, -1, sizeof(::Protocol::IngamePacket)},
+        {22, -1, -1, sizeof(::Protocol::AuthenticationPacket)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
     &::Protocol::_Packet_default_instance_._instance,
     &::Protocol::_IngamePacket_default_instance_._instance,
+    &::Protocol::_AuthenticationPacket_default_instance_._instance,
 };
 const char descriptor_table_protodef_Packet_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\014Packet.proto\022\010Protocol\":\n\006Packet\022\"\n\004ty"
     "pe\030\001 \001(\0162\024.Protocol.PacketType\022\014\n\004data\030\002"
-    " \001(\014\"e\n\014IngamePacket\022\021\n\tsessionId\030\002 \001(\014\022"
-    "\016\n\006roomId\030\001 \001(\014\022$\n\006method\030\003 \001(\0162\024.Protoc"
-    "ol.IngameType\022\014\n\004data\030\004 \001(\014*\210\001\n\nPacketTy"
-    "pe\022\006\n\002Ok\020\000\022\017\n\013InvalidData\020\001\022\020\n\014ErrorOccu"
-    "red\020\002\022\021\n\rPortHandshake\020d\022\021\n\rInfoHandshak"
-    "e\020e\022\010\n\004Ping\020f\022\013\n\006Ingame\020\310\001\022\022\n\rAutenticat"
-    "ion\020\311\001*B\n\nIngameType\022\014\n\010IngameOk\020\000\022\010\n\004Mo"
-    "ve\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003Hit\020\004**\n\022Au"
-    "thenticationType\022\024\n\020AuthenticationOk\020\000b\006"
-    "proto3"
+    " \001(\014\"e\n\014IngamePacket\022\021\n\tsessionId\030\001 \001(\014\022"
+    "\016\n\006roomId\030\002 \001(\014\022$\n\006method\030\003 \001(\0162\024.Protoc"
+    "ol.IngameType\022\014\n\004data\030\004 \001(\014\"u\n\024Authentic"
+    "ationPacket\022\021\n\tsessionId\030\001 \001(\014\022\016\n\006roomId"
+    "\030\002 \001(\014\022,\n\006method\030\003 \001(\0162\034.Protocol.Authen"
+    "ticationType\022\014\n\004data\030\004 \001(\014*\210\001\n\nPacketTyp"
+    "e\022\006\n\002Ok\020\000\022\017\n\013InvalidData\020\001\022\020\n\014ErrorOccur"
+    "ed\020\002\022\021\n\rPortHandshake\020d\022\021\n\rInfoHandshake"
+    "\020e\022\010\n\004Ping\020f\022\013\n\006Ingame\020\310\001\022\022\n\rAutenticati"
+    "on\020\311\001*B\n\nIngameType\022\014\n\010IngameOk\020\000\022\010\n\004Mov"
+    "e\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003Hit\020\004*\?\n\022Aut"
+    "henticationType\022\024\n\020AuthenticationOk\020\000\022\023\n"
+    "\017UdpHolePunching\020\001b\006proto3"
 };
 static ::absl::once_flag descriptor_table_Packet_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_Packet_2eproto = {
     false,
     false,
-    446,
+    586,
     descriptor_table_protodef_Packet_2eproto,
     "Packet.proto",
     &descriptor_table_Packet_2eproto_once,
     nullptr,
     0,
-    2,
+    3,
     schemas,
     file_default_instances,
     TableStruct_Packet_2eproto::offsets,
@@ -183,9 +234,9 @@ const ::google::protobuf::EnumDescriptor* AuthenticationType_descriptor() {
   return file_level_enum_descriptors_Packet_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t AuthenticationType_internal_data_[] = {
-    65536u, 0u, };
+    131072u, 0u, };
 bool AuthenticationType_IsValid(int value) {
-  return 0 <= value && value <= 0;
+  return 0 <= value && value <= 1;
 }
 // ===================================================================
 
@@ -457,8 +508,8 @@ IngamePacket::IngamePacket(::google::protobuf::Arena* arena)
 inline PROTOBUF_NDEBUG_INLINE IngamePacket::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
     const Impl_& from, const ::Protocol::IngamePacket& from_msg)
-      : roomid_(arena, from.roomid_),
-        sessionid_(arena, from.sessionid_),
+      : sessionid_(arena, from.sessionid_),
+        roomid_(arena, from.roomid_),
         data_(arena, from.data_),
         _cached_size_{0} {}
 
@@ -482,8 +533,8 @@ IngamePacket::IngamePacket(
 inline PROTOBUF_NDEBUG_INLINE IngamePacket::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : roomid_(arena),
-        sessionid_(arena),
+      : sessionid_(arena),
+        roomid_(arena),
         data_(arena),
         _cached_size_{0} {}
 
@@ -499,8 +550,8 @@ inline void IngamePacket::SharedDtor(MessageLite& self) {
   IngamePacket& this_ = static_cast<IngamePacket&>(self);
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.roomid_.Destroy();
   this_._impl_.sessionid_.Destroy();
+  this_._impl_.roomid_.Destroy();
   this_._impl_.data_.Destroy();
   this_._impl_.~Impl_();
 }
@@ -562,23 +613,23 @@ const ::_pbi::TcParseTable<2, 4, 0, 0, 2> IngamePacket::_table_ = {
     // bytes data = 4;
     {::_pbi::TcParser::FastBS1,
      {34, 63, 0, PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.data_)}},
-    // bytes roomId = 1;
+    // bytes sessionId = 1;
     {::_pbi::TcParser::FastBS1,
-     {10, 63, 0, PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.roomid_)}},
-    // bytes sessionId = 2;
+     {10, 63, 0, PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.sessionid_)}},
+    // bytes roomId = 2;
     {::_pbi::TcParser::FastBS1,
-     {18, 63, 0, PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.sessionid_)}},
+     {18, 63, 0, PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.roomid_)}},
     // .Protocol.IngameType method = 3;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(IngamePacket, _impl_.method_), 63>(),
      {24, 63, 0, PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.method_)}},
   }}, {{
     65535, 65535
   }}, {{
-    // bytes roomId = 1;
-    {PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.roomid_), 0, 0,
-    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
-    // bytes sessionId = 2;
+    // bytes sessionId = 1;
     {PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.sessionid_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
+    // bytes roomId = 2;
+    {PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.roomid_), 0, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
     // .Protocol.IngameType method = 3;
     {PROTOBUF_FIELD_OFFSET(IngamePacket, _impl_.method_), 0, 0,
@@ -599,8 +650,8 @@ PROTOBUF_NOINLINE void IngamePacket::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.roomid_.ClearToEmpty();
   _impl_.sessionid_.ClearToEmpty();
+  _impl_.roomid_.ClearToEmpty();
   _impl_.data_.ClearToEmpty();
   _impl_.method_ = 0;
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -621,15 +672,15 @@ PROTOBUF_NOINLINE void IngamePacket::Clear() {
           ::uint32_t cached_has_bits = 0;
           (void)cached_has_bits;
 
-          // bytes roomId = 1;
-          if (!this_._internal_roomid().empty()) {
-            const std::string& _s = this_._internal_roomid();
+          // bytes sessionId = 1;
+          if (!this_._internal_sessionid().empty()) {
+            const std::string& _s = this_._internal_sessionid();
             target = stream->WriteBytesMaybeAliased(1, _s, target);
           }
 
-          // bytes sessionId = 2;
-          if (!this_._internal_sessionid().empty()) {
-            const std::string& _s = this_._internal_sessionid();
+          // bytes roomId = 2;
+          if (!this_._internal_roomid().empty()) {
+            const std::string& _s = this_._internal_roomid();
             target = stream->WriteBytesMaybeAliased(2, _s, target);
           }
 
@@ -671,15 +722,15 @@ PROTOBUF_NOINLINE void IngamePacket::Clear() {
 
           ::_pbi::Prefetch5LinesFrom7Lines(&this_);
            {
-            // bytes roomId = 1;
-            if (!this_._internal_roomid().empty()) {
-              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
-                                              this_._internal_roomid());
-            }
-            // bytes sessionId = 2;
+            // bytes sessionId = 1;
             if (!this_._internal_sessionid().empty()) {
               total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
                                               this_._internal_sessionid());
+            }
+            // bytes roomId = 2;
+            if (!this_._internal_roomid().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_roomid());
             }
             // bytes data = 4;
             if (!this_._internal_data().empty()) {
@@ -704,11 +755,11 @@ void IngamePacket::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::go
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (!from._internal_roomid().empty()) {
-    _this->_internal_set_roomid(from._internal_roomid());
-  }
   if (!from._internal_sessionid().empty()) {
     _this->_internal_set_sessionid(from._internal_sessionid());
+  }
+  if (!from._internal_roomid().empty()) {
+    _this->_internal_set_roomid(from._internal_roomid());
   }
   if (!from._internal_data().empty()) {
     _this->_internal_set_data(from._internal_data());
@@ -732,13 +783,315 @@ void IngamePacket::InternalSwap(IngamePacket* PROTOBUF_RESTRICT other) {
   auto* arena = GetArena();
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.roomid_, &other->_impl_.roomid_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.sessionid_, &other->_impl_.sessionid_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.roomid_, &other->_impl_.roomid_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.data_, &other->_impl_.data_, arena);
   swap(_impl_.method_, other->_impl_.method_);
 }
 
 ::google::protobuf::Metadata IngamePacket::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class AuthenticationPacket::_Internal {
+ public:
+};
+
+AuthenticationPacket::AuthenticationPacket(::google::protobuf::Arena* arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:Protocol.AuthenticationPacket)
+}
+inline PROTOBUF_NDEBUG_INLINE AuthenticationPacket::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
+    const Impl_& from, const ::Protocol::AuthenticationPacket& from_msg)
+      : sessionid_(arena, from.sessionid_),
+        roomid_(arena, from.roomid_),
+        data_(arena, from.data_),
+        _cached_size_{0} {}
+
+AuthenticationPacket::AuthenticationPacket(
+    ::google::protobuf::Arena* arena,
+    const AuthenticationPacket& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  AuthenticationPacket* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.method_ = from._impl_.method_;
+
+  // @@protoc_insertion_point(copy_constructor:Protocol.AuthenticationPacket)
+}
+inline PROTOBUF_NDEBUG_INLINE AuthenticationPacket::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility,
+    ::google::protobuf::Arena* arena)
+      : sessionid_(arena),
+        roomid_(arena),
+        data_(arena),
+        _cached_size_{0} {}
+
+inline void AuthenticationPacket::SharedCtor(::_pb::Arena* arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.method_ = {};
+}
+AuthenticationPacket::~AuthenticationPacket() {
+  // @@protoc_insertion_point(destructor:Protocol.AuthenticationPacket)
+  SharedDtor(*this);
+}
+inline void AuthenticationPacket::SharedDtor(MessageLite& self) {
+  AuthenticationPacket& this_ = static_cast<AuthenticationPacket&>(self);
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.sessionid_.Destroy();
+  this_._impl_.roomid_.Destroy();
+  this_._impl_.data_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* AuthenticationPacket::PlacementNew_(const void*, void* mem,
+                                        ::google::protobuf::Arena* arena) {
+  return ::new (mem) AuthenticationPacket(arena);
+}
+constexpr auto AuthenticationPacket::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(AuthenticationPacket),
+                                            alignof(AuthenticationPacket));
+}
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::google::protobuf::internal::ClassDataFull AuthenticationPacket::_class_data_ = {
+    ::google::protobuf::internal::ClassData{
+        &_AuthenticationPacket_default_instance_._instance,
+        &_table_.header,
+        nullptr,  // OnDemandRegisterArenaDtor
+        nullptr,  // IsInitialized
+        &AuthenticationPacket::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<AuthenticationPacket>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        &AuthenticationPacket::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<AuthenticationPacket>(), &AuthenticationPacket::ByteSizeLong,
+            &AuthenticationPacket::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+        PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_._cached_size_),
+        false,
+    },
+    &AuthenticationPacket::kDescriptorMethods,
+    &descriptor_table_Packet_2eproto,
+    nullptr,  // tracker
+};
+const ::google::protobuf::internal::ClassData* AuthenticationPacket::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
+  return _class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 0, 2> AuthenticationPacket::_table_ = {
+  {
+    0,  // no _has_bits_
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    _class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::Protocol::AuthenticationPacket>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // bytes data = 4;
+    {::_pbi::TcParser::FastBS1,
+     {34, 63, 0, PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.data_)}},
+    // bytes sessionId = 1;
+    {::_pbi::TcParser::FastBS1,
+     {10, 63, 0, PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.sessionid_)}},
+    // bytes roomId = 2;
+    {::_pbi::TcParser::FastBS1,
+     {18, 63, 0, PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.roomid_)}},
+    // .Protocol.AuthenticationType method = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(AuthenticationPacket, _impl_.method_), 63>(),
+     {24, 63, 0, PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.method_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bytes sessionId = 1;
+    {PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.sessionid_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
+    // bytes roomId = 2;
+    {PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.roomid_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
+    // .Protocol.AuthenticationType method = 3;
+    {PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.method_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kOpenEnum)},
+    // bytes data = 4;
+    {PROTOBUF_FIELD_OFFSET(AuthenticationPacket, _impl_.data_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+
+PROTOBUF_NOINLINE void AuthenticationPacket::Clear() {
+// @@protoc_insertion_point(message_clear_start:Protocol.AuthenticationPacket)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.sessionid_.ClearToEmpty();
+  _impl_.roomid_.ClearToEmpty();
+  _impl_.data_.ClearToEmpty();
+  _impl_.method_ = 0;
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::uint8_t* AuthenticationPacket::_InternalSerialize(
+            const MessageLite& base, ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) {
+          const AuthenticationPacket& this_ = static_cast<const AuthenticationPacket&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::uint8_t* AuthenticationPacket::_InternalSerialize(
+            ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+          const AuthenticationPacket& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(serialize_to_array_start:Protocol.AuthenticationPacket)
+          ::uint32_t cached_has_bits = 0;
+          (void)cached_has_bits;
+
+          // bytes sessionId = 1;
+          if (!this_._internal_sessionid().empty()) {
+            const std::string& _s = this_._internal_sessionid();
+            target = stream->WriteBytesMaybeAliased(1, _s, target);
+          }
+
+          // bytes roomId = 2;
+          if (!this_._internal_roomid().empty()) {
+            const std::string& _s = this_._internal_roomid();
+            target = stream->WriteBytesMaybeAliased(2, _s, target);
+          }
+
+          // .Protocol.AuthenticationType method = 3;
+          if (this_._internal_method() != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteEnumToArray(
+                3, this_._internal_method(), target);
+          }
+
+          // bytes data = 4;
+          if (!this_._internal_data().empty()) {
+            const std::string& _s = this_._internal_data();
+            target = stream->WriteBytesMaybeAliased(4, _s, target);
+          }
+
+          if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+            target =
+                ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+                    this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+          }
+          // @@protoc_insertion_point(serialize_to_array_end:Protocol.AuthenticationPacket)
+          return target;
+        }
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::size_t AuthenticationPacket::ByteSizeLong(const MessageLite& base) {
+          const AuthenticationPacket& this_ = static_cast<const AuthenticationPacket&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::size_t AuthenticationPacket::ByteSizeLong() const {
+          const AuthenticationPacket& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(message_byte_size_start:Protocol.AuthenticationPacket)
+          ::size_t total_size = 0;
+
+          ::uint32_t cached_has_bits = 0;
+          // Prevent compiler warnings about cached_has_bits being unused
+          (void)cached_has_bits;
+
+          ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+           {
+            // bytes sessionId = 1;
+            if (!this_._internal_sessionid().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_sessionid());
+            }
+            // bytes roomId = 2;
+            if (!this_._internal_roomid().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_roomid());
+            }
+            // bytes data = 4;
+            if (!this_._internal_data().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_data());
+            }
+            // .Protocol.AuthenticationType method = 3;
+            if (this_._internal_method() != 0) {
+              total_size += 1 +
+                            ::_pbi::WireFormatLite::EnumSize(this_._internal_method());
+            }
+          }
+          return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                                     &this_._impl_._cached_size_);
+        }
+
+void AuthenticationPacket::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<AuthenticationPacket*>(&to_msg);
+  auto& from = static_cast<const AuthenticationPacket&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:Protocol.AuthenticationPacket)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_sessionid().empty()) {
+    _this->_internal_set_sessionid(from._internal_sessionid());
+  }
+  if (!from._internal_roomid().empty()) {
+    _this->_internal_set_roomid(from._internal_roomid());
+  }
+  if (!from._internal_data().empty()) {
+    _this->_internal_set_data(from._internal_data());
+  }
+  if (from._internal_method() != 0) {
+    _this->_impl_.method_ = from._impl_.method_;
+  }
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void AuthenticationPacket::CopyFrom(const AuthenticationPacket& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:Protocol.AuthenticationPacket)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void AuthenticationPacket::InternalSwap(AuthenticationPacket* PROTOBUF_RESTRICT other) {
+  using std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.sessionid_, &other->_impl_.sessionid_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.roomid_, &other->_impl_.roomid_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.data_, &other->_impl_.data_, arena);
+  swap(_impl_.method_, other->_impl_.method_);
+}
+
+::google::protobuf::Metadata AuthenticationPacket::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)
