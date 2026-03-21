@@ -8,7 +8,7 @@ void Matching::AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session
     _waitingQueue.push_back({ waitSessionId, session });
     spdlog::info("matching: waiting queue is added {}", uuids::to_string(waitSessionId));
 
-    session->StartHandShaking();
+    session->StartPortHandshaking();
     session->SetNotifyDisconnectCallback([weakSelf = weak_from_this()](const std::shared_ptr<Session>& removeSession) {
         if(auto self = weakSelf.lock())
             self->RemoveSession(removeSession);
@@ -23,7 +23,7 @@ void Matching::Start()
 {
     _isRunning = true;
 
-    _ioManager->RegisterAsyncWork([weakSelf = weak_from_this()]() {
+    _ioManager->PostOnIOContext([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
             self->MatchMaking();
     });
@@ -88,7 +88,7 @@ void Matching::MatchMaking()
     {
         auto [nextSessionId, nextSession] = _waitingQueue.front();
         newRoom->AddSession(nextSessionId, nextSession);
-        nextSession->SetRoom(newRoom->GetId());
+        nextSession->SetRoomAndSendInfo(newRoom->GetId());
 
         _waitingQueue.pop_front();
     }
@@ -107,7 +107,7 @@ void Matching::MatchMaking()
     if(auto self = weakSelf.lock())
     {
         // register MatchMaking function (lambda)
-        self->_ioManager->RegisterAsyncWork([weakSelf]() {
+        self->_ioManager->PostOnIOContext([weakSelf]() {
             if(auto self = weakSelf.lock())
             {
                 self->MatchMaking();

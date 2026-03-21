@@ -20,7 +20,7 @@ void Room::WorldInit()
 
     spdlog::info("room {}: world create complete", uuids::to_string(_roomId));
 
-    _ioManager->RegisterBlockingWork([weakSelf = weak_from_this()]() {
+    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
             self->DequeuePacketAsync();
     });
@@ -108,7 +108,7 @@ void Room::DequeuePacketAsync()
         spdlog::error("room {}: serialize error", uuids::to_string(_roomId));
     }
 
-    _ioManager->RegisterBlockingWork([weakSelf = weak_from_this()]() {
+    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
             self->DequeuePacketAsync();
     });

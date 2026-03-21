@@ -17,11 +17,12 @@ using namespace Protocol;
 class Session : public std::enable_shared_from_this<Session>
 {
 private:
+    using Raw = std::vector<unsigned char>;
     struct SecretKey {};
 
 public:
     explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid sessionId, std::uint16_t udpPort)
-    : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _serverUdpPort(udpPort), _clientUdpPort(0),
+    : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _strand(ioManager->GetIoContext()), _serverUdpPort(udpPort), _clientUdpPort(0),
       _id(sessionId), _readSize(0), _readNetSize(0) {}
 
     ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
@@ -39,9 +40,9 @@ public:
     void Start();
     void Stop();
 
-    void StartHandShaking();
+    void StartPortHandshaking();
 
-    void SetRoom(uuids::uuid roomId);
+    void SetRoomAndSendInfo(uuids::uuid roomId);
 
     uuids::uuid GetId() const { return _id; }
     uuids::uuid GetRoomId() const { return _roomId; }
@@ -49,11 +50,17 @@ public:
     using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
     void SetNotifyDisconnectCallback(NotifyDisconnectCallback callback);
 
+    using SendToHandler = std::function<void(asio::ip::udp::endpoint, std::shared_ptr<Raw>)>;
+    void SetSendToHandler(SendToHandler handler);
+
 private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<asio::ip::tcp::socket> _socketPtr;
+    asio::io_context::strand _strand;
     std::uint16_t _serverUdpPort;
     std::uint16_t _clientUdpPort;
+
+    asio::ip::udp::endpoint _clientUdpEp;
 
     // Set by first handshaking
     uuids::uuid _id;
@@ -65,8 +72,9 @@ private:
     std::vector<unsigned char> _readBuffer;
 
     NotifyDisconnectCallback _disconnectCallback;
+    SendToHandler _sendTo;
 
-    std::queue<std::shared_ptr<Packet>> _sendQueue;
+    std::queue<std::shared_ptr<Raw>> _sendQueue;
     std::mutex _sendQueueMutex;
     std::condition_variable _sendQueueCv;
 

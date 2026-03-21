@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.22)
+﻿cmake_minimum_required (VERSION 3.22)
 
 # 지원되는 경우 MSVC 컴파일러에 대해 핫 다시 로드 사용하도록 설정합니다.
 if (POLICY CMP0141)

@@ -9,6 +9,9 @@
 #include <uuid.h>
 #include <vector>
 
+#include "Packet.pb.h"
+using namespace Protocol;
+
 class IOManager;
 class Matching;
 class Room;
@@ -30,6 +33,32 @@ public:
         return newServer;
     }
 
+    // Test Area
+    static std::string ConvertType(PacketType type)
+    {
+        switch(type)
+        {
+        case PacketType::Ok:
+            return "Ok";
+        case PacketType::InvalidData:
+            return "InvalidData";
+        case PacketType::ErrorOccured:
+            return "ErrorOccured";
+        case PacketType::PortHandshake:
+            return "PortHandshake";
+        case PacketType::InfoHandshake:
+            return "InfoHandshake";
+        case PacketType::Ping:
+            return "Ping";
+        case PacketType::Ingame:
+            return "Ingame";
+        case PacketType::Autentication:
+            return "Authentication";
+        default:
+            return "INVALID_TYPE_ERROR";
+        }
+    }
+
 public:
     void Start();
     void Stop();
@@ -39,11 +68,14 @@ public:
     void RemoveRoom(std::shared_ptr<Room> room);
 
 private:
+    using Raw = std::vector<unsigned char>;
+    void SendAsyncByUdp(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data);
     void ReceiveAsyncByUdp();
     void ProcessPacketAsync(std::uint16_t size, const unsigned char* data);
 
 private:
     std::shared_ptr<IOManager> _ioManager;
+    asio::io_context::strand _strand;
     std::shared_ptr<Matching> _matching;
 
     asio::ip::tcp::endpoint _tcpEndpoint;

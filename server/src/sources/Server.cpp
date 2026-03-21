@@ -6,7 +6,7 @@
 #include "Session.hpp"
 
 Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port)
-: _ioManager(ioManager), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
+: _ioManager(ioManager), _strand(ioManager->GetIoContext()), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
   _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0))
 {
     _udpEndpoint = _udpSocket.local_endpoint();
@@ -65,6 +65,10 @@ void Server::AcceptAsync()
         // session information
         auto sessionAddrStr = newSession->GetEndpoint().address().to_string();
         auto sessionId = newSession->GetId();
+        newSession->SetSendToHandler([weakSelf](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
+            if(auto self = weakSelf.lock())
+                self->SendAsyncByUdp(ep, std::move(data));
+        });
 
         if(auto self = weakSelf.lock())
         {
@@ -86,11 +90,27 @@ void Server::AcceptAsync()
     });
 }
 
+void Server::SendAsyncByUdp(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data)
+{
+    _udpSocket.async_send_to(asio::buffer(*data), ep, asio::bind_executor(_strand, [weakSelf = weak_from_this(), data, ep](const std::error_code& ec, std::size_t) {
+        if (ec)
+        {
+            spdlog::error("server: udp send error occured({})", ec.message());
+            return;
+        }
+
+        if (auto self = weakSelf.lock())
+        {
+            spdlog::info("[test log] server: udp send to ({}:{}) complete", ep.address().to_string(), ep.port());
+        }
+    }));
+}
+
 void Server::ReceiveAsyncByUdp()
 {
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
     auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
-    _udpSocket.async_receive_from(asio::buffer(*receiveBuffer), *senderEndpoint, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code ec, const std::size_t bytesRead) {
+    _udpSocket.async_receive_from(asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code ec, const std::size_t bytesRead) {
         if(ec)
         {
             if(ec == asio::error::operation_aborted)
@@ -138,7 +158,7 @@ void Server::ReceiveAsyncByUdp()
         // client must have own room id and session id
         if(auto self = weakSelf.lock())
         {
-            self->_ioManager->RegisterAsyncWork([weakSelf, receiveBuffer, realData, realSize]() {
+            self->_ioManager->PostOnBlockingPool([weakSelf, receiveBuffer, realData, realSize]() {
                 if(auto self = weakSelf.lock())
                     self->ProcessPacketAsync(realSize, realData);
             });
@@ -146,7 +166,7 @@ void Server::ReceiveAsyncByUdp()
 
         if(auto self = weakSelf.lock())
             self->ReceiveAsyncByUdp();
-    });
+    }));
 }
 
 void Server::ProcessPacketAsync(std::uint16_t size, const unsigned char* data)
@@ -160,7 +180,7 @@ void Server::ProcessPacketAsync(std::uint16_t size, const unsigned char* data)
 
     if(packet.type() != PacketType::Ingame)
     {
-        spdlog::error("server: invalid packet income");
+        spdlog::error("server: invalid packet income({})", ConvertType(packet.type()));
         return;
     }
 
