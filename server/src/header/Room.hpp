@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <uuid.h>
+#include <asio.hpp>
 
 #include "Packet.pb.h"
 #include "World.hpp"
@@ -43,6 +44,7 @@ public:
     void Broadcast(std::shared_ptr<Packet> packet);
     void EnqueuePacket(std::shared_ptr<IngamePacket> packet);
     void DequeuePacketAsync();
+    void PunchUdpHole(uuids::uuid sessionId, std::shared_ptr<asio::ip::udp::endpoint> udpEndpoint);
 
     uuids::uuid GetId() const
     {

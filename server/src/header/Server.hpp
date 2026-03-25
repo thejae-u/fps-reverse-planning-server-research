@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <array>
 #include <asio.hpp>
 #include <memory>
 #include <spdlog/spdlog.h>
@@ -8,6 +7,9 @@
 #include <unordered_set>
 #include <uuid.h>
 #include <vector>
+#include <queue>
+#include <atomic>
+#include <mutex>
 
 #include "Packet.pb.h"
 using namespace Protocol;
@@ -15,6 +17,7 @@ using namespace Protocol;
 class IOManager;
 class Matching;
 class Room;
+class Session;
 
 constexpr std::uint16_t BUF_SIZE = 65535;
 
@@ -69,9 +72,16 @@ public:
 
 private:
     using Raw = std::vector<unsigned char>;
-    void SendAsyncByUdp(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data);
+    void EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr<Raw> payload);
+    void SendAsyncByUdp();
     void ReceiveAsyncByUdp();
-    void ProcessPacketAsync(std::uint16_t size, const unsigned char* data);
+    void ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std::uint16_t size, const unsigned char* data);
+    std::shared_ptr<Room> GetRoom(uuids::uuid id)
+    {
+        std::lock_guard<std::mutex> roomsLock(_roomsMutex);
+        auto room = _rooms.find(id);
+        return room == _rooms.end() ? nullptr : room->second;
+    }
 
 private:
     std::shared_ptr<IOManager> _ioManager;
@@ -89,6 +99,10 @@ private:
     std::unordered_map<uuids::uuid /*room id*/, std::shared_ptr<Room> /*room object*/> _rooms;
     std::mutex _roomsMutex;
 
-    std::unordered_set<uuids::uuid> _sessions;
+    std::unordered_map<uuids::uuid, std::shared_ptr<Session>> _sessions;
     std::mutex _sessionsMutex;
+
+    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _payloadQueue;
+    std::mutex _payloadQueueMutex;
+    std::atomic<bool> _isSending;
 };

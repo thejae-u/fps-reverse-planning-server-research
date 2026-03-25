@@ -1,17 +1,21 @@
 ﻿#include "Session.hpp"
 #include "asio.hpp"
 
-void Session::Start()
+void Session::StartTcpRead()
 {
     if(_disconnectCallback == nullptr)
     {
         spdlog::error("session {}: disconnect callback not set", uuids::to_string(GetId()));
         return;
     }
+
+    // Tcp read open
+    ReadSizeAsync();
 }
 
 void Session::Stop()
 {
+    _isValid = false;
     _socketPtr->close();
     if(_disconnectCallback == nullptr)
         return;
@@ -20,14 +24,14 @@ void Session::Stop()
     _disconnectCallback = nullptr;
 }
 
-void Session::StartPortHandshaking()
+void Session::Init()
 {
     spdlog::info("{} handshake", uuids::to_string(_id));
 
     _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
         {
-            self->ExchangeUdpPort();
+            self->SendSessionInfo();
         }
     });
 }
@@ -112,54 +116,80 @@ void Session::ReadDataAsync(const std::uint16_t& dataSize)
     }));
 }
 
-void Session::EnqueueSendPacket(const std::shared_ptr<Packet> data)
+void Session::EnqueueUdpSendPacket(const std::shared_ptr<Packet> data)
 {
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this(), data]() {
-        if(auto self = weakSelf.lock())
-        {
-            // seraizlie data
-            int size = static_cast<int>(data->ByteSizeLong());
-            Raw sendPacket;
-            if (!data->SerializeToArray(sendPacket.data(), size))
-            {
-                spdlog::error("session {}: failed serialize send packet", uuids::to_string(self->GetId()));
-                return;
-            }
+    // serialize data
+    auto size = static_cast<int>(data->ByteSizeLong());
+    auto sendPacket = std::make_shared<Raw>(size);
+    if(!data->SerializeToArray(sendPacket->data(), size))
+    {
+        spdlog::error("session {}: failed serialize send packet", uuids::to_string(GetId()));
+        return;
+    }
 
-            // make raw packet include 2byte size header
-            std::uint16_t sendNetSize = static_cast<std::uint16_t>(htons(size));
-            auto sendRaw = std::make_shared<Raw>(sizeof(sendNetSize) + sendPacket.size());
-            std::memcpy(sendRaw->data(), &sendNetSize, sizeof(sendNetSize));
-            std::memcpy(sendRaw->data() + sizeof(sendNetSize), sendPacket.data(), sendPacket.size());
+    std::uint16_t sendNetSize = static_cast<std::uint16_t>(htons(size));
+    auto payload = std::make_shared<Raw>(sizeof(sendNetSize) + sendPacket->size());
+    std::memcpy(payload->data(), &sendNetSize, sizeof(sendNetSize));
+    std::memcpy(payload->data() + sizeof(sendNetSize), sendPacket->data(), sendPacket->size());
 
-            std::lock_guard<std::mutex> sendQueueLock(self->_sendQueueMutex);
-            self->_sendQueue.push(sendRaw);
+    if(_sendTo == nullptr)
+    {
+        spdlog::error("session {}: send handler is not set", uuids::to_string(GetId()));
+        Stop();
+        return;
+    }
 
-            self->_sendQueueCv.notify_one();
-        }
-    });
+    // Udp Send
+    _sendTo(_clientUdpEp, payload);
 }
 
-void Session::DequeueSendPacket()
+void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
 {
-    std::unique_lock<std::mutex> sendQueueLock(_sendQueueMutex);
-    _sendQueueCv.wait(sendQueueLock, [&] {
-        return !_sendQueue.empty();
-    });
+    std::shared_ptr<Raw> sendData;
+    auto size = static_cast<int>(data->ByteSizeLong());
+    if(!data->SerializeToArray(sendData->data(), size))
+    {
+        spdlog::error("session {}: failed to serialize tcp data", uuids::to_string(_id));
+        return;
+    }
 
-    auto packet = _sendQueue.front();
-    _sendQueue.pop();
+    std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
+    _sendTcpQueue.push(sendData);
 
-    // send by udp
-    if(_sendTo != nullptr)
-        _sendTo(_clientUdpEp, std::move(packet));
+    if(!_isWriting)
+    {
+        DoSendAsyncTcpLoop();
+    }
+}
 
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
-        if (auto self = weakSelf.lock())
+void Session::DoSendAsyncTcpLoop()
+{
+    std::shared_ptr<Raw> packet;
+    std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
+    packet = _sendTcpQueue.front();
+    _sendTcpQueue.pop();
+
+    bool hasMore = !_sendTcpQueue.empty();
+    asio::async_write(*_socketPtr, asio::buffer(*packet), asio::bind_executor(_strand, [weakSelf = weak_from_this(), packet, hasMore](const std::error_code& ec, std::size_t) {
+        if(ec)
         {
-            self->DequeueSendPacket();
+            if(auto self = weakSelf.lock())
+            {
+                if(ec != asio::error::operation_aborted)
+                    spdlog::error("session {} write loop error: {}", uuids::to_string(self->GetId()), ec.message());
+                self->Stop();
+            }
+            return;
         }
-    });
+
+        if(auto self = weakSelf.lock())
+        {
+            if(hasMore)
+            {
+                self->DoSendAsyncTcpLoop();
+            }
+        }
+    }));
 }
 
 void Session::SendAsync(const std::shared_ptr<Packet> packet)
@@ -214,13 +244,14 @@ void Session::SendAsync(const std::shared_ptr<Packet> packet)
     }));
 }
 
-void Session::ExchangeUdpPort()
+void Session::SendSessionInfo()
 {
+    // TODO : Send Packet include Session ID
     std::string sendData;
     Packet sendPacket;
 
     sendPacket.set_type(PacketType::PortHandshake);
-    sendPacket.set_data(std::to_string(_serverUdpPort));
+    sendPacket.set_data(std::format("{},{}", std::to_string(_serverUdpPort), uuids::to_string(GetId())));
     sendPacket.SerializeToString(&sendData);
 
     // reusable
@@ -235,56 +266,20 @@ void Session::ExchangeUdpPort()
     // 1. send port data size
     asio::write(*_socketPtr, asio::buffer(&netSize, sizeof(netSize)), ec);
 
-    // 2. send port real data 
-    if(!ec)
-        asio::write(*_socketPtr, asio::buffer(sendData), ec);
-
-    // 3. receive port data size
-    if(!ec)
-        asio::read(*_socketPtr, asio::buffer(&netSize, sizeof(netSize)), ec);
-
-    // 4. receive port real data
+    // 2. send port real data
     if(!ec)
     {
-        size = ntohs(netSize);
-        receiveData.resize(size);
-
-        asio::read(*_socketPtr, asio::buffer(receiveData), ec);
+        spdlog::info("session {} send size complete", uuids::to_string(_id));
+        asio::write(*_socketPtr, asio::buffer(sendData), ec);
     }
 
     // if error occured once, move here
     if(ec)
     {
-        spdlog::error("session {} error occured: {}", uuids::to_string(_id), ec.message());
-
-        // disconnect immediately
+        spdlog::error("session {} send error occured: {}", uuids::to_string(_id), ec.message());
         Stop();
         return;
     }
 
-    // 5. parsing from received data
-    if(!receivePacket.ParseFromArray(receiveData.data(), static_cast<int>(size)))
-    {
-        spdlog::error("session {} error occured: failed parse data", uuids::to_string(_id));
-        Stop();
-        return;
-    }
-
-    if(receivePacket.type() != PacketType::PortHandshake)
-    {
-        spdlog::error("session {} error occured: wrong packet", uuids::to_string(_id));
-        return;
-    }
-
-    _clientUdpPort = static_cast<uint16_t>(std::stoi(receivePacket.data()));
-    spdlog::info("session {} received port: {}", uuids::to_string(_id), _clientUdpPort);
-
-    // Tcp read open
-    ReadSizeAsync();
-
-    // send work register
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
-        if(auto self = weakSelf.lock())
-            self->DequeueSendPacket(); 
-    });
+    StartTcpRead();
 }

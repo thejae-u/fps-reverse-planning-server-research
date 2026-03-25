@@ -37,13 +37,13 @@ public:
     void AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session> session);
     void Start();
     void Stop();
-    void MatchMaking();
 
     using RoomCallback = std::function<void(const std::shared_ptr<Room>&)>;
     void SetRegisterRoomCallback(RoomCallback handler);
     void SetRemoveRoomCallback(RoomCallback handler);
 
 private:
+    void TryMatch();
     void RemoveSession(std::shared_ptr<Session> removeSession);
     void RemoveRoom(std::shared_ptr<Room> removeRoom);
 
@@ -54,7 +54,6 @@ private:
     // waiting sessions
     std::deque<std::pair<uuids::uuid, std::shared_ptr<Session>>> _waitingQueue;
     std::mutex _waitingQueueMutex;
-    std::condition_variable _waitingCv;
 
     // matched rooms
     std::deque<std::pair<uuids::uuid, std::shared_ptr<Room>>> _activeRooms;

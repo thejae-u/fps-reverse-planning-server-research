@@ -47,8 +47,35 @@ void Server::AcceptAsync()
     auto weakSelf(weak_from_this());
     auto newSession = Session::Create(_ioManager, _uuidGen(), _udpEndpoint.port());
 
+    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+    auto sessionId = newSession->GetId();
+    if(_sessions.find(sessionId) != _sessions.end())
+    {
+        spdlog::error("server: create duplicate session, create again");
+        AcceptAsync();
+        return;
+    }
+    _sessions.insert({ sessionId, newSession });
+
+    newSession->SetNotifyDisconnectCallback([weakSelf](std::shared_ptr<Session> session) {
+        auto sessionId = session->GetId();
+        if(auto self = weakSelf.lock())
+        {
+            std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
+            auto it = self->_sessions.find(sessionId);
+            self->_sessions.erase(it);
+            spdlog::info("server: session {} removed from server", uuids::to_string(sessionId));
+        }
+    });
+
+    // Udp Send handler register
+    newSession->SetSendToHandler([weakSelf](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
+        if(auto self = weakSelf.lock())
+            self->EnqueueSendData(ep, std::move(data));
+    });
+
     // async accept new client
-    _acceptor.async_accept(*newSession->GetSocket(), [weakSelf, newSession](std::error_code ec) {
+    _acceptor.async_accept(*newSession->GetSocket(), [weakSelf, newSession, sessionId](std::error_code ec) {
         if(ec)
         {
             if(ec == asio::error::connection_aborted ||
@@ -62,27 +89,9 @@ void Server::AcceptAsync()
             return;
         }
 
-        // session information
-        auto sessionAddrStr = newSession->GetEndpoint().address().to_string();
-        auto sessionId = newSession->GetId();
-        newSession->SetSendToHandler([weakSelf](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
-            if(auto self = weakSelf.lock())
-                self->SendAsyncByUdp(ep, std::move(data));
-        });
-
         if(auto self = weakSelf.lock())
         {
-            std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
-            if(self->_sessions.find(sessionId) != self->_sessions.end())
-            {
-                spdlog::error("server: invalid session id {} is already exists", uuids::to_string(sessionId));
-                self->AcceptAsync();
-                return;
-            }
-
-            // add to matchmaking queue
-            // move session ownership to Matching 
-            self->_matching->AddWaitSession(sessionId, std::move(newSession));
+            newSession->Init();
 
             // new session create for accept other client
             self->AcceptAsync();
@@ -90,18 +99,41 @@ void Server::AcceptAsync()
     });
 }
 
-void Server::SendAsyncByUdp(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data)
+void Server::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr<Raw> payload)
 {
-    _udpSocket.async_send_to(asio::buffer(*data), ep, asio::bind_executor(_strand, [weakSelf = weak_from_this(), data, ep](const std::error_code& ec, std::size_t) {
-        if (ec)
+    {
+        std::lock_guard<std::mutex> payloadQueueLock(_payloadQueueMutex);
+        _payloadQueue.push({ ep, payload });
+    }
+
+    if(!_isSending)
+    {
+        SendAsyncByUdp();
+    }
+}
+
+void Server::SendAsyncByUdp()
+{
+    std::lock_guard<std::mutex> payloadQueueLock(_payloadQueueMutex);
+    auto [ep, payload] = _payloadQueue.front();
+    _payloadQueue.pop();
+
+    bool hasMore = !_payloadQueue.empty();
+
+    _udpSocket.async_send_to(
+    asio::buffer(*payload), ep, asio::bind_executor(_strand, [weakSelf = weak_from_this(), payload, ep, hasMore](const std::error_code& ec, std::size_t) {
+        if(ec)
         {
             spdlog::error("server: udp send error occured({})", ec.message());
             return;
         }
 
-        if (auto self = weakSelf.lock())
+        if(auto self = weakSelf.lock())
         {
             spdlog::info("[test log] server: udp send to ({}:{}) complete", ep.address().to_string(), ep.port());
+
+            if(hasMore)
+                self->SendAsyncByUdp();
         }
     }));
 }
@@ -110,7 +142,8 @@ void Server::ReceiveAsyncByUdp()
 {
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
     auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
-    _udpSocket.async_receive_from(asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code ec, const std::size_t bytesRead) {
+    _udpSocket.async_receive_from(
+    asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code ec, const std::size_t bytesRead) {
         if(ec)
         {
             if(ec == asio::error::operation_aborted)
@@ -141,26 +174,27 @@ void Server::ReceiveAsyncByUdp()
         std::memcpy(&expectedSize, receiveBuffer->data(), sizeof(expectedSize));
         expectedSize = ntohs(expectedSize);
 
-        std::size_t realSize = bytesRead - sizeof(std::uint16_t);
+        std::size_t payloadSize = bytesRead - sizeof(std::uint16_t);
 
-        if(expectedSize != realSize)
+        if(expectedSize != payloadSize)
         {
-            spdlog::error("server: bad data received (expected {}, real {})", expectedSize, realSize);
+            spdlog::error("server: bad data received (expected {}, real {})", expectedSize, payloadSize);
             if(auto self = weakSelf.lock())
                 self->ReceiveAsyncByUdp();
 
             return;
         }
 
-        const unsigned char* realData = receiveBuffer->data() + 2;
+        // raw pointer to data payload, no onwership
+        const unsigned char* payload = receiveBuffer->data() + 2;
 
         // send to room
         // client must have own room id and session id
         if(auto self = weakSelf.lock())
         {
-            self->_ioManager->PostOnBlockingPool([weakSelf, receiveBuffer, realData, realSize]() {
+            self->_ioManager->PostOnBlockingPool([weakSelf, senderEndpoint, receiveBuffer, payload, payloadSize]() {
                 if(auto self = weakSelf.lock())
-                    self->ProcessPacketAsync(realSize, realData);
+                    self->ProcessPacket(std::move(senderEndpoint), payloadSize, payload);
             });
         }
 
@@ -169,7 +203,7 @@ void Server::ReceiveAsyncByUdp()
     }));
 }
 
-void Server::ProcessPacketAsync(std::uint16_t size, const unsigned char* data)
+void Server::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std::uint16_t size, const unsigned char* data)
 {
     Packet packet;
     if(!packet.ParseFromArray(data, size))
@@ -178,30 +212,62 @@ void Server::ProcessPacketAsync(std::uint16_t size, const unsigned char* data)
         return;
     }
 
-    if(packet.type() != PacketType::Ingame)
+    if(packet.type() == PacketType::Ingame)
     {
-        spdlog::error("server: invalid packet income({})", ConvertType(packet.type()));
+        auto ingamePacket = std::make_shared<IngamePacket>();
+        if(!ingamePacket->ParseFromString(packet.data()))
+        {
+            spdlog::error("server: parsing ingame packet error");
+            return;
+        }
+
+        auto roomId = uuids::uuid::from_string(ingamePacket->roomid());
+        auto room = GetRoom(roomId.value());
+        if(room == nullptr)
+        {
+            spdlog::error("server: invalid room id ({})", ingamePacket->roomid());
+            return;
+        }
+
+        room->EnqueuePacket(std::move(ingamePacket));
         return;
     }
 
-    auto ingamePacket = std::make_shared<IngamePacket>();
-    if(!ingamePacket->ParseFromString(packet.data()))
+    // Client UDP HolePunching
+    if(packet.type() == PacketType::Autentication)
     {
-        spdlog::error("server: parsing ingame packet error");
-        return;
+        AuthenticationPacket authPacket;
+        if(!authPacket.ParseFromString(packet.data()))
+        {
+            spdlog::error("server: parsing authentication packet error");
+            return;
+        }
+
+        auto sessionId = uuids::uuid::from_string(authPacket.sessionid());
+        if(!sessionId.has_value())
+        {
+            spdlog::error("server: auth packet has no session id");
+            return;
+        }
+
+        // move to matching, wait for matchmaking
+        {
+            std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+            auto session = _sessions.find(sessionId.value());
+            if(session == _sessions.end())
+            {
+                spdlog::error("server: no session in server");
+                return;
+            }
+
+            // session send endpoint set
+            session->second->PunchUdpHole(*sender);
+
+            // transfer session ownership from session to matching
+            _matching->AddWaitSession(session->second->GetId(), std::move(session->second));
+            _sessions.erase(session);
+        }
     }
-
-    auto roomId = uuids::uuid::from_string(ingamePacket->roomid());
-
-    std::lock_guard<std::mutex> roomsLock(_roomsMutex);
-    if(auto room = _rooms.find(roomId.value()); room != _rooms.end())
-    {
-        room->second->EnqueuePacket(std::move(ingamePacket));
-        return;
-    }
-
-    spdlog::error("server: invalid room id ({})", ingamePacket->roomid());
-    return;
 }
 
 void Server::AddRoom(std::shared_ptr<Room> room)
