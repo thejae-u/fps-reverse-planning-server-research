@@ -1,4 +1,4 @@
-# client/CMakeLists.txt
+﻿# client/CMakeLists.txt
 cmake_minimum_required (VERSION 3.21)
 project(client)
 

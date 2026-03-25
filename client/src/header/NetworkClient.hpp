@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <asio.hpp>
 #include <deque>
@@ -11,12 +11,14 @@
 
 #include "Packet.pb.h"
 
+class IOManager;
+
 using namespace Protocol;
 
-class NetworkClient
+class NetworkClient : public std::enable_shared_from_this<NetworkClient>
 {
 public:
-    NetworkClient();
+    NetworkClient(std::shared_ptr<IOManager> ioManager);
     ~NetworkClient();
 
     void Connect(const std::string& host, uint16_t port);
@@ -29,19 +31,22 @@ public:
     bool IsMatching() const { return _isMatching; }
     void SetMatching(bool matching) { _isMatching = matching; }
 
+    void SendMatchRequest();
     void Send(const std::string& message);
+    void SendIngamePacket(IngameType type, const std::string& data);
     void SendUdpCorrect(const std::string& message, const std::string& host, uint16_t port);
     void SendUdpMalformed(const std::string& message, const std::string& host, uint16_t port, int errorType);
+    void SendUdpHolePunching();
 
     struct LogMessage {
         std::string text;
         spdlog::level::level_enum level;
     };
 
-    const std::deque<LogMessage>& GetLogs() const
+    std::vector<LogMessage> GetLogs() const
     {
         std::lock_guard<std::mutex> lock(_logMutex);
-        return _logs;
+        return std::vector<LogMessage>(_logs.begin(), _logs.end());
     }
 
     using MessageCallback = std::function<void(const std::string&)>;
@@ -52,11 +57,12 @@ private:
     void AddLog(const std::string& msg, spdlog::level::level_enum level = spdlog::level::info);
     void AsyncRead();
     void AsyncReadUdp();
-    void EnsureIOThreadStarted();
+    void InitUdpSocket();
 
-    void Handshake();
+    void AsyncHandshake();
 
-    asio::io_context _ioContext;
+    std::shared_ptr<IOManager> _ioManager;
+    asio::strand<asio::io_context::executor_type> _strand;
     std::shared_ptr<asio::ip::tcp::socket> _socket;
     asio::ip::udp::socket _udpSocket;
     asio::ip::udp::endpoint _udpRemoteEndpoint;
@@ -68,8 +74,9 @@ private:
     bool _isMatching = false;
     std::string _roomId;
     std::string _sessionId;
+    std::string _serverHost;
+    asio::ip::address _serverAddress;
 
-    std::unique_ptr<std::thread> _contextThread;
     std::deque<LogMessage> _logs;
     mutable std::mutex _logMutex;
 
