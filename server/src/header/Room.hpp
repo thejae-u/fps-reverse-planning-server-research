@@ -15,8 +15,9 @@
 #include "World.hpp"
 using namespace Protocol;
 
-class Session;
 class IOManager;
+class SessionManager;
+class Session;
 
 class Room : public std::enable_shared_from_this<Room>
 {
@@ -24,27 +25,27 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid roomId) : _ioManager(ioManager), _roomId(roomId), _world(std::make_unique<World>(roomId)) {}
+    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
+    : _ioManager(ioManager), _sessionManager(sessionManager), _roomId(roomId), _world(std::make_unique<World>(roomId)) {}
     ~Room()
     {
         spdlog::info("room {} destroyed", uuids::to_string(_roomId));
     }
 
-    static auto Create(std::shared_ptr<IOManager> ioManager, uuids::uuid roomId)
+    static auto Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
     {
-        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, roomId);
+        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, sessionManager, roomId);
         return newRoom;
     }
 
 public:
     void WorldInit();
     void Stop();
-    void AddSession(uuids::uuid sessionId, std::shared_ptr<Session> session);
-    void RemoveSession(std::shared_ptr<Session> removeSession);
+    void AddSession(uuids::uuid sessionId, std::weak_ptr<Session> session);
+    void RemoveSession(std::weak_ptr<Session> removeSession);
     void Broadcast(std::shared_ptr<Packet> packet);
     void EnqueuePacket(std::shared_ptr<IngamePacket> packet);
     void DequeuePacketAsync();
-    void PunchUdpHole(uuids::uuid sessionId, std::shared_ptr<asio::ip::udp::endpoint> udpEndpoint);
 
     uuids::uuid GetId() const
     {
@@ -56,10 +57,11 @@ public:
 
 private:
     std::shared_ptr<IOManager> _ioManager;
+    std::shared_ptr<SessionManager> _sessionManager;
     uuids::uuid _roomId;
     std::atomic<bool> _isRunning;
 
-    std::unordered_map<uuids::uuid, std::shared_ptr<Session>> _sessions;
+    std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
     std::mutex _sessionsMutex;
 
     RemoveRoomCallback _removeRoomFromMatchingHandler;

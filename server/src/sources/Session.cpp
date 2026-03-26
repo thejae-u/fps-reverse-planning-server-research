@@ -1,9 +1,10 @@
 ﻿#include "Session.hpp"
+
 #include "asio.hpp"
 
 void Session::StartTcpRead()
 {
-    if(_disconnectCallback == nullptr)
+    if (_disconnectCallbacks.size() == 0)
     {
         spdlog::error("session {}: disconnect callback not set", uuids::to_string(GetId()));
         return;
@@ -17,11 +18,17 @@ void Session::Stop()
 {
     _isValid = false;
     _socketPtr->close();
-    if(_disconnectCallback == nullptr)
+
+    if(_disconnectCallbacks.size() == 0)
         return;
 
-    _disconnectCallback(shared_from_this());
-    _disconnectCallback = nullptr;
+    // execute all disconnect callback
+    for(const auto& callback : _disconnectCallbacks)
+    {
+        callback(shared_from_this());
+    }
+
+    _disconnectCallbacks.clear();
 }
 
 void Session::Init()
@@ -47,9 +54,10 @@ void Session::SetRoomAndSendInfo(uuids::uuid roomId)
     SendAsync(std::move(infoPacket));
 }
 
-void Session::SetNotifyDisconnectCallback(NotifyDisconnectCallback callback)
+void Session::AddDisconnectListener(NotifyDisconnectCallback callback)
 {
-    _disconnectCallback = std::move(callback);
+    std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
+    _disconnectCallbacks.push_back(callback);
 }
 
 void Session::SetSendToHandler(SendToHandler handler)
@@ -246,7 +254,6 @@ void Session::SendAsync(const std::shared_ptr<Packet> packet)
 
 void Session::SendSessionInfo()
 {
-    // TODO : Send Packet include Session ID
     std::string sendData;
     Packet sendPacket;
 

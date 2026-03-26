@@ -11,6 +11,7 @@
 #include "IOManager.hpp"
 #include "Room.hpp"
 
+class SessionManager;
 class Server;
 class Session;
 
@@ -22,19 +23,19 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Matching(SecretKey, std::shared_ptr<IOManager> ioManager) : _ioManager(ioManager), _isRunning(false) {}
+    explicit Matching(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager) : _ioManager(ioManager), _isRunning(false) {}
     ~Matching()
     {
         spdlog::info("matching destroyed");
     }
-    static std::shared_ptr<Matching> Create(std::shared_ptr<IOManager> ioManager)
+    static std::shared_ptr<Matching> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager)
     {
-        auto newMatching = std::make_shared<Matching>(SecretKey{}, ioManager);
+        auto newMatching = std::make_shared<Matching>(SecretKey{}, ioManager, sessionManager);
         return newMatching;
     }
 
 public:
-    void AddWaitSession(uuids::uuid waitSessionId, std::shared_ptr<Session> session);
+    void AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> session);
     void Start();
     void Stop();
 
@@ -44,15 +45,16 @@ public:
 
 private:
     void TryMatch();
-    void RemoveSession(std::shared_ptr<Session> removeSession);
+    void RemoveSession(std::weak_ptr<Session> removeSession);
     void RemoveRoom(std::shared_ptr<Room> removeRoom);
 
 private:
     std::shared_ptr<IOManager> _ioManager;
+    std::shared_ptr<SessionManager> _sessionManager;
     uuids::uuid_system_generator _uuidGen;
 
     // waiting sessions
-    std::deque<std::pair<uuids::uuid, std::shared_ptr<Session>>> _waitingQueue;
+    std::deque<std::pair<uuids::uuid, std::weak_ptr<Session>>> _waitingQueue;
     std::mutex _waitingQueueMutex;
 
     // matched rooms

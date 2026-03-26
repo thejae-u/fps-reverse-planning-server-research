@@ -1,5 +1,7 @@
 ﻿#include "Room.hpp"
+
 #include "IOManager.hpp"
+#include "SessionManager.hpp"
 #include "Session.hpp"
 
 void Room::WorldInit()
@@ -39,37 +41,46 @@ void Room::Stop()
     }
 }
 
-void Room::AddSession(uuids::uuid sessionId, std::shared_ptr<Session> session)
+void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    _sessions.insert({ sessionId, session });
-    session->SetNotifyDisconnectCallback([weakSelf = weak_from_this()](const std::shared_ptr<Session>& removeSession) {
-        if(auto self = weakSelf.lock())
-            self->RemoveSession(removeSession);
-    });
+    if(auto session = weakSession.lock())
+    {
+        _sessions.insert({ sessionId, weakSession });
+        session->AddDisconnectListener([weakSelf = weak_from_this()](const std::weak_ptr<Session>& removeSession) {
+            if(auto self = weakSelf.lock())
+                self->RemoveSession(removeSession);
+        });
+    }
 }
 
-void Room::RemoveSession(std::shared_ptr<Session> removeSession)
+void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
-    _sessions.erase(removeSession->GetId());
+    if(auto removeSession = weakRemoveSession.lock())
+    {
+        spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
+        _sessions.erase(removeSession->GetId());
 
-    if(!_sessions.empty())
-        return;
+        if(!_sessions.empty())
+            return;
 
-    spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
-    _removeRoomFromMatchingHandler(shared_from_this());
+        spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
+        _removeRoomFromMatchingHandler(shared_from_this());
+    }
 }
 
 void Room::Broadcast(std::shared_ptr<Packet> packet)
 {
-    for(auto& [id, session] : _sessions)
+    for(auto& [id, weakSession] : _sessions)
     {
-        if(!session->IsValid())
-            continue;
-        session->EnqueueUdpSendPacket(packet);
-        spdlog::info("room: session {} send", uuids::to_string(session->GetId()));
+        if(auto session = weakSession.lock())
+        {
+            if(!session->IsValid())
+                continue;
+            session->EnqueueUdpSendPacket(packet);
+            spdlog::info("room: session {} send", uuids::to_string(session->GetId()));
+        }
     }
 }
 

@@ -15,6 +15,7 @@
 using namespace Protocol;
 
 class IOManager;
+class SessionManager;
 class Matching;
 class Room;
 class Session;
@@ -27,12 +28,12 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port);
+    explicit Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port);
     ~Server() { spdlog::info("server successfully destroyed"); }
 
-    static std::shared_ptr<Server> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port)
+    static std::shared_ptr<Server> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
     {
-        auto newServer = std::make_shared<Server>(SecretKey{}, ioManager, matching, port);
+        auto newServer = std::make_shared<Server>(SecretKey{}, ioManager, sessionManager, matching, port);
         return newServer;
     }
 
@@ -86,6 +87,7 @@ private:
 private:
     std::shared_ptr<IOManager> _ioManager;
     asio::io_context::strand _strand;
+    std::shared_ptr<SessionManager> _sessionManager;
     std::shared_ptr<Matching> _matching;
 
     asio::ip::tcp::endpoint _tcpEndpoint;
@@ -99,7 +101,7 @@ private:
     std::unordered_map<uuids::uuid /*room id*/, std::shared_ptr<Room> /*room object*/> _rooms;
     std::mutex _roomsMutex;
 
-    std::unordered_map<uuids::uuid, std::shared_ptr<Session>> _sessions;
+    std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
     std::mutex _sessionsMutex;
 
     std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _payloadQueue;

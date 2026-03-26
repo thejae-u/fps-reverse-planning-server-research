@@ -3,6 +3,7 @@
 #include <asio.hpp>
 #include <functional>
 #include <queue>
+#include <vector>
 #include <memory>
 #include <mutex>
 #include <atomic>
@@ -54,7 +55,7 @@ public:
     uuids::uuid GetRoomId() const { return _roomId; }
 
     using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
-    void SetNotifyDisconnectCallback(NotifyDisconnectCallback callback);
+    void AddDisconnectListener(NotifyDisconnectCallback callback);
 
     using SendToHandler = std::function<void(asio::ip::udp::endpoint, std::shared_ptr<Raw>)>;
     void SetSendToHandler(SendToHandler handler);
@@ -79,6 +80,9 @@ private:
     std::vector<unsigned char> _readBuffer;
 
     NotifyDisconnectCallback _disconnectCallback;
+    std::vector<NotifyDisconnectCallback> _disconnectCallbacks;
+    std::mutex _disconnectCallbacksMutex;
+
     SendToHandler _sendTo;
 
     std::queue<std::shared_ptr<Raw>> _sendUdpQueue;

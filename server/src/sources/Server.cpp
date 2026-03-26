@@ -1,12 +1,13 @@
 ﻿#include "Server.hpp"
 
 #include "IOManager.hpp"
+#include "SessionManager.hpp"
 #include "Matching.hpp"
 #include "Room.hpp"
 #include "Session.hpp"
 
-Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<Matching> matching, std::uint16_t port)
-: _ioManager(ioManager), _strand(ioManager->GetIoContext()), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
+Server::Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
+: _ioManager(ioManager), _strand(ioManager->GetIoContext()), _sessionManager(sessionManager), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
   _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0))
 {
     _udpEndpoint = _udpSocket.local_endpoint();
@@ -44,9 +45,7 @@ void Server::Stop()
 
 void Server::AcceptAsync()
 {
-    auto weakSelf(weak_from_this());
     auto newSession = Session::Create(_ioManager, _uuidGen(), _udpEndpoint.port());
-
     std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
     auto sessionId = newSession->GetId();
     if(_sessions.find(sessionId) != _sessions.end())
@@ -55,48 +54,58 @@ void Server::AcceptAsync()
         AcceptAsync();
         return;
     }
-    _sessions.insert({ sessionId, newSession });
 
-    newSession->SetNotifyDisconnectCallback([weakSelf](std::shared_ptr<Session> session) {
-        auto sessionId = session->GetId();
+    newSession->AddDisconnectListener([weakSelf = weak_from_this(), sessionId](const std::weak_ptr<Session>& weakSession) {
         if(auto self = weakSelf.lock())
         {
-            std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
-            auto it = self->_sessions.find(sessionId);
-            self->_sessions.erase(it);
-            spdlog::info("server: session {} removed from server", uuids::to_string(sessionId));
+            if(auto session = weakSession.lock())
+            {
+                std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
+                auto it = self->_sessions.find(sessionId);
+                self->_sessions.erase(it);
+                spdlog::info("server: session {} removed from server", uuids::to_string(sessionId));
+            }
         }
     });
 
     // Udp Send handler register
-    newSession->SetSendToHandler([weakSelf](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
+    newSession->SetSendToHandler([weakSelf = weak_from_this()](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
         if(auto self = weakSelf.lock())
             self->EnqueueSendData(ep, std::move(data));
     });
 
+    auto weakSession = _sessionManager->Insert(newSession->GetId(), std::move(newSession));
+    _sessions.insert({ sessionId, weakSession });
+
     // async accept new client
-    _acceptor.async_accept(*newSession->GetSocket(), [weakSelf, newSession, sessionId](std::error_code ec) {
-        if(ec)
-        {
-            if(ec == asio::error::connection_aborted ||
-               ec == asio::error::operation_aborted)
+    if(auto session = weakSession.lock())
+    {
+        _acceptor.async_accept(*session->GetSocket(), [weakSelf = weak_from_this(), weakSession, sessionId](const std::error_code& ec) {
+            if(ec)
             {
-                spdlog::info("server: acceptor aborted");
+                if(ec == asio::error::connection_aborted ||
+                   ec == asio::error::operation_aborted)
+                {
+                    spdlog::info("server: acceptor aborted");
+                    return;
+                }
+
+                spdlog::error("server: accept error occured({})", ec.message());
                 return;
             }
 
-            spdlog::error("server: accept error occured({})", ec.message());
-            return;
-        }
+            if(auto self = weakSelf.lock())
+            {
+                if(auto session = weakSession.lock())
+                {
+                    session->Init();
 
-        if(auto self = weakSelf.lock())
-        {
-            newSession->Init();
-
-            // new session create for accept other client
-            self->AcceptAsync();
-        }
-    });
+                    // new session create for accept other client
+                    self->AcceptAsync();
+                }
+            }
+        });
+    }
 }
 
 void Server::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr<Raw> payload)
@@ -143,7 +152,7 @@ void Server::ReceiveAsyncByUdp()
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
     auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
     _udpSocket.async_receive_from(
-    asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code ec, const std::size_t bytesRead) {
+    asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code& ec, const std::size_t bytesRead) {
         if(ec)
         {
             if(ec == asio::error::operation_aborted)
@@ -253,19 +262,21 @@ void Server::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std:
         // move to matching, wait for matchmaking
         {
             std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
-            auto session = _sessions.find(sessionId.value());
-            if(session == _sessions.end())
+            auto it = _sessions.find(sessionId.value());
+            if(it == _sessions.end())
             {
                 spdlog::error("server: no session in server");
                 return;
             }
 
-            // session send endpoint set
-            session->second->PunchUdpHole(*sender);
+            auto& weakSession = it->second;
+            if(auto session = weakSession.lock())
+            {
+                session->PunchUdpHole(*sender);
 
-            // transfer session ownership from session to matching
-            _matching->AddWaitSession(session->second->GetId(), std::move(session->second));
-            _sessions.erase(session);
+                // transfer session ownership from session to matching
+                _matching->AddWaitSession(session->GetId(), weakSession);
+            }
         }
     }
 }
