@@ -1,7 +1,7 @@
 ﻿#include "Matching.hpp"
 
 #include "SessionManager.hpp"
-#include "Server.hpp"
+#include "Listener.hpp"
 #include "Session.hpp"
 
 void Matching::AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> weakSession)
@@ -14,7 +14,7 @@ void Matching::AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> 
 
     if(auto session = weakSession.lock())
     {
-        session->AddDisconnectListener([weakSelf = weak_from_this()](const std::weak_ptr<Session>& weakRemoveSession) {
+        session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::weak_ptr<Session>& weakRemoveSession) {
             if(auto self = weakSelf.lock())
                 self->RemoveSession(weakRemoveSession);
         });

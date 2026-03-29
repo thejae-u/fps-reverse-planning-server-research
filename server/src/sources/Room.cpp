@@ -47,7 +47,7 @@ void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
     if(auto session = weakSession.lock())
     {
         _sessions.insert({ sessionId, weakSession });
-        session->AddDisconnectListener([weakSelf = weak_from_this()](const std::weak_ptr<Session>& removeSession) {
+        session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::weak_ptr<Session>& removeSession) {
             if(auto self = weakSelf.lock())
                 self->RemoveSession(removeSession);
         });

@@ -15,6 +15,8 @@
 #include "IOManager.hpp"
 #include "Packet.pb.h"
 
+class Listener;
+
 using namespace Protocol;
 
 class Session : public std::enable_shared_from_this<Session>
@@ -55,7 +57,7 @@ public:
     uuids::uuid GetRoomId() const { return _roomId; }
 
     using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
-    void AddDisconnectListener(NotifyDisconnectCallback callback);
+    void AddDisconnectCallback(NotifyDisconnectCallback callback);
 
     using SendToHandler = std::function<void(asio::ip::udp::endpoint, std::shared_ptr<Raw>)>;
     void SetSendToHandler(SendToHandler handler);
@@ -66,6 +68,8 @@ private:
     asio::io_context::strand _strand;
     std::uint16_t _serverUdpPort;
     std::uint16_t _clientUdpPort;
+
+    std::weak_ptr<Listener> _listener;
 
     asio::ip::udp::endpoint _clientUdpEp;
     std::atomic<bool> _isValid;

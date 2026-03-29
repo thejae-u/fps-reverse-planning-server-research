@@ -23,9 +23,9 @@ void Session::Stop()
         return;
 
     // execute all disconnect callback
-    for(const auto& callback : _disconnectCallbacks)
+    for(const auto& disconnectCallback : _disconnectCallbacks)
     {
-        callback(shared_from_this());
+        disconnectCallback(shared_from_this());
     }
 
     _disconnectCallbacks.clear();
@@ -54,7 +54,7 @@ void Session::SetRoomAndSendInfo(uuids::uuid roomId)
     SendAsync(std::move(infoPacket));
 }
 
-void Session::AddDisconnectListener(NotifyDisconnectCallback callback)
+void Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
 {
     std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
     _disconnectCallbacks.push_back(callback);

@@ -3,7 +3,7 @@
 
 #include "IOManager.hpp"
 #include "Matching.hpp"
-#include "Server.hpp"
+#include "Listener.hpp"
 #include "SessionManager.hpp"
 
 // Test Server Port
@@ -18,9 +18,9 @@ int main()
 
     auto sessionManager = SessionManager::Create();
     auto matching = Matching::Create(ioManager, sessionManager);
-    auto server = Server::Create(ioManager, sessionManager, matching, SERVER_PORT);
+    auto listener = Listener::Create(ioManager, sessionManager, matching, SERVER_PORT);
 
-    server->Start();
+    listener->Start();
 
     std::string tmp;
     while(std::cin >> tmp)
@@ -29,7 +29,7 @@ int main()
             break;
     }
 
-    server->Stop();
+    listener->Stop();
     sessionManager->Clear();
     ioManager->Stop();
     return 0;

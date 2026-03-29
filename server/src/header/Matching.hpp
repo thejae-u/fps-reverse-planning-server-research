@@ -12,7 +12,7 @@
 #include "Room.hpp"
 
 class SessionManager;
-class Server;
+class Listener;
 class Session;
 
 constexpr std::uint8_t MATCHING_PLAYERS = 10;

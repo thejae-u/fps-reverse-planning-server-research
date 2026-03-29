@@ -22,18 +22,18 @@ class Session;
 
 constexpr std::uint16_t BUF_SIZE = 65535;
 
-class Server : public std::enable_shared_from_this<Server>
+class Listener : public std::enable_shared_from_this<Listener>
 {
 private:
     struct SecretKey {};
 
 public:
-    explicit Server(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port);
-    ~Server() { spdlog::info("server successfully destroyed"); }
+    explicit Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port);
+    ~Listener() { spdlog::info("server successfully destroyed"); }
 
-    static std::shared_ptr<Server> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
+    static std::shared_ptr<Listener> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
     {
-        auto newServer = std::make_shared<Server>(SecretKey{}, ioManager, sessionManager, matching, port);
+        auto newServer = std::make_shared<Listener>(SecretKey{}, ioManager, sessionManager, matching, port);
         return newServer;
     }
 
