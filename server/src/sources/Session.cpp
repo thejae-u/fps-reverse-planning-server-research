@@ -1,12 +1,14 @@
 ﻿#include "Session.hpp"
 
 #include "asio.hpp"
+#include "Listener.hpp"
+#include "CustomUtility.hpp"
 
 void Session::StartTcpRead()
 {
-    if (_disconnectCallbacks.size() == 0)
+    if(_disconnectCallbacks.size() == 0)
     {
-        spdlog::error("session {}: disconnect callback not set", uuids::to_string(GetId()));
+        spdlog::error("session {}: disconnect callback not set", uuids::to_string(_id));
         return;
     }
 
@@ -16,16 +18,22 @@ void Session::StartTcpRead()
 
 void Session::Stop()
 {
+    if(_state == SessionState::Invalid) // already stopped
+        return;
+
     _isValid = false;
+    _state = SessionState::Invalid;
     _socketPtr->close();
 
     if(_disconnectCallbacks.size() == 0)
         return;
 
     // execute all disconnect callback
-    for(const auto& disconnectCallback : _disconnectCallbacks)
+    for(const auto& [handle, disconnectCallback] : _disconnectCallbacks)
     {
+        std::lock_guard<std::mutex> callbacksLock(_disconnectCallbacksMutex);
         disconnectCallback(shared_from_this());
+        spdlog::info("session {} disconnect handle {} called", uuids::to_string(_id), handle);
     }
 
     _disconnectCallbacks.clear();
@@ -33,31 +41,50 @@ void Session::Stop()
 
 void Session::Init()
 {
-    spdlog::info("{} handshake", uuids::to_string(_id));
-
+    spdlog::info("session{}: Init", uuids::to_string(_id));
     _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
         if(auto self = weakSelf.lock())
         {
+            self->_state = SessionState::Initializing;
             self->SendSessionInfo();
         }
     });
 }
 
-void Session::SetRoomAndSendInfo(uuids::uuid roomId)
+void Session::SetRoom(uuids::uuid roomId)
 {
     _roomId = roomId;
 
-    auto infoPacket = std::make_shared<Packet>();
-    infoPacket->set_type(PacketType::InfoHandshake);
-    infoPacket->set_data(std::format("{},{}", uuids::to_string(_roomId), uuids::to_string(_id)));
+    Matchmaking matchmakingPacket;
+    matchmakingPacket.set_type(MatchmakingType::Matched);
+    matchmakingPacket.set_sessionid(uuids::to_string(_id));
+    matchmakingPacket.set_roomid(uuids::to_string(roomId));
 
-    SendAsync(std::move(infoPacket));
+    std::string serializedData;
+    if(!matchmakingPacket.SerializeToString(&serializedData))
+    {
+        spdlog::error("session {}: serialize match making packet error in set_room()", uuids::to_string(_id));
+        return;
+    }
+
+    auto sendPacket = std::make_shared<Packet>();
+    sendPacket->set_type(PacketType::Match);
+    sendPacket->set_data(serializedData);
+
+    EnqueueTcpSendPacket(std::move(sendPacket));
 }
 
-void Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
+CallbackHandle Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
 {
     std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
-    _disconnectCallbacks.push_back(callback);
+    _disconnectCallbacks[_callbackHandleCount] = callback;
+    return _callbackHandleCount++;
+}
+
+void Session::RemoveDiscconectCallback(CallbackHandle handle)
+{
+    std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
+    _disconnectCallbacks.erase(handle);
 }
 
 void Session::SetSendToHandler(SendToHandler handler)
@@ -98,7 +125,7 @@ void Session::ReadSizeAsync()
 void Session::ReadDataAsync(const std::uint16_t& dataSize)
 {
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(dataSize);
-    asio::async_read(*_socketPtr, asio::buffer(*receiveBuffer), asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer](const std::error_code& ec, std::size_t) {
+    asio::async_read(*_socketPtr, asio::buffer(*receiveBuffer), asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, dataSize](const std::error_code& ec, std::size_t) {
         if(ec)
         {
             if(auto self = weakSelf.lock())
@@ -118,10 +145,112 @@ void Session::ReadDataAsync(const std::uint16_t& dataSize)
 
         if(auto self = weakSelf.lock())
         {
-            spdlog::info("session {} : read ok", uuids::to_string(self->GetId()));
+            self->_ioManager->PostOnBlockingPool([weakSelf, receiveBuffer, dataSize]() {
+                if(auto self = weakSelf.lock())
+                {
+                    self->EnqueueProcessPacket(std::move(receiveBuffer), dataSize);
+                }
+            });
+
             self->ReadSizeAsync();
         }
     }));
+}
+
+void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::uint16_t size)
+{
+    spdlog::info("enqueue packet");
+    auto packet = std::make_shared<Packet>();
+    if(!packet->ParseFromArray(data->data(), size))
+    {
+        spdlog::error("session {}: parsing process packet error", uuids::to_string(_id));
+        return;
+    }
+
+    std::lock_guard<std::mutex> processQueueLock(_processQueueMutex);
+    _processQueue.push(packet);
+
+    if(_isProcessing)
+        return;
+
+    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
+        if(auto self = weakSelf.lock())
+            self->ProcessPacketAsync();
+    });
+}
+
+// TODO : DoProcessPacketAsync로 빼서 실제 parsing, proccess 로직은 별도의 함수로 관리
+void Session::ProcessPacketAsync()
+{
+    spdlog::info("process packet");
+    std::lock_guard<std::mutex> processQueueLock(_processQueueMutex);
+    while(!_processQueue.empty())
+    {
+        auto packet = _processQueue.front();
+        _processQueue.pop();
+
+        // matching sequence
+        if(packet->type() == PacketType::Match)
+        {
+            auto dataSize = packet->data().size();
+            auto matchmakingPacket = std::make_shared<Matchmaking>();
+            if(!matchmakingPacket->ParseFromArray(packet->data().data(), dataSize))
+            {
+                spdlog::error("session {}: parsing match making packet error", uuids::to_string(_id));
+                return;
+            }
+
+            if(uuids::uuid::from_string(matchmakingPacket->sessionid()) != _id)
+            {
+                spdlog::error("session {}: session id is not same ({})", uuids::to_string(_id), matchmakingPacket->sessionid());
+                return;
+            }
+
+            _state = SessionState::WaitMatching; // Update State
+            _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
+                if(auto self = weakSelf.lock())
+                {
+                    if(auto listener = self->_weakListener.lock())
+                    {
+                        spdlog::info("session {}: request waiting for match", uuids::to_string(self->GetId()));
+                        MatchingLastError e;
+                        if(!listener->AddToMatchmakingQueue(self->GetId(), e))
+                        {
+                            if(e == MatchingLastError::FailedByExsists)
+                            {
+                                return;
+                            }
+
+                            // failed packet send
+                        }
+
+                        // send ok packet
+                        Matchmaking sendMatchmakingPacket;
+                        sendMatchmakingPacket.set_type(MatchmakingType::Waiting);
+                        sendMatchmakingPacket.set_sessionid(uuids::to_string(self->GetId()));
+
+                        std::string serializedData;
+                        if(!sendMatchmakingPacket.SerializeToString(&serializedData))
+                        {
+                            spdlog::error("session {}: serialize match making packet error", uuids::to_string(self->GetId()));
+                            return;
+                        }
+
+                        auto sendPacket = std::make_shared<Packet>();
+                        sendPacket->set_type(PacketType::Match);
+                        sendPacket->set_data(serializedData);
+                        self->EnqueueTcpSendPacket(std::move(sendPacket)); // send matching complete to client
+                        self->_isValid = true;                             // allow broadcast
+                    }
+                }
+            });
+        }
+        else
+        {
+            spdlog::warn("session {}: income not implemented packet type", uuids::to_string(GetId()));
+            return;
+        }
+    }
 }
 
 void Session::EnqueueUdpSendPacket(const std::shared_ptr<Packet> data)
@@ -153,8 +282,9 @@ void Session::EnqueueUdpSendPacket(const std::shared_ptr<Packet> data)
 
 void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
 {
-    std::shared_ptr<Raw> sendData;
     auto size = static_cast<int>(data->ByteSizeLong());
+    auto sendData = std::make_shared<Raw>(size);
+
     if(!data->SerializeToArray(sendData->data(), size))
     {
         spdlog::error("session {}: failed to serialize tcp data", uuids::to_string(_id));
@@ -164,90 +294,52 @@ void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
     std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
     _sendTcpQueue.push(sendData);
 
-    if(!_isWriting)
-    {
-        DoSendAsyncTcpLoop();
-    }
+    if(_isWriting)
+        return;
+
+    _isWriting = true;
+    DoSendAsyncTcpLoop();
 }
 
 void Session::DoSendAsyncTcpLoop()
 {
-    std::shared_ptr<Raw> packet;
-    std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
-    packet = _sendTcpQueue.front();
-    _sendTcpQueue.pop();
-
-    bool hasMore = !_sendTcpQueue.empty();
-    asio::async_write(*_socketPtr, asio::buffer(*packet), asio::bind_executor(_strand, [weakSelf = weak_from_this(), packet, hasMore](const std::error_code& ec, std::size_t) {
-        if(ec)
-        {
-            if(auto self = weakSelf.lock())
-            {
-                if(ec != asio::error::operation_aborted)
-                    spdlog::error("session {} write loop error: {}", uuids::to_string(self->GetId()), ec.message());
-                self->Stop();
-            }
-            return;
-        }
-
-        if(auto self = weakSelf.lock())
-        {
-            if(hasMore)
-            {
-                self->DoSendAsyncTcpLoop();
-            }
-        }
-    }));
-}
-
-void Session::SendAsync(const std::shared_ptr<Packet> packet)
-{
-    // 1. serialize packet
-    std::size_t size = packet->ByteSizeLong();
-    auto sendBuffer = std::make_shared<std::vector<unsigned char>>(size);
-    if(!packet->SerializeToArray(sendBuffer->data(), static_cast<int>(size)))
+    // Dequeue from send queue
+    std::shared_ptr<Raw> dataBody;
     {
-        spdlog::error("session {} failed serailze packet");
-        return;
+        std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
+        dataBody = _sendTcpQueue.front();
+        _sendTcpQueue.pop();
     }
 
-    // 2. calculate data size
-    std::uint16_t dataSize = static_cast<std::uint16_t>(sendBuffer->size());
-    std::uint16_t dataNetSize = htons(dataSize);
+    // calculate size for payload
+    std::uint16_t size = dataBody->size();
+    std::uint16_t netSize = htons(size);
+    auto totalSize = sizeof(size) + size;
 
-    // 3. data size send
-    asio::async_write(*_socketPtr, asio::buffer(&dataNetSize, sizeof(dataNetSize)), asio::bind_executor(_strand, [weakSelf = weak_from_this(), sendBuffer, dataSize, dataNetSize](std::error_code ec, std::size_t) {
-        if(ec)
+    // make payload (size header + send data)
+    auto payload = std::make_shared<Raw>(totalSize);
+    std::memcpy(payload->data(), &netSize, sizeof(netSize));
+    std::memcpy(payload->data() + sizeof(netSize), dataBody->data(), size);
+
+    asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = weak_from_this(), payload](const std::error_code& ec, std::size_t) {
+        if(auto self = weakSelf.lock())
         {
-            if(auto self = weakSelf.lock())
+            if(ec)
             {
-                spdlog::error("session {} send size async error occured: {}", uuids::to_string(self->GetId()), ec.message());
+                if(ec != asio::error::operation_aborted)
+                    spdlog::error("session {} write error: {}", uuids::to_string(self->GetId()), ec.message());
                 self->Stop();
                 return;
             }
-        }
 
-        if(auto self = weakSelf.lock())
-        {
-            spdlog::info("session {} send size complete", uuids::to_string(self->GetId()));
+            std::lock_guard<std::mutex> sendQueueMutex(self->_sendTcpQueueMutex);
+            if(self->_sendTcpQueue.empty())
+            {
+                self->_isWriting = false;
+                return;
+            }
 
-            // 4. real data send
-            asio::async_write(*self->_socketPtr, asio::buffer(*sendBuffer), asio::bind_executor(self->_strand, [weakSelf, sendBuffer](const std::error_code& ec, std::size_t) {
-                if(ec)
-                {
-                    if(auto self = weakSelf.lock())
-                    {
-                        spdlog::error("session {} send data async error occured: {}", uuids::to_string(self->GetId()), ec.message());
-                        self->Stop();
-                        return;
-                    }
-                }
-
-                if(auto self = weakSelf.lock())
-                {
-                    spdlog::info("[test log] session {} send complete", uuids::to_string(self->GetId()));
-                }
-            }));
+            self->DoSendAsyncTcpLoop();
         }
     }));
 }

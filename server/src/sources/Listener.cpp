@@ -40,14 +40,15 @@ void Listener::Stop()
     _rooms.clear();
     _acceptor.close();
     _udpSocket.close();
-    spdlog::info("listener stoped...\n");
+    spdlog::info("listener stopped...\n");
 }
 
 void Listener::AcceptAsync()
 {
-    auto newSession = Session::Create(_ioManager, _uuidGen(), _udpEndpoint.port());
-    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+    auto newSession = Session::Create(_ioManager, weak_from_this(), _uuidGen(), _udpEndpoint.port());
     auto sessionId = newSession->GetId();
+
+    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
     if(_sessions.find(sessionId) != _sessions.end())
     {
         spdlog::error("listener: create duplicate session, create again");
@@ -55,16 +56,13 @@ void Listener::AcceptAsync()
         return;
     }
 
-    newSession->AddDisconnectCallback([weakSelf = weak_from_this(), sessionId](const std::weak_ptr<Session>& weakSession) {
+    auto handle = newSession->AddDisconnectCallback([weakSelf = weak_from_this(), sessionId](const std::weak_ptr<Session>& weakSession) {
         if(auto self = weakSelf.lock())
         {
-            if(auto session = weakSession.lock())
-            {
-                std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
-                auto it = self->_sessions.find(sessionId);
-                self->_sessions.erase(it);
-                spdlog::info("listener: session {} removed from listener", uuids::to_string(sessionId));
-            }
+            std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
+            self->_sessions.erase(sessionId);
+            self->_sessionCallbackHandles.erase(sessionId);
+            spdlog::info("listener: session {} removed from listener", uuids::to_string(sessionId));
         }
     });
 
@@ -75,7 +73,9 @@ void Listener::AcceptAsync()
     });
 
     auto weakSession = _sessionManager->Insert(newSession->GetId(), std::move(newSession));
-    _sessions.insert({ sessionId, weakSession });
+
+    _sessions[sessionId] = weakSession;
+    _sessionCallbackHandles[sessionId] = handle;
 
     // async accept new client
     if(auto session = weakSession.lock())
@@ -115,10 +115,11 @@ void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr
         _payloadQueue.push({ ep, payload });
     }
 
-    if(!_isSending)
-    {
-        SendAsyncByUdp();
-    }
+    if(_isSending)
+        return;
+
+    _isSending = true;
+    SendAsyncByUdp();
 }
 
 void Listener::SendAsyncByUdp()
@@ -127,10 +128,8 @@ void Listener::SendAsyncByUdp()
     auto [ep, payload] = _payloadQueue.front();
     _payloadQueue.pop();
 
-    bool hasMore = !_payloadQueue.empty();
-
     _udpSocket.async_send_to(
-    asio::buffer(*payload), ep, asio::bind_executor(_strand, [weakSelf = weak_from_this(), payload, ep, hasMore](const std::error_code& ec, std::size_t) {
+    asio::buffer(*payload), ep, asio::bind_executor(_strand, [weakSelf = weak_from_this(), payload, ep](const std::error_code& ec, std::size_t) {
         if(ec)
         {
             spdlog::error("listener: udp send error occured({})", ec.message());
@@ -141,8 +140,14 @@ void Listener::SendAsyncByUdp()
         {
             spdlog::info("[test log] listener: udp send to ({}:{}) complete", ep.address().to_string(), ep.port());
 
-            if(hasMore)
-                self->SendAsyncByUdp();
+            std::lock_guard<std::mutex> payloadQueueLock(self->_payloadQueueMutex);
+            if(self->_payloadQueue.empty())
+            {
+                self->_isSending = false;
+                return;
+            }
+
+            self->SendAsyncByUdp();
         }
     }));
 }
@@ -243,7 +248,7 @@ void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, st
     }
 
     // Client UDP HolePunching
-    if(packet.type() == PacketType::Autentication)
+    if(packet.type() == PacketType::Authentication)
     {
         AuthenticationPacket authPacket;
         if(!authPacket.ParseFromString(packet.data()))
@@ -273,9 +278,6 @@ void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, st
             if(auto session = weakSession.lock())
             {
                 session->PunchUdpHole(*sender);
-
-                // transfer session ownership from session to matching
-                _matching->AddWaitSession(session->GetId(), weakSession);
             }
         }
     }
@@ -300,4 +302,14 @@ void Listener::RemoveRoom(std::shared_ptr<Room> room)
     }
 
     spdlog::info("listener: remove room {} from listener", uuids::to_string(removeId));
+}
+
+bool Listener::AddToMatchmakingQueue(uuids::uuid sessionId, MatchingLastError& type)
+{
+    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+    auto session = _sessions.find(sessionId);
+    if(session == _sessions.end())
+        return false;
+
+    return _matching->AddWaitSession(sessionId, session->second, type);
 }

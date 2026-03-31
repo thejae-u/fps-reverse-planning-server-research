@@ -86,6 +86,12 @@ void NetworkClient::Disconnect()
     _sessionId.clear();
     _serverUdpPort = 0;
 
+    {
+        std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
+        while (!_sendTcpQueue.empty()) _sendTcpQueue.pop();
+        _isWriting = false;
+    }
+
     std::error_code ec;
     if (_socket->is_open())
         _socket->close(ec);
@@ -99,17 +105,60 @@ void NetworkClient::Disconnect()
 
 void NetworkClient::SendMatchRequest()
 {
-    if(!_connected)
+    if(!_connected || _sessionId.empty())
         return;
 
-    if (_roomId.empty())
-    {
-        AddLog("Matchmaking requested (automatic)...");
-        _isMatching = true;
-    }
-    else
+    if (!_roomId.empty())
     {
         AddLog("Matchmaking request ignored: already matched.");
+        return;
+    }
+
+    if (_isMatching)
+    {
+        AddLog("Matchmaking request ignored: already in queue.");
+        return;
+    }
+
+    try
+    {
+        Matchmaking match;
+        match.set_type(MatchmakingType::Request);
+        match.set_sessionid(_sessionId);
+
+        std::string matchData;
+        if (!match.SerializeToString(&matchData)) return;
+
+        auto packet = std::make_shared<Packet>();
+        packet->set_type(PacketType::Match);
+        packet->set_data(matchData);
+
+        std::string packetData;
+        if (!packet->SerializeToString(&packetData)) return;
+
+        uint16_t size = static_cast<uint16_t>(packetData.size());
+        uint16_t netSize = htons(size);
+        auto buffer = std::make_shared<std::vector<char>>(sizeof(netSize) + packetData.size());
+        std::memcpy(buffer->data(), &netSize, sizeof(netSize));
+        std::memcpy(buffer->data() + sizeof(netSize), packetData.data(), packetData.size());
+
+        {
+            std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
+            _sendTcpQueue.push(buffer);
+        }
+
+        if (!_isWriting)
+        {
+            _isWriting = true;
+            DoSendAsyncTcpLoop();
+        }
+        
+        _isMatching = true;
+        AddLog("Matchmaking request queued.");
+    }
+    catch (const std::exception& e)
+    {
+        AddLog(std::format("SendMatchRequest exception: {}", e.what()), spdlog::level::err);
     }
 }
 
@@ -170,9 +219,12 @@ void NetworkClient::AsyncHandshake()
             }
 
             // In the new sequence, we must perform UDP hole punching immediately 
-            // after receiving the port and session ID to enter the matchmaking queue.
-            AddLog("Handshake success! Sending UDP Hole Punching for matchmaking...");
+            // after receiving the port and session ID.
+            AddLog("Handshake success! Sending UDP Hole Punching...");
             SendUdpHolePunching();
+
+            // Automate matching request immediately after handshake
+            SendMatchRequest();
             
             AsyncRead();
         }));
@@ -190,12 +242,16 @@ void NetworkClient::Send(const std::string& message)
     std::memcpy(buffer->data(), &netSize, sizeof(netSize));
     std::memcpy(buffer->data() + sizeof(netSize), message.data(), message.size());
 
-    auto self = shared_from_this();
-    asio::async_write(*_socket, asio::buffer(*buffer), [this, self, buffer](std::error_code ec, std::size_t length) {
-        if (ec) {
-            AddLog("Write error: " + ec.message(), spdlog::level::err);
-        }
-    });
+    {
+        std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
+        _sendTcpQueue.push(buffer);
+    }
+
+    if (!_isWriting)
+    {
+        _isWriting = true;
+        DoSendAsyncTcpLoop();
+    }
 }
 
 void NetworkClient::SendIngamePacket(IngameType type, const std::string& data)
@@ -324,16 +380,26 @@ void NetworkClient::AsyncRead()
                 if (!body_ec) {
                     Packet packet;
                     if (packet.ParseFromArray(bodyBuffer->data(), static_cast<int>(bodyBuffer->size()))) {
-                        if (packet.type() == PacketType::InfoHandshake)
+                        if (packet.type() == PacketType::Match)
                         {
-                            std::string info = packet.data();
-                            size_t commaPos = info.find(',');
-                            if (commaPos != std::string::npos)
+                            Matchmaking match;
+                            if (match.ParseFromString(packet.data()))
                             {
-                                _roomId = info.substr(0, commaPos);
-                                // Session ID is already confirmed during PortHandshake
-                                _isMatching = false;
-                                AddLog("Matching complete! Entering Room: " + _roomId);
+                                if (match.type() == MatchmakingType::Waiting)
+                                {
+                                    AddLog("Matchmaking: In queue, waiting for other players...");
+                                }
+                                else if (match.type() == MatchmakingType::Matched)
+                                {
+                                    _roomId = match.roomid();
+                                    _isMatching = false;
+                                    AddLog("Matchmaking Success! Room: " + _roomId);
+                                }
+                                else if (match.type() == MatchmakingType::Failed)
+                                {
+                                    _isMatching = false;
+                                    AddLog("Matchmaking Failed.", spdlog::level::err);
+                                }
                             }
                         }
                         else if (packet.type() == PacketType::Ingame)
@@ -483,7 +549,7 @@ void NetworkClient::SendUdpHolePunching()
         if (!auth.SerializeToString(&authData)) return;
 
         Packet packet;
-        packet.set_type(PacketType::Autentication);
+        packet.set_type(PacketType::Authentication);
         packet.set_data(authData);
 
         std::string packetData;
@@ -514,4 +580,36 @@ void NetworkClient::SendUdpHolePunching()
     {
         AddLog(std::format("SendUdpHolePunching exception: {}", e.what()), spdlog::level::err);
     }
+}
+
+void NetworkClient::DoSendAsyncTcpLoop()
+{
+    std::shared_ptr<std::vector<char>> buffer;
+    {
+        std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
+        buffer = _sendTcpQueue.front();
+        _sendTcpQueue.pop();
+    }
+
+    auto self = shared_from_this();
+    asio::async_write(*_socket, asio::buffer(*buffer), asio::bind_executor(_strand, [this, self, buffer](std::error_code ec, std::size_t) {
+        if (ec)
+        {
+            if (ec != asio::error::operation_aborted)
+            {
+                AddLog("TCP Write error: " + ec.message(), spdlog::level::err);
+            }
+            Disconnect();
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
+        if (_sendTcpQueue.empty())
+        {
+            _isWriting = false;
+            return;
+        }
+
+        DoSendAsyncTcpLoop();
+    }));
 }

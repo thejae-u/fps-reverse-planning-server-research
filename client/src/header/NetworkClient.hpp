@@ -87,4 +87,11 @@ private:
     MessageCallback _messageCallback;
     MessageCallback _udpMessageCallback;
     std::array<char, 65535> _udpReceiveBuffer;
+
+    // Write-related members
+    std::queue<std::shared_ptr<std::vector<char>>> _sendTcpQueue;
+    std::mutex _sendTcpQueueMutex;
+    std::atomic<bool> _isWriting{false};
+
+    void DoSendAsyncTcpLoop();
 };

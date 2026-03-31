@@ -12,14 +12,7 @@ void Room::WorldInit()
         spdlog::info("room {} invalid situation: no session", uuids::to_string(_roomId));
     }
 
-    std::vector<uuids::uuid> sessionIds(_sessions.size());
-    for(const auto& [id, session] : _sessions)
-    {
-        sessionIds.emplace_back(id);
-    }
-
-    _world->Init(sessionIds);
-
+    _world->Init(_sessions);
     spdlog::info("room {}: world create complete", uuids::to_string(_roomId));
 
     _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {

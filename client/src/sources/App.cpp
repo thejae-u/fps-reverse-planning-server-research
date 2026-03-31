@@ -208,14 +208,6 @@ void App::StartMatchmakingTest(int count)
         
         client->Connect(_host, (uint16_t)_port);
         
-        // Matchmaking request is now handled automatically after handshake success
-        // or can be triggered immediately if connection is already established
-        _ioManager->RegisterAsyncWork([client]() {
-            if (client->IsConnected()) {
-                client->SendMatchRequest();
-            }
-        });
-
         _testClients.push_back(client);
     }
 

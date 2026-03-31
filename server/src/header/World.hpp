@@ -8,8 +8,7 @@
 
 class Session;
 
-struct Vector3 
-{
+struct Vector3 {
     std::int32_t x;
     std::int32_t y;
     std::int32_t z;
@@ -40,8 +39,7 @@ struct Vector3
     Vector3(const std::int32_t x, const std::int32_t y, const std::int32_t z) : x(x), y(y), z(z) {}
 };
 
-struct Player
-{
+struct Player {
     Vector3 position;
     Vector3 velocity;
 
@@ -56,20 +54,20 @@ struct Player
     std::int32_t heal;
     std::int32_t guard;
 
-    Player() 
-        : position(), velocity(), hp(0), ammo(0), kill(0), death(0), assist(0), damage(0), heal(0), guard(0) {}
+    Player()
+    : position(), velocity(), hp(0), ammo(0), kill(0), death(0), assist(0), damage(0), heal(0), guard(0) {}
 };
 
 class World
 {
 public:
     explicit World(uuids::uuid roomId) : _roomId(roomId), _playerSize(static_cast<std::size_t>(0)) {}
-    ~World() 
+    ~World()
     {
         spdlog::info("world(room id) {}: world destroyed", uuids::to_string(_roomId));
     }
 
-    void Init(const std::vector<uuids::uuid> sessions);
+    void Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions);
     void Move(uuids::uuid player, Vector3 position);
 
 private:

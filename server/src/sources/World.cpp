@@ -1,12 +1,12 @@
 ﻿#include "World.hpp"
 #include "Session.hpp"
 
-void World::Init(const std::vector<uuids::uuid> sessionIds)
+void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions)
 {
     std::lock_guard<std::mutex> playerLock(_playerMutex);
-    _playerSize = sessionIds.size();
+    _playerSize = sessions.size();
 
-    for(const auto id : sessionIds)
+    for(const auto [id, session] : sessions)
     {
         auto newPlayer = std::make_unique<Player>();
         _players.insert({ id, std::move(newPlayer) });

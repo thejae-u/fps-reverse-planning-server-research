@@ -12,6 +12,7 @@
 #include <mutex>
 
 #include "Packet.pb.h"
+#include "CustomUtility.hpp"
 using namespace Protocol;
 
 class IOManager;
@@ -37,32 +38,6 @@ public:
         return newServer;
     }
 
-    // Test Area
-    static std::string ConvertType(PacketType type)
-    {
-        switch(type)
-        {
-        case PacketType::Ok:
-            return "Ok";
-        case PacketType::InvalidData:
-            return "InvalidData";
-        case PacketType::ErrorOccured:
-            return "ErrorOccured";
-        case PacketType::PortHandshake:
-            return "PortHandshake";
-        case PacketType::InfoHandshake:
-            return "InfoHandshake";
-        case PacketType::Ping:
-            return "Ping";
-        case PacketType::Ingame:
-            return "Ingame";
-        case PacketType::Autentication:
-            return "Authentication";
-        default:
-            return "INVALID_TYPE_ERROR";
-        }
-    }
-
 public:
     void Start();
     void Stop();
@@ -70,6 +45,9 @@ public:
     void AcceptAsync();
     void AddRoom(std::shared_ptr<Room> room);
     void RemoveRoom(std::shared_ptr<Room> room);
+
+public:
+    bool AddToMatchmakingQueue(uuids::uuid sessionId, MatchingLastError& type);
 
 private:
     using Raw = std::vector<unsigned char>;
@@ -102,6 +80,7 @@ private:
     std::mutex _roomsMutex;
 
     std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
+    std::unordered_map<uuids::uuid, CallbackHandle> _sessionCallbackHandles;
     std::mutex _sessionsMutex;
 
     std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _payloadQueue;

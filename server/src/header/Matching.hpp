@@ -5,11 +5,13 @@
 #include <mutex>
 #include <queue>
 #include <stack>
+#include <unordered_map>
 
 #include <uuid.h>
 
 #include "IOManager.hpp"
 #include "Room.hpp"
+#include "CustomUtility.hpp"
 
 class SessionManager;
 class Listener;
@@ -35,7 +37,7 @@ public:
     }
 
 public:
-    void AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> session);
+    bool AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> session, MatchingLastError& type);
     void Start();
     void Stop();
 
@@ -55,6 +57,8 @@ private:
 
     // waiting sessions
     std::deque<std::pair<uuids::uuid, std::weak_ptr<Session>>> _waitingQueue;
+    std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _weakSessions;
+    std::unordered_map<uuids::uuid, CallbackHandle> _sessionCallbackHandles;
     std::mutex _waitingQueueMutex;
 
     // matched rooms

@@ -31,7 +31,14 @@ std::weak_ptr<Session> SessionManager::Insert(uuids::uuid id, const std::shared_
         return std::weak_ptr<Session>{};
     }
 
-    _sessions[id] = std::move(session);
+    session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::shared_ptr<Session>& delSession) {
+        if(auto self = weakSelf.lock())
+        {
+            self->Erase(delSession->GetId());
+        }
+    });
+
+    _sessions[id] = session;
     spdlog::info("session manager: session {} insert success", uuids::to_string(id));
 
     return _sessions[id];
@@ -47,6 +54,7 @@ void SessionManager::Erase(uuids::uuid id)
     }
 
     _sessions.erase(id);
+    spdlog::info("session {} erased from session manager", uuids::to_string(id));
 }
 
 std::size_t SessionManager::Size()
