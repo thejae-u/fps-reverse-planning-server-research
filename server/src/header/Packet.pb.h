@@ -59,6 +59,9 @@ extern AuthenticationPacketDefaultTypeInternal _AuthenticationPacket_default_ins
 class IngamePacket;
 struct IngamePacketDefaultTypeInternal;
 extern IngamePacketDefaultTypeInternal _IngamePacket_default_instance_;
+class Matchmaking;
+struct MatchmakingDefaultTypeInternal;
+extern MatchmakingDefaultTypeInternal _Matchmaking_default_instance_;
 class Packet;
 struct PacketDefaultTypeInternal;
 extern PacketDefaultTypeInternal _Packet_default_instance_;
@@ -70,14 +73,15 @@ namespace protobuf {
 
 namespace Protocol {
 enum PacketType : int {
-  Ok = 0,
+  PacketOk = 0,
   InvalidData = 1,
   ErrorOccured = 2,
   PortHandshake = 100,
   InfoHandshake = 101,
   Ping = 102,
+  Match = 103,
   Ingame = 200,
-  Autentication = 201,
+  Authentication = 201,
   PacketType_INT_MIN_SENTINEL_DO_NOT_USE_ =
       std::numeric_limits<::int32_t>::min(),
   PacketType_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -137,6 +141,43 @@ inline const std::string& IngameType_Name(IngameType value) {
 inline bool IngameType_Parse(absl::string_view name, IngameType* value) {
   return ::google::protobuf::internal::ParseNamedEnum<IngameType>(
       IngameType_descriptor(), name, value);
+}
+enum MatchmakingType : int {
+  MatchmakingOk = 0,
+  Request = 1,
+  Success = 2,
+  Failed = 3,
+  Waiting = 4,
+  Matched = 5,
+  MatchmakingType_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      std::numeric_limits<::int32_t>::min(),
+  MatchmakingType_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      std::numeric_limits<::int32_t>::max(),
+};
+
+bool MatchmakingType_IsValid(int value);
+extern const uint32_t MatchmakingType_internal_data_[];
+constexpr MatchmakingType MatchmakingType_MIN = static_cast<MatchmakingType>(0);
+constexpr MatchmakingType MatchmakingType_MAX = static_cast<MatchmakingType>(5);
+constexpr int MatchmakingType_ARRAYSIZE = 5 + 1;
+const ::google::protobuf::EnumDescriptor*
+MatchmakingType_descriptor();
+template <typename T>
+const std::string& MatchmakingType_Name(T value) {
+  static_assert(std::is_same<T, MatchmakingType>::value ||
+                    std::is_integral<T>::value,
+                "Incorrect type passed to MatchmakingType_Name().");
+  return MatchmakingType_Name(static_cast<MatchmakingType>(value));
+}
+template <>
+inline const std::string& MatchmakingType_Name(MatchmakingType value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<MatchmakingType_descriptor,
+                                                 0, 5>(
+      static_cast<int>(value));
+}
+inline bool MatchmakingType_Parse(absl::string_view name, MatchmakingType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<MatchmakingType>(
+      MatchmakingType_descriptor(), name, value);
 }
 enum AuthenticationType : int {
   AuthenticationOk = 0,
@@ -385,6 +426,234 @@ class Packet final : public ::google::protobuf::Message
 };
 // -------------------------------------------------------------------
 
+class Matchmaking final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:Protocol.Matchmaking) */ {
+ public:
+  inline Matchmaking() : Matchmaking(nullptr) {}
+  ~Matchmaking() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(Matchmaking* msg, std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(Matchmaking));
+  }
+#endif
+
+  template <typename = void>
+  explicit PROTOBUF_CONSTEXPR Matchmaking(
+      ::google::protobuf::internal::ConstantInitialized);
+
+  inline Matchmaking(const Matchmaking& from) : Matchmaking(nullptr, from) {}
+  inline Matchmaking(Matchmaking&& from) noexcept
+      : Matchmaking(nullptr, std::move(from)) {}
+  inline Matchmaking& operator=(const Matchmaking& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline Matchmaking& operator=(Matchmaking&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields()
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::google::protobuf::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::google::protobuf::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const Matchmaking& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const Matchmaking* internal_default_instance() {
+    return reinterpret_cast<const Matchmaking*>(
+        &_Matchmaking_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 1;
+  friend void swap(Matchmaking& a, Matchmaking& b) { a.Swap(&b); }
+  inline void Swap(Matchmaking* other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(Matchmaking* other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  Matchmaking* New(::google::protobuf::Arena* arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<Matchmaking>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const Matchmaking& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const Matchmaking& from) { Matchmaking::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(
+      ::google::protobuf::MessageLite& to_msg,
+      const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  static ::uint8_t* _InternalSerialize(
+      const MessageLite& msg, ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream);
+
+  public:
+  ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  ::size_t ByteSizeLong() const final;
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  int GetCachedSize() const { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(Matchmaking* other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(
+      ::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "Protocol.Matchmaking"; }
+
+ protected:
+  explicit Matchmaking(::google::protobuf::Arena* arena);
+  Matchmaking(::google::protobuf::Arena* arena, const Matchmaking& from);
+  Matchmaking(::google::protobuf::Arena* arena, Matchmaking&& from) noexcept
+      : Matchmaking(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* GetClassData() const PROTOBUF_FINAL;
+  static void* PlacementNew_(const void*, void* mem,
+                             ::google::protobuf::Arena* arena);
+  static constexpr auto InternalNewImpl_();
+  static const ::google::protobuf::internal::ClassDataFull _class_data_;
+
+ public:
+  ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSessionIdFieldNumber = 2,
+    kRoomIdFieldNumber = 3,
+    kTypeFieldNumber = 1,
+  };
+  // bytes sessionId = 2;
+  void clear_sessionid() ;
+  const std::string& sessionid() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_sessionid(Arg_&& arg, Args_... args);
+  std::string* mutable_sessionid();
+  PROTOBUF_NODISCARD std::string* release_sessionid();
+  void set_allocated_sessionid(std::string* value);
+
+  private:
+  const std::string& _internal_sessionid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_sessionid(
+      const std::string& value);
+  std::string* _internal_mutable_sessionid();
+
+  public:
+  // optional bytes roomId = 3;
+  bool has_roomid() const;
+  void clear_roomid() ;
+  const std::string& roomid() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_roomid(Arg_&& arg, Args_... args);
+  std::string* mutable_roomid();
+  PROTOBUF_NODISCARD std::string* release_roomid();
+  void set_allocated_roomid(std::string* value);
+
+  private:
+  const std::string& _internal_roomid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_roomid(
+      const std::string& value);
+  std::string* _internal_mutable_roomid();
+
+  public:
+  // .Protocol.MatchmakingType type = 1;
+  void clear_type() ;
+  ::Protocol::MatchmakingType type() const;
+  void set_type(::Protocol::MatchmakingType value);
+
+  private:
+  ::Protocol::MatchmakingType _internal_type() const;
+  void _internal_set_type(::Protocol::MatchmakingType value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:Protocol.Matchmaking)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<
+      2, 3, 0,
+      0, 2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(
+        ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena);
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena, const Impl_& from,
+                          const Matchmaking& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr sessionid_;
+    ::google::protobuf::internal::ArenaStringPtr roomid_;
+    int type_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_Packet_2eproto;
+};
+// -------------------------------------------------------------------
+
 class IngamePacket final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:Protocol.IngamePacket) */ {
  public:
@@ -444,7 +713,7 @@ class IngamePacket final : public ::google::protobuf::Message
     return reinterpret_cast<const IngamePacket*>(
         &_IngamePacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 1;
+  static constexpr int kIndexInFileMessages = 2;
   friend void swap(IngamePacket& a, IngamePacket& b) { a.Swap(&b); }
   inline void Swap(IngamePacket* other) {
     if (other == this) return;
@@ -688,7 +957,7 @@ class AuthenticationPacket final : public ::google::protobuf::Message
     return reinterpret_cast<const AuthenticationPacket*>(
         &_AuthenticationPacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 3;
   friend void swap(AuthenticationPacket& a, AuthenticationPacket& b) { a.Swap(&b); }
   inline void Swap(AuthenticationPacket* other) {
     if (other == this) return;
@@ -956,6 +1225,149 @@ inline void Packet::set_allocated_data(std::string* value) {
     _impl_.data_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:Protocol.Packet.data)
+}
+
+// -------------------------------------------------------------------
+
+// Matchmaking
+
+// .Protocol.MatchmakingType type = 1;
+inline void Matchmaking::clear_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_ = 0;
+}
+inline ::Protocol::MatchmakingType Matchmaking::type() const {
+  // @@protoc_insertion_point(field_get:Protocol.Matchmaking.type)
+  return _internal_type();
+}
+inline void Matchmaking::set_type(::Protocol::MatchmakingType value) {
+  _internal_set_type(value);
+  // @@protoc_insertion_point(field_set:Protocol.Matchmaking.type)
+}
+inline ::Protocol::MatchmakingType Matchmaking::_internal_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::Protocol::MatchmakingType>(_impl_.type_);
+}
+inline void Matchmaking::_internal_set_type(::Protocol::MatchmakingType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.type_ = value;
+}
+
+// bytes sessionId = 2;
+inline void Matchmaking::clear_sessionid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.ClearToEmpty();
+}
+inline const std::string& Matchmaking::sessionid() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Protocol.Matchmaking.sessionId)
+  return _internal_sessionid();
+}
+template <typename Arg_, typename... Args_>
+inline PROTOBUF_ALWAYS_INLINE void Matchmaking::set_sessionid(Arg_&& arg,
+                                                     Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:Protocol.Matchmaking.sessionId)
+}
+inline std::string* Matchmaking::mutable_sessionid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_sessionid();
+  // @@protoc_insertion_point(field_mutable:Protocol.Matchmaking.sessionId)
+  return _s;
+}
+inline const std::string& Matchmaking::_internal_sessionid() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.sessionid_.Get();
+}
+inline void Matchmaking::_internal_set_sessionid(const std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.Set(value, GetArena());
+}
+inline std::string* Matchmaking::_internal_mutable_sessionid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.sessionid_.Mutable( GetArena());
+}
+inline std::string* Matchmaking::release_sessionid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:Protocol.Matchmaking.sessionId)
+  return _impl_.sessionid_.Release();
+}
+inline void Matchmaking::set_allocated_sessionid(std::string* value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sessionid_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.sessionid_.IsDefault()) {
+    _impl_.sessionid_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:Protocol.Matchmaking.sessionId)
+}
+
+// optional bytes roomId = 3;
+inline bool Matchmaking::has_roomid() const {
+  bool value = (_impl_._has_bits_[0] & 0x00000001u) != 0;
+  return value;
+}
+inline void Matchmaking::clear_roomid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.roomid_.ClearToEmpty();
+  _impl_._has_bits_[0] &= ~0x00000001u;
+}
+inline const std::string& Matchmaking::roomid() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Protocol.Matchmaking.roomId)
+  return _internal_roomid();
+}
+template <typename Arg_, typename... Args_>
+inline PROTOBUF_ALWAYS_INLINE void Matchmaking::set_roomid(Arg_&& arg,
+                                                     Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_._has_bits_[0] |= 0x00000001u;
+  _impl_.roomid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:Protocol.Matchmaking.roomId)
+}
+inline std::string* Matchmaking::mutable_roomid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  std::string* _s = _internal_mutable_roomid();
+  // @@protoc_insertion_point(field_mutable:Protocol.Matchmaking.roomId)
+  return _s;
+}
+inline const std::string& Matchmaking::_internal_roomid() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.roomid_.Get();
+}
+inline void Matchmaking::_internal_set_roomid(const std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_._has_bits_[0] |= 0x00000001u;
+  _impl_.roomid_.Set(value, GetArena());
+}
+inline std::string* Matchmaking::_internal_mutable_roomid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_._has_bits_[0] |= 0x00000001u;
+  return _impl_.roomid_.Mutable( GetArena());
+}
+inline std::string* Matchmaking::release_roomid() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:Protocol.Matchmaking.roomId)
+  if ((_impl_._has_bits_[0] & 0x00000001u) == 0) {
+    return nullptr;
+  }
+  _impl_._has_bits_[0] &= ~0x00000001u;
+  auto* released = _impl_.roomid_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.roomid_.Set("", GetArena());
+  }
+  return released;
+}
+inline void Matchmaking::set_allocated_roomid(std::string* value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    _impl_._has_bits_[0] |= 0x00000001u;
+  } else {
+    _impl_._has_bits_[0] &= ~0x00000001u;
+  }
+  _impl_.roomid_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.roomid_.IsDefault()) {
+    _impl_.roomid_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:Protocol.Matchmaking.roomId)
 }
 
 // -------------------------------------------------------------------
@@ -1320,6 +1732,12 @@ struct is_proto_enum<::Protocol::IngameType> : std::true_type {};
 template <>
 inline const EnumDescriptor* GetEnumDescriptor<::Protocol::IngameType>() {
   return ::Protocol::IngameType_descriptor();
+}
+template <>
+struct is_proto_enum<::Protocol::MatchmakingType> : std::true_type {};
+template <>
+inline const EnumDescriptor* GetEnumDescriptor<::Protocol::MatchmakingType>() {
+  return ::Protocol::MatchmakingType_descriptor();
 }
 template <>
 struct is_proto_enum<::Protocol::AuthenticationType> : std::true_type {};

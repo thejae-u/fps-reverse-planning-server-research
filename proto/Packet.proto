@@ -4,7 +4,7 @@ package Protocol;
 
 enum PacketType {
     // status response
-    Ok = 0;
+    PacketOk = 0;
     InvalidData = 1;
     ErrorOccured = 2;
 
@@ -12,10 +12,11 @@ enum PacketType {
     PortHandshake = 100;
     InfoHandshake = 101;
     Ping = 102;
+    Match = 103;
 
     // Udp
     Ingame = 200;
-    Autentication = 201;
+    Authentication = 201;
 }
 
 enum IngameType {
@@ -26,14 +27,30 @@ enum IngameType {
     Hit = 4;
 }
 
+enum MatchmakingType {
+    MatchmakingOk = 0;
+    Request = 1;
+    Success = 2;
+    Failed = 3;
+
+    Waiting = 4;
+    Matched = 5; 
+}
+
 enum AuthenticationType {
     AuthenticationOk = 0;
     UdpHolePunching = 1;
 }
 
-message Packet{
+message Packet {
     PacketType type = 1;
     bytes data = 2;
+}
+
+message Matchmaking {
+    MatchmakingType type = 1;
+    bytes sessionId = 2;
+    optional bytes roomId = 3;
 }
 
 message IngamePacket {

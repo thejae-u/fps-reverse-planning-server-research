@@ -54,6 +54,37 @@ struct PacketDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PacketDefaultTypeInternal _Packet_default_instance_;
 
+inline constexpr Matchmaking::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        sessionid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        roomid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        type_{static_cast< ::Protocol::MatchmakingType >(0)} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR Matchmaking::Matchmaking(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct MatchmakingDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR MatchmakingDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~MatchmakingDefaultTypeInternal() {}
+  union {
+    Matchmaking _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 MatchmakingDefaultTypeInternal _Matchmaking_default_instance_;
+
 inline constexpr IngamePacket::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : sessionid_(
@@ -122,7 +153,7 @@ struct AuthenticationPacketDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 AuthenticationPacketDefaultTypeInternal _AuthenticationPacket_default_instance_;
 }  // namespace Protocol
-static const ::_pb::EnumDescriptor* file_level_enum_descriptors_Packet_2eproto[3];
+static const ::_pb::EnumDescriptor* file_level_enum_descriptors_Packet_2eproto[4];
 static constexpr const ::_pb::ServiceDescriptor**
     file_level_service_descriptors_Packet_2eproto = nullptr;
 const ::uint32_t
@@ -138,6 +169,20 @@ const ::uint32_t
         ~0u,  // no sizeof(Split)
         PROTOBUF_FIELD_OFFSET(::Protocol::Packet, _impl_.type_),
         PROTOBUF_FIELD_OFFSET(::Protocol::Packet, _impl_.data_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Matchmaking, _impl_._has_bits_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Matchmaking, _internal_metadata_),
+        ~0u,  // no _extensions_
+        ~0u,  // no _oneof_case_
+        ~0u,  // no _weak_field_map_
+        ~0u,  // no _inlined_string_donated_
+        ~0u,  // no _split_
+        ~0u,  // no sizeof(Split)
+        PROTOBUF_FIELD_OFFSET(::Protocol::Matchmaking, _impl_.type_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Matchmaking, _impl_.sessionid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Matchmaking, _impl_.roomid_),
+        ~0u,
+        ~0u,
+        0,
         ~0u,  // no _has_bits_
         PROTOBUF_FIELD_OFFSET(::Protocol::IngamePacket, _internal_metadata_),
         ~0u,  // no _extensions_
@@ -167,11 +212,13 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, -1, -1, sizeof(::Protocol::Packet)},
-        {10, -1, -1, sizeof(::Protocol::IngamePacket)},
-        {22, -1, -1, sizeof(::Protocol::AuthenticationPacket)},
+        {10, 21, -1, sizeof(::Protocol::Matchmaking)},
+        {24, -1, -1, sizeof(::Protocol::IngamePacket)},
+        {36, -1, -1, sizeof(::Protocol::AuthenticationPacket)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
     &::Protocol::_Packet_default_instance_._instance,
+    &::Protocol::_Matchmaking_default_instance_._instance,
     &::Protocol::_IngamePacket_default_instance_._instance,
     &::Protocol::_AuthenticationPacket_default_instance_._instance,
 };
@@ -179,31 +226,37 @@ const char descriptor_table_protodef_Packet_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     protodesc_cold) = {
     "\n\014Packet.proto\022\010Protocol\":\n\006Packet\022\"\n\004ty"
     "pe\030\001 \001(\0162\024.Protocol.PacketType\022\014\n\004data\030\002"
-    " \001(\014\"e\n\014IngamePacket\022\021\n\tsessionId\030\001 \001(\014\022"
-    "\016\n\006roomId\030\002 \001(\014\022$\n\006method\030\003 \001(\0162\024.Protoc"
-    "ol.IngameType\022\014\n\004data\030\004 \001(\014\"u\n\024Authentic"
-    "ationPacket\022\021\n\tsessionId\030\001 \001(\014\022\016\n\006roomId"
-    "\030\002 \001(\014\022,\n\006method\030\003 \001(\0162\034.Protocol.Authen"
-    "ticationType\022\014\n\004data\030\004 \001(\014*\210\001\n\nPacketTyp"
-    "e\022\006\n\002Ok\020\000\022\017\n\013InvalidData\020\001\022\020\n\014ErrorOccur"
-    "ed\020\002\022\021\n\rPortHandshake\020d\022\021\n\rInfoHandshake"
-    "\020e\022\010\n\004Ping\020f\022\013\n\006Ingame\020\310\001\022\022\n\rAutenticati"
-    "on\020\311\001*B\n\nIngameType\022\014\n\010IngameOk\020\000\022\010\n\004Mov"
-    "e\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003Hit\020\004*\?\n\022Aut"
-    "henticationType\022\024\n\020AuthenticationOk\020\000\022\023\n"
-    "\017UdpHolePunching\020\001b\006proto3"
+    " \001(\014\"i\n\013Matchmaking\022\'\n\004type\030\001 \001(\0162\031.Prot"
+    "ocol.MatchmakingType\022\021\n\tsessionId\030\002 \001(\014\022"
+    "\023\n\006roomId\030\003 \001(\014H\000\210\001\001B\t\n\007_roomId\"e\n\014Ingam"
+    "ePacket\022\021\n\tsessionId\030\001 \001(\014\022\016\n\006roomId\030\002 \001"
+    "(\014\022$\n\006method\030\003 \001(\0162\024.Protocol.IngameType"
+    "\022\014\n\004data\030\004 \001(\014\"u\n\024AuthenticationPacket\022\021"
+    "\n\tsessionId\030\001 \001(\014\022\016\n\006roomId\030\002 \001(\014\022,\n\006met"
+    "hod\030\003 \001(\0162\034.Protocol.AuthenticationType\022"
+    "\014\n\004data\030\004 \001(\014*\232\001\n\nPacketType\022\014\n\010PacketOk"
+    "\020\000\022\017\n\013InvalidData\020\001\022\020\n\014ErrorOccured\020\002\022\021\n"
+    "\rPortHandshake\020d\022\021\n\rInfoHandshake\020e\022\010\n\004P"
+    "ing\020f\022\t\n\005Match\020g\022\013\n\006Ingame\020\310\001\022\023\n\016Authent"
+    "ication\020\311\001*B\n\nIngameType\022\014\n\010IngameOk\020\000\022\010"
+    "\n\004Move\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003Hit\020\004*d"
+    "\n\017MatchmakingType\022\021\n\rMatchmakingOk\020\000\022\013\n\007"
+    "Request\020\001\022\013\n\007Success\020\002\022\n\n\006Failed\020\003\022\013\n\007Wa"
+    "iting\020\004\022\013\n\007Matched\020\005*\?\n\022AuthenticationTy"
+    "pe\022\024\n\020AuthenticationOk\020\000\022\023\n\017UdpHolePunch"
+    "ing\020\001b\006proto3"
 };
 static ::absl::once_flag descriptor_table_Packet_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_Packet_2eproto = {
     false,
     false,
-    586,
+    813,
     descriptor_table_protodef_Packet_2eproto,
     "Packet.proto",
     &descriptor_table_Packet_2eproto_once,
     nullptr,
     0,
-    3,
+    4,
     schemas,
     file_default_instances,
     TableStruct_Packet_2eproto::offsets,
@@ -216,7 +269,7 @@ const ::google::protobuf::EnumDescriptor* PacketType_descriptor() {
   return file_level_enum_descriptors_Packet_2eproto[0];
 }
 PROTOBUF_CONSTINIT const uint32_t PacketType_internal_data_[] = {
-    196608u, 327680u, 200u, 101u, 201u, 100u, 102u, };
+    196608u, 131200u, 0u, 0u, 0u, 30u, 201u, 200u, };
 bool PacketType_IsValid(int value) {
   return ::_pbi::ValidateEnum(value, PacketType_internal_data_);
 }
@@ -229,9 +282,18 @@ PROTOBUF_CONSTINIT const uint32_t IngameType_internal_data_[] = {
 bool IngameType_IsValid(int value) {
   return 0 <= value && value <= 4;
 }
-const ::google::protobuf::EnumDescriptor* AuthenticationType_descriptor() {
+const ::google::protobuf::EnumDescriptor* MatchmakingType_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_Packet_2eproto);
   return file_level_enum_descriptors_Packet_2eproto[2];
+}
+PROTOBUF_CONSTINIT const uint32_t MatchmakingType_internal_data_[] = {
+    393216u, 0u, };
+bool MatchmakingType_IsValid(int value) {
+  return 0 <= value && value <= 5;
+}
+const ::google::protobuf::EnumDescriptor* AuthenticationType_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_Packet_2eproto);
+  return file_level_enum_descriptors_Packet_2eproto[3];
 }
 PROTOBUF_CONSTINIT const uint32_t AuthenticationType_internal_data_[] = {
     131072u, 0u, };
@@ -488,6 +550,302 @@ void Packet::InternalSwap(Packet* PROTOBUF_RESTRICT other) {
 }
 
 ::google::protobuf::Metadata Packet::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class Matchmaking::_Internal {
+ public:
+  using HasBits =
+      decltype(std::declval<Matchmaking>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_._has_bits_);
+};
+
+Matchmaking::Matchmaking(::google::protobuf::Arena* arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:Protocol.Matchmaking)
+}
+inline PROTOBUF_NDEBUG_INLINE Matchmaking::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
+    const Impl_& from, const ::Protocol::Matchmaking& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        sessionid_(arena, from.sessionid_),
+        roomid_(arena, from.roomid_) {}
+
+Matchmaking::Matchmaking(
+    ::google::protobuf::Arena* arena,
+    const Matchmaking& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  Matchmaking* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.type_ = from._impl_.type_;
+
+  // @@protoc_insertion_point(copy_constructor:Protocol.Matchmaking)
+}
+inline PROTOBUF_NDEBUG_INLINE Matchmaking::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility,
+    ::google::protobuf::Arena* arena)
+      : _cached_size_{0},
+        sessionid_(arena),
+        roomid_(arena) {}
+
+inline void Matchmaking::SharedCtor(::_pb::Arena* arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.type_ = {};
+}
+Matchmaking::~Matchmaking() {
+  // @@protoc_insertion_point(destructor:Protocol.Matchmaking)
+  SharedDtor(*this);
+}
+inline void Matchmaking::SharedDtor(MessageLite& self) {
+  Matchmaking& this_ = static_cast<Matchmaking&>(self);
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.sessionid_.Destroy();
+  this_._impl_.roomid_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* Matchmaking::PlacementNew_(const void*, void* mem,
+                                        ::google::protobuf::Arena* arena) {
+  return ::new (mem) Matchmaking(arena);
+}
+constexpr auto Matchmaking::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(Matchmaking),
+                                            alignof(Matchmaking));
+}
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::google::protobuf::internal::ClassDataFull Matchmaking::_class_data_ = {
+    ::google::protobuf::internal::ClassData{
+        &_Matchmaking_default_instance_._instance,
+        &_table_.header,
+        nullptr,  // OnDemandRegisterArenaDtor
+        nullptr,  // IsInitialized
+        &Matchmaking::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<Matchmaking>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        &Matchmaking::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<Matchmaking>(), &Matchmaking::ByteSizeLong,
+            &Matchmaking::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+        PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_._cached_size_),
+        false,
+    },
+    &Matchmaking::kDescriptorMethods,
+    &descriptor_table_Packet_2eproto,
+    nullptr,  // tracker
+};
+const ::google::protobuf::internal::ClassData* Matchmaking::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
+  return _class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 3, 0, 0, 2> Matchmaking::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_._has_bits_),
+    0, // no _extensions_
+    3, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967288,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    3,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    _class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::Protocol::Matchmaking>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // .Protocol.MatchmakingType type = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(Matchmaking, _impl_.type_), 63>(),
+     {8, 63, 0, PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_.type_)}},
+    // bytes sessionId = 2;
+    {::_pbi::TcParser::FastBS1,
+     {18, 63, 0, PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_.sessionid_)}},
+    // optional bytes roomId = 3;
+    {::_pbi::TcParser::FastBS1,
+     {26, 0, 0, PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_.roomid_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // .Protocol.MatchmakingType type = 1;
+    {PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_.type_), -1, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kOpenEnum)},
+    // bytes sessionId = 2;
+    {PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_.sessionid_), -1, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
+    // optional bytes roomId = 3;
+    {PROTOBUF_FIELD_OFFSET(Matchmaking, _impl_.roomid_), _Internal::kHasBitsOffset + 0, 0,
+    (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+
+PROTOBUF_NOINLINE void Matchmaking::Clear() {
+// @@protoc_insertion_point(message_clear_start:Protocol.Matchmaking)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.sessionid_.ClearToEmpty();
+  cached_has_bits = _impl_._has_bits_[0];
+  if (cached_has_bits & 0x00000001u) {
+    _impl_.roomid_.ClearNonDefaultToEmpty();
+  }
+  _impl_.type_ = 0;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::uint8_t* Matchmaking::_InternalSerialize(
+            const MessageLite& base, ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) {
+          const Matchmaking& this_ = static_cast<const Matchmaking&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::uint8_t* Matchmaking::_InternalSerialize(
+            ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+          const Matchmaking& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(serialize_to_array_start:Protocol.Matchmaking)
+          ::uint32_t cached_has_bits = 0;
+          (void)cached_has_bits;
+
+          // .Protocol.MatchmakingType type = 1;
+          if (this_._internal_type() != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteEnumToArray(
+                1, this_._internal_type(), target);
+          }
+
+          // bytes sessionId = 2;
+          if (!this_._internal_sessionid().empty()) {
+            const std::string& _s = this_._internal_sessionid();
+            target = stream->WriteBytesMaybeAliased(2, _s, target);
+          }
+
+          cached_has_bits = this_._impl_._has_bits_[0];
+          // optional bytes roomId = 3;
+          if (cached_has_bits & 0x00000001u) {
+            const std::string& _s = this_._internal_roomid();
+            target = stream->WriteBytesMaybeAliased(3, _s, target);
+          }
+
+          if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+            target =
+                ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+                    this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+          }
+          // @@protoc_insertion_point(serialize_to_array_end:Protocol.Matchmaking)
+          return target;
+        }
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::size_t Matchmaking::ByteSizeLong(const MessageLite& base) {
+          const Matchmaking& this_ = static_cast<const Matchmaking&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::size_t Matchmaking::ByteSizeLong() const {
+          const Matchmaking& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(message_byte_size_start:Protocol.Matchmaking)
+          ::size_t total_size = 0;
+
+          ::uint32_t cached_has_bits = 0;
+          // Prevent compiler warnings about cached_has_bits being unused
+          (void)cached_has_bits;
+
+          ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+           {
+            // bytes sessionId = 2;
+            if (!this_._internal_sessionid().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_sessionid());
+            }
+          }
+           {
+            // optional bytes roomId = 3;
+            cached_has_bits = this_._impl_._has_bits_[0];
+            if (cached_has_bits & 0x00000001u) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_roomid());
+            }
+          }
+           {
+            // .Protocol.MatchmakingType type = 1;
+            if (this_._internal_type() != 0) {
+              total_size += 1 +
+                            ::_pbi::WireFormatLite::EnumSize(this_._internal_type());
+            }
+          }
+          return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                                     &this_._impl_._cached_size_);
+        }
+
+void Matchmaking::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<Matchmaking*>(&to_msg);
+  auto& from = static_cast<const Matchmaking&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:Protocol.Matchmaking)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_sessionid().empty()) {
+    _this->_internal_set_sessionid(from._internal_sessionid());
+  }
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (cached_has_bits & 0x00000001u) {
+    _this->_internal_set_roomid(from._internal_roomid());
+  }
+  if (from._internal_type() != 0) {
+    _this->_impl_.type_ = from._impl_.type_;
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void Matchmaking::CopyFrom(const Matchmaking& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:Protocol.Matchmaking)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void Matchmaking::InternalSwap(Matchmaking* PROTOBUF_RESTRICT other) {
+  using std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.sessionid_, &other->_impl_.sessionid_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.roomid_, &other->_impl_.roomid_, arena);
+  swap(_impl_.type_, other->_impl_.type_);
+}
+
+::google::protobuf::Metadata Matchmaking::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================

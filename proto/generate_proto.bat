@@ -4,22 +4,7 @@
 setlocal enabledelayedexpansion
 
 :: vcpkg에서 설치한 protoc.exe 경로 탐색
-set "VCPKG_PROTOC="
-
-if exist "..\server\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe" (
-    set "VCPKG_PROTOC=..\server\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe"
-) else if exist "..\server\build\vcpkg_installed\x86-windows\tools\protobuf\protoc.exe" (
-    set "VCPKG_PROTOC=..\server\build\vcpkg_installed\x86-windows\tools\protobuf\protoc.exe"
-) else (
-    where protoc >nul 2>nul
-    if %errorlevel% equ 0 (
-        for /f "tokens=*" %%i in ('where protoc') do set "VCPKG_PROTOC=%%i"
-        echo Warning: vcpkg protoc not found. Using system protoc: !VCPKG_PROTOC!
-    ) else (
-        echo Error: protoc not found. Please build the project first or install protobuf.
-        exit /b 1
-    )
-)
+set "VCPKG_PROTOC=C:\vcpkg\installed\x64-windows\tools\protobuf\protoc.exe"
 
 echo Using protoc: %VCPKG_PROTOC%
 
