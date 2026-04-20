@@ -1,4 +1,5 @@
 using System.Text;
+using AuthServer.OpenApi;
 using AuthServer.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -9,44 +10,28 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// Modern OpenAPI support for .NET 9/10 (using Microsoft.OpenApi 2.0.0+)
-builder.Services.AddOpenApi(options =>
+builder.Services.AddCors(options =>
 {
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    options.AddPolicy("DevCors", policy =>
     {
-        document.Info.Title = "AuthServer API";
-        document.Info.Version = "v1";
-
-        var scheme = new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            In = ParameterLocation.Header,
-            Name = "Authorization",
-            Description = "Please enter token (e.g. 'Bearer <token>')"
-        };
-
-        document.Components ??= new OpenApiComponents();
-        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        document.Components.SecuritySchemes.Add("Bearer", scheme);
-
-        // In Microsoft.OpenApi 2.0.0, use OpenApiSecuritySchemeReference
-        var requirement = new OpenApiSecurityRequirement();
-        var schemeReference = new OpenApiSecuritySchemeReference("Bearer", document);
-        requirement.Add(schemeReference, new List<string>());
-
-        // OpenApiDocument in 2.0.0 uses 'Security' instead of 'SecurityRequirements'
-        document.Security ??= new List<OpenApiSecurityRequirement>();
-        document.Security.Add(requirement);
-
-        return Task.CompletedTask;
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
     });
 });
 
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+
+});
+
+builder.Services.AddSingleton<GlobalFields>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
+builder.Services.AddHostedService<MatchWorker>();
 builder.Services.AddLogging();
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
@@ -81,11 +66,13 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference(options =>
+    app.MapScalarApiReference("/scalar", options =>
     {
         options.WithTitle("AuthServer API Reference");
     });
 }
+
+app.UseCors("DevCors");
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -95,5 +82,10 @@ app.MapControllers();
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
 app.MapGet("/version", () => "AuthServer 0.0.5");
+app.MapGet("/info", () => new
+{
+    info = "API Server for Native C++ Game Logic Server",
+    detail = "Created thejaeu with Perplexity AI"
+});
 
 app.Run();

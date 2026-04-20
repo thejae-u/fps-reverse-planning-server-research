@@ -12,10 +12,46 @@ namespace AuthServer.Controllers;
 public class MatchController : ControllerBase
 {
     private readonly MatchService _matchService;
+    private readonly GlobalFields _globalFields;
 
-    public MatchController(MatchService matchService)
+    public MatchController(MatchService matchService, GlobalFields globalFields)
     {
         _matchService = matchService;
+        _globalFields = globalFields;
+    }
+
+    [HttpGet("wait")]
+    public async Task<IActionResult> Wait(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(_globalFields.TimeOutSec));
+
+        try
+        {
+            var result = await _matchService.WaitForMatchAsync(userId, timeoutCts.Token);
+
+            if (result is null)
+            {
+                return NotFound(new ErrorResponse
+                {
+                    Code = "QUEUE_NOT_FOUND",
+                    Message = "매칭 큐 정보가 없습니다."
+                });
+            }
+
+            return Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
+            return NoContent();
+        }
     }
 
     [HttpPost("join")]
@@ -85,7 +121,8 @@ public class MatchController : ControllerBase
             UserId = result.Data.UserId,
             Username = result.Data.Username,
             Status = result.Data.Status.ToString(),
-            JoinedAtUtc = result.Data.JoinedAtUtc
+            JoinedAtUtc = result.Data.JoinedAtUtc,
+            MatchId = result.Data.MatchId
         });
     }
 
@@ -110,12 +147,16 @@ public class MatchController : ControllerBase
             });
         }
 
+        var matchResult = _matchService.GetMatchResultByUserId(userId);
+
         return Ok(new MatchStatusResponse
         {
             UserId = entry.UserId,
             Username = entry.Username,
             Status = entry.Status.ToString(),
-            JoinedAtUtc = entry.JoinedAtUtc
+            JoinedAtUtc = entry.JoinedAtUtc,
+            MatchId = entry.MatchId,
+            ServerAddress = matchResult?.ServerAddress
         });
     }
 }

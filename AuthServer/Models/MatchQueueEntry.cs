@@ -4,7 +4,9 @@ public enum MatchStatus
 {
     Waiting,
     Matched,
-    Cancelled
+    Cancelled,
+    Completed,
+    Failed
 }
 
 public class MatchQueueEntry
@@ -13,4 +15,5 @@ public class MatchQueueEntry
     public string Username { get; set; } = string.Empty;
     public MatchStatus Status { get; set; } = MatchStatus.Waiting;
     public DateTime JoinedAtUtc { get; set; } = DateTime.UtcNow;
+    public string? MatchId { get; set; }
 }
