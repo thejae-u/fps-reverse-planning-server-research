@@ -1,9 +1,12 @@
 ﻿#include "App.hpp"
+#include "IOManager.hpp"
 
 int main() {
-    App app;
-    if (app.Init()) {
-        app.Run();
+    auto app = std::make_unique<App>();
+
+    if (app->Init()) {
+        app->Run();
     }
+
     return 0;
 }

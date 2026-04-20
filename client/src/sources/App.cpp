@@ -1,4 +1,5 @@
-#include "App.hpp"
+﻿#include "App.hpp"
+#include "IOManager.hpp"
 
 App::App() {}
 
@@ -40,14 +41,7 @@ bool App::Init()
     ImGui_ImplGlfw_InitForOpenGL(_window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    _networkClient.SetMessageCallback([this](const std::string& msg) {
-        OnMessage("[TCP]: " + msg);
-    });
-
-    _networkClient.SetUdpMessageCallback([this](const std::string& msg) {
-        OnMessage("[UDP]: " + msg);
-    });
-
+    _ioManager = IOManager::Create("ClientIO", 4, 4);
     return true;
 }
 
@@ -56,6 +50,8 @@ void App::Run()
     while(!glfwWindowShouldClose(_window))
     {
         glfwPollEvents();
+
+        UpdateAutoSend();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -77,62 +73,35 @@ void App::Run()
 
 void App::RenderUI()
 {
-    ImGui::Begin("Connection Control");
-    ImGui::InputText("Host", _host, IM_ARRAYSIZE(_host));
-    ImGui::InputInt("TCP Port", &_port);
-    ImGui::InputInt("UDP Port", &_udpPort);
-
-    if(!_networkClient.IsConnected())
-    {
-        if(ImGui::Button("Connect (TCP)"))
-        {
-            _networkClient.Connect(_host, (uint16_t)_port);
-        }
-    }
-    else
-    {
-        if(ImGui::Button("Disconnect (TCP)"))
-        {
-            _networkClient.Disconnect();
-        }
-    }
-
-    ImGui::Separator();
-    ImGui::Text("TCP Status: %s", _networkClient.IsConnected() ? "Connected" : "Disconnected");
-    ImGui::End();
-
     ImGui::Begin("Test Functions");
 
     ImGui::Text("TCP Functions");
     ImGui::InputText("TCP Msg", _messageToSend, IM_ARRAYSIZE(_messageToSend));
-    if(ImGui::Button("Send TCP Message"))
-    {
-        _networkClient.Send(_messageToSend);
-    }
-    if(ImGui::Button("Send Match Request (111)"))
-    {
-        _networkClient.Send("111");
-    }
-
     ImGui::Separator();
 
     ImGui::Text("UDP Functions");
     ImGui::InputText("UDP Msg", _udpMessageToSend, IM_ARRAYSIZE(_udpMessageToSend));
-    if(ImGui::Button("Send UDP (Correct Protocol)"))
+    
+    if (ImGui::TreeNode("Ingame Packets (Requires Room)"))
     {
-        _networkClient.SendUdpCorrect(_udpMessageToSend, _host, (uint16_t)_udpPort);
-    }
+        ImGui::Text("All Matched Clients:");
+        if (ImGui::Button("Send Move##All")) SendIngamePacketsFromAll(IngameType::Move);
+        ImGui::SameLine();
+        if (ImGui::Button("Send Jump##All")) SendIngamePacketsFromAll(IngameType::Jump);
+        ImGui::SameLine();
+        if (ImGui::Button("Send Shoot##All")) SendIngamePacketsFromAll(IngameType::Shoot);
+        ImGui::SameLine();
+        if (ImGui::Button("Send Hit##All")) SendIngamePacketsFromAll(IngameType::Hit);
 
-    ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.6f, 0.6f));
-    if(ImGui::Button("Send UDP (Size < 2 bytes)"))
-    {
-        _networkClient.SendUdpMalformed(_udpMessageToSend, _host, (uint16_t)_udpPort, 1);
+        ImGui::Separator();
+        ImGui::Checkbox("Auto-send Move (Stress)", &_autoSendIngame);
+        if (_autoSendIngame)
+        {
+            ImGui::SliderFloat("Interval (sec)", &_autoSendInterval, 0.01f, 5.0f);
+        }
+        
+        ImGui::TreePop();
     }
-    if(ImGui::Button("Send UDP (Mismatched Header)"))
-    {
-        _networkClient.SendUdpMalformed(_udpMessageToSend, _host, (uint16_t)_udpPort, 2);
-    }
-    ImGui::PopStyleColor();
 
     ImGui::Separator();
     ImGui::Text("Stress Testing");
@@ -150,46 +119,63 @@ void App::RenderUI()
         StopMatchmakingTest();
     }
 
-    ImGui::Text("Active Test Clients: %zu", _testClients.size());
+    ImGui::Text("Active Test Clients: %zu", [this](){ std::lock_guard<std::mutex> lock(_testClientsMutex); return _testClients.size(); }());
     int connectedCount = 0;
-    for(const auto& client : _testClients)
     {
-        if(client->IsConnected())
-            connectedCount++;
+        std::lock_guard<std::mutex> lock(_testClientsMutex);
+        for(const auto& client : _testClients)
+        {
+            if(client->IsConnected())
+                connectedCount++;
+        }
     }
     ImGui::Text("Connected Test Clients (TCP): %d", connectedCount);
 
     ImGui::End();
 
     ImGui::Begin("Client List");
-    if (ImGui::BeginTable("ClientsTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+    if (ImGui::BeginTable("ClientsTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
     {
         ImGui::TableSetupColumn("Client");
         ImGui::TableSetupColumn("Status");
+        ImGui::TableSetupColumn("Match Status");
+        ImGui::TableSetupColumn("Room ID");
+        ImGui::TableSetupColumn("Session ID");
         ImGui::TableSetupColumn("UDP Port");
         ImGui::TableHeadersRow();
 
         // Main Client
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        ImGui::Text("Main Client");
-        ImGui::TableSetColumnIndex(1);
-        ImGui::TextColored(_networkClient.IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
-                           _networkClient.IsConnected() ? "Connected" : "Disconnected");
-        ImGui::TableSetColumnIndex(2);
-        ImGui::Text("%u", _networkClient.GetClientUdpPort());
-
-        // Test Clients
-        for (size_t i = 0; i < _testClients.size(); ++i)
+       // Test Clients
         {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::Text("Test Client [%zu]", i);
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextColored(_testClients[i]->IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
-                               _testClients[i]->IsConnected() ? "Connected" : "Disconnected");
-            ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%u", _testClients[i]->GetClientUdpPort());
+            std::lock_guard<std::mutex> lock(_testClientsMutex);
+            for (size_t i = 0; i < _testClients.size(); ++i)
+            {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("Test Client [%zu]", i);
+                
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextColored(_testClients[i]->IsConnected() ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1),
+                                _testClients[i]->IsConnected() ? "Connected" : "Disconnected");
+
+                ImGui::TableSetColumnIndex(2);
+                if (_testClients[i]->IsConnected()) {
+                    if (!_testClients[i]->GetRoomId().empty()) ImGui::Text("Matched");
+                    else if (_testClients[i]->IsMatching()) ImGui::Text("Matching...");
+                    else ImGui::Text("Wait...");
+                } else { ImGui::Text("-"); }
+
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%s", _testClients[i]->GetRoomId().empty() ? "-" : _testClients[i]->GetRoomId().substr(0, 8).c_str()); // 너무 길면 생략
+
+                ImGui::TableSetColumnIndex(4);
+                ImGui::Text("%s", _testClients[i]->GetSessionId().empty() ? "-" : _testClients[i]->GetSessionId().substr(0, 8).c_str());
+
+                ImGui::TableSetColumnIndex(5);
+                ImGui::Text("%u", _testClients[i]->GetClientUdpPort());
+            }
         }
         ImGui::EndTable();
     }
@@ -206,41 +192,31 @@ void App::RenderUI()
             ImGui::SetScrollHereY(1.0f);
     }
     ImGui::End();
-
-    ImGui::Begin("Logs");
-    for(const auto& log : _networkClient.GetLogs())
-    {
-        ImVec4 color = ImVec4(1, 1, 1, 1);
-        if(log.level == spdlog::level::err)
-            color = ImVec4(1, 0, 0, 1);
-        else if(log.level == spdlog::level::warn)
-            color = ImVec4(1, 1, 0, 1);
-
-        ImGui::TextColored(color, "%s", log.text.c_str());
-    }
-    if(ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
-        ImGui::SetScrollHereY(1.0f);
-    ImGui::End();
 }
 
 void App::StartMatchmakingTest(int count)
 {
     StopMatchmakingTest();
 
+    std::lock_guard<std::mutex> lock(_testClientsMutex);
     for(int i = 0; i < count; ++i)
     {
-        auto client = std::make_unique<NetworkClient>();
+        auto client = std::make_shared<NetworkClient>(_ioManager);
         client->SetMessageCallback([this, i](const std::string& msg) {
             OnMessage("Test Client [" + std::to_string(i) + "] TCP: " + msg);
         });
+        
         client->Connect(_host, (uint16_t)_port);
-        _testClients.push_back(std::move(client));
+        
+        _testClients.push_back(client);
     }
+
     spdlog::info("Started matchmaking test with {} clients", count);
 }
 
 void App::StopMatchmakingTest()
 {
+    std::lock_guard<std::mutex> lock(_testClientsMutex);
     if(_testClients.empty())
         return;
 
@@ -266,6 +242,11 @@ void App::Shutdown()
 {
     StopMatchmakingTest();
 
+    if (_ioManager)
+    {
+        _ioManager->Stop();
+    }
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -275,4 +256,29 @@ void App::Shutdown()
         glfwDestroyWindow(_window);
     }
     glfwTerminate();
+}
+
+void App::SendIngamePacketsFromAll(IngameType type)
+{
+    std::lock_guard<std::mutex> lock(_testClientsMutex);
+    for (auto& client : _testClients)
+    {
+        if (client->IsConnected() && !client->GetRoomId().empty())
+        {
+            client->SendIngamePacket(type, "TestClientPacket");
+        }
+    }
+}
+
+void App::UpdateAutoSend()
+{
+    if (!_autoSendIngame)
+        return;
+
+    double currentTime = glfwGetTime();
+    if (currentTime - _lastAutoSendTime >= _autoSendInterval)
+    {
+        SendIngamePacketsFromAll(IngameType::Move);
+        _lastAutoSendTime = currentTime;
+    }
 }

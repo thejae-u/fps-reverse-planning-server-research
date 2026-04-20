@@ -34,13 +34,13 @@ public:
 
 public:
     template <typename CompletionHandler>
-    auto PostOnIOContext(CompletionHandler&& handler)
+    auto RegisterAsyncWork(CompletionHandler&& handler)
     {
         return asio::post(_io, std::forward<CompletionHandler>(handler));
     }
 
     template <typename CompletionHandler>
-    auto PostOnBlockingPool(CompletionHandler&& handler)
+    auto RegisterBlockingWork(CompletionHandler&& handler)
     {
         return asio::post(_blockingPool, std::forward<CompletionHandler>(handler));
     }
@@ -56,7 +56,7 @@ public:
                 w->join();
         }
 
-        spdlog::info("io manager stop complete");
+        spdlog::info("io manager stop complete\n");
     }
 
 public:

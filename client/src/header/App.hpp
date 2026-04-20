@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,6 +11,8 @@
 #include <string>
 #include <mutex>
 #include <uuid.h>
+
+class IOManager;
 
 class App {
 public:
@@ -26,11 +28,14 @@ private:
     void OnMessage(const std::string& message);
     void StartMatchmakingTest(int count);
     void StopMatchmakingTest();
-    void StartUdpStressTest(int count, int packetSize);
+    void SendIngamePacketsFromAll(IngameType type);
+    void UpdateAutoSend();
 
     GLFWwindow* _window = nullptr;
-    NetworkClient _networkClient;
-    std::vector<std::unique_ptr<NetworkClient>> _testClients;
+    std::shared_ptr<IOManager> _ioManager;
+    std::vector<std::shared_ptr<NetworkClient>> _testClients;
+    std::mutex _testClientsMutex;
+
 
     char _host[128] = "127.0.0.1";
     int _port = 52800;
@@ -43,4 +48,7 @@ private:
     std::vector<std::string> _receivedMessages;
     std::mutex _messagesMutex;
     bool _useUdpForTest = false;
+    bool _autoSendIngame = false;
+    float _autoSendInterval = 1.0f;
+    double _lastAutoSendTime = 0.0;
 };
