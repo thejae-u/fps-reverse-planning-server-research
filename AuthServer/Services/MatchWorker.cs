@@ -21,13 +21,7 @@ public class MatchWorker : BackgroundService
         {
             try
             {
-                var matchList = _matchService.TryMakeMatches();
-                if (matchList is not null)
-                {
-                    _logger.LogInformation("New Group Matched");
-                    _logger.LogInformation("Id: {id}\nGroup: [{group}]", matchList[0].MatchId, string.Join(", ", matchList.Select(x => x.Username)));
-                }
-
+                await _matchService.TryMakeMatchesAsync();
                 await Task.Delay(100, stoppingToken);
             }
             catch (OperationCanceledException)

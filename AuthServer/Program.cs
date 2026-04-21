@@ -1,4 +1,5 @@
 using System.Text;
+using AuthServer.Hubs;
 using AuthServer.OpenApi;
 using AuthServer.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -15,18 +16,22 @@ builder.Services.AddCors(options =>
     options.AddPolicy("DevCors", policy =>
     {
         policy
-            .AllowAnyOrigin()
+            .WithOrigins("http://localhost:5500")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
 builder.Services.AddOpenApi("v1", options =>
 {
     options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
-
 });
 
+// web socket
+builder.Services.AddSignalR();
+
+// Service DI
 builder.Services.AddSingleton<GlobalFields>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
@@ -34,6 +39,7 @@ builder.Services.AddSingleton<MatchService>();
 builder.Services.AddHostedService<MatchWorker>();
 builder.Services.AddLogging();
 
+// JWT Configuation
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
@@ -43,21 +49,36 @@ if (string.IsNullOrEmpty(jwtIssuer) || string.IsNullOrEmpty(jwtAudience) || stri
     throw new InvalidOperationException("JWT appsettings not set");
 }
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
         {
-            ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
-            ValidateAudience = true,
-            ValidAudience = jwtAudience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-    });
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/match"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        }
+    };
+});
 
 builder.Services.AddAuthorization();
 
@@ -79,13 +100,17 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Server Information Route
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-app.MapGet("/version", () => "AuthServer 0.0.5");
+app.MapGet("/version", () => "AuthServer 0.1.0");
 app.MapGet("/info", () => new
 {
     info = "API Server for Native C++ Game Logic Server",
     detail = "Created thejaeu with Perplexity AI"
 });
+
+// SignalR Match Hub Route
+app.MapHub<MatchHub>("/hubs/match");
 
 app.Run();

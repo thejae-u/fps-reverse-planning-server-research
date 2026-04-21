@@ -1,7 +1,6 @@
+using AuthServer.Hubs;
 using AuthServer.Models;
-using AuthServer.Dtos;
-using System.Collections.Concurrent;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
+using Microsoft.AspNetCore.SignalR;
 
 namespace AuthServer.Services;
 
@@ -10,75 +9,32 @@ public class MatchService
     private readonly Dictionary<string, MatchQueueEntry> _entries = new();
     private readonly Queue<string> _waitingQueue = new();
     private readonly Dictionary<string, MatchResult> _matchResults = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<MatchStatusResponse>> _waiters = new();
     private readonly object _lock = new();
+    private readonly IHubContext<MatchHub> _hubContext;
 
     private readonly GlobalFields _globalFields;
 
-    public MatchService(GlobalFields globalFields)
+    public MatchService(IHubContext<MatchHub> hubContext, GlobalFields globalFields)
     {
+        _hubContext = hubContext;
         _globalFields = globalFields;
-    }
-
-    public async Task<MatchStatusResponse?> WaitForMatchAsync(string userId, CancellationToken cancellationToken)
-    {
-        var current = GetStatus(userId);
-        if (current is null)
-            return null;
-
-        if (current.Status == MatchStatus.Matched)
-        {
-            var matched = BuildStatusResponse(current);
-            return matched;
-        }
-
-        var tcs = new TaskCompletionSource<MatchStatusResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _waiters.AddOrUpdate(userId, tcs, (_, __) => tcs);
-
-        using var registration = cancellationToken.Register(() =>
-        {
-            if (_waiters.TryRemove(userId, out var pending))
-            {
-                pending.TrySetCanceled(cancellationToken);
-            }
-        });
-
-        try
-        {
-            return await tcs.Task;
-        }
-        finally
-        {
-            _waiters.TryRemove(userId, out _);
-        }
-    }
-
-    public MatchStatusResponse BuildStatusResponse(MatchQueueEntry entry)
-    {
-        var matchResult = GetMatchResultByUserId(entry.UserId);
-        return new MatchStatusResponse
-        {
-            UserId = entry.UserId,
-            Username = entry.Username,
-            Status = entry.Status.ToString(),
-            JoinedAtUtc = entry.JoinedAtUtc,
-            MatchId = entry.MatchId,
-            ServerAddress = matchResult?.ServerAddress
-        };
     }
 
     public Result<MatchQueueEntry> Join(string userId, string username)
     {
         lock (_lock)
         {
-            // client exist in entries
             if (_entries.TryGetValue(userId, out var existing))
             {
                 if (existing.Status == MatchStatus.Waiting)
+                {
                     return Result<MatchQueueEntry>.Failure("ALREADY_IN_QUEUE", "이미 매칭 큐에 참가 중입니다.");
+                }
 
                 if (existing.Status == MatchStatus.Matched)
+                {
                     return Result<MatchQueueEntry>.Failure("ALREADY_MATCHED", "이미 매칭이 완료되었습니다.");
+                }
 
                 existing.Status = MatchStatus.Waiting;
                 existing.JoinedAtUtc = DateTime.UtcNow;
@@ -89,7 +45,6 @@ public class MatchService
                 return Result<MatchQueueEntry>.Success(existing);
             }
 
-            // new client request
             var entry = new MatchQueueEntry
             {
                 UserId = userId,
@@ -139,6 +94,7 @@ public class MatchService
         {
             if (!_entries.TryGetValue(userId, out var entry))
                 return null;
+
             if (string.IsNullOrEmpty(entry.MatchId))
                 return null;
 
@@ -147,11 +103,15 @@ public class MatchService
         }
     }
 
-    public List<MatchQueueEntry>? TryMakeMatches()
+    public async Task TryMakeMatchesAsync()
     {
+        List<MatchQueueEntry> candidates;
+        MatchResult? result = null;
+
         lock (_lock)
         {
-            var candidates = new List<MatchQueueEntry>();
+            candidates = new List<MatchQueueEntry>();
+
             while (_waitingQueue.Count > 0 && candidates.Count < _globalFields.PlayerCount)
             {
                 var userId = _waitingQueue.Dequeue();
@@ -168,20 +128,19 @@ public class MatchService
             if (candidates.Count < _globalFields.PlayerCount)
             {
                 foreach (var candidate in candidates)
-                {
                     _waitingQueue.Enqueue(candidate.UserId);
-                }
 
-                return null;
+                return;
             }
 
             var matchId = Guid.NewGuid().ToString("N");
-            var result = new MatchResult
+
+            result = new MatchResult
             {
                 MatchId = matchId,
                 MatchedAtUtc = DateTime.UtcNow,
                 UserIds = candidates.Select(x => x.UserId).ToList(),
-                ServerAddress = "localhost:54800"
+                ServerAddress = "https://logic.fps.thejaeu.com"
             };
 
             _matchResults[matchId] = result;
@@ -190,14 +149,22 @@ public class MatchService
             {
                 entry.Status = MatchStatus.Matched;
                 entry.MatchId = matchId;
-
-                if (_waiters.TryRemove(entry.UserId, out var waiter))
-                {
-                    waiter.TrySetResult(BuildStatusResponse(entry));
-                }
             }
+        }
 
-            return candidates;
+        foreach (var entry in candidates)
+        {
+            await _hubContext.Clients
+                .Group(MatchHub.GetUserGroup(entry.UserId))
+                .SendAsync("Matched", new
+                {
+                    UserId = entry.UserId,
+                    Username = entry.Username,
+                    Status = entry.Status.ToString(),
+                    MatchId = entry.MatchId,
+                    ServerAddress = result?.ServerAddress,
+                    MatchedAtUtc = result?.MatchedAtUtc
+                });
         }
     }
 }
