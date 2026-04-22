@@ -1,6 +1,7 @@
 using AuthServer.Hubs;
 using AuthServer.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
 
 namespace AuthServer.Services;
 
@@ -12,12 +13,12 @@ public class MatchService
     private readonly object _lock = new();
     private readonly IHubContext<MatchHub> _hubContext;
 
-    private readonly GlobalFields _globalFields;
+    private readonly MatchOptions _options;
 
-    public MatchService(IHubContext<MatchHub> hubContext, GlobalFields globalFields)
+    public MatchService(IHubContext<MatchHub> hubContext, IOptions<MatchOptions> options)
     {
         _hubContext = hubContext;
-        _globalFields = globalFields;
+        _options = options.Value;
     }
 
     public Result<MatchQueueEntry> Join(string userId, string username)
@@ -112,7 +113,7 @@ public class MatchService
         {
             candidates = new List<MatchQueueEntry>();
 
-            while (_waitingQueue.Count > 0 && candidates.Count < _globalFields.PlayerCount)
+            while (_waitingQueue.Count > 0 && candidates.Count < _options.PlayerCount)
             {
                 var userId = _waitingQueue.Dequeue();
 
@@ -125,7 +126,7 @@ public class MatchService
                 candidates.Add(entry);
             }
 
-            if (candidates.Count < _globalFields.PlayerCount)
+            if (candidates.Count < _options.PlayerCount)
             {
                 foreach (var candidate in candidates)
                     _waitingQueue.Enqueue(candidate.UserId);

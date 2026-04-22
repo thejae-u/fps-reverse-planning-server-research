@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AuthServer SignalR Match Test UI</title>
+    <title>AuthServer SignalR Match + Chat Test UI</title>
     <style>
         :root {
             --bg: #0b1220;
@@ -17,6 +17,7 @@
             --warn: #f59e0b;
             --bad: #ef4444;
             --accent: #60a5fa;
+            --chat: #a78bfa;
         }
 
         * {
@@ -31,7 +32,7 @@
         }
 
         .wrap {
-            max-width: 1520px;
+            max-width: 1580px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -109,7 +110,8 @@
         }
 
         input,
-        button {
+        button,
+        textarea {
             width: 100%;
             border-radius: 10px;
             border: 1px solid var(--line);
@@ -117,6 +119,11 @@
             color: var(--text);
             padding: 10px 12px;
             font-size: 14px;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 68px;
         }
 
         button {
@@ -232,6 +239,21 @@
             line-height: 1.5;
         }
 
+        .chat-log {
+            background: #07111d;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            min-height: 120px;
+            max-height: 180px;
+            overflow: auto;
+            padding: 10px;
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+
         .kv {
             display: grid;
             grid-template-columns: 92px 1fr;
@@ -250,16 +272,34 @@
             color: var(--accent);
             font-weight: 800;
         }
+
+        .chat-title {
+            color: var(--chat);
+        }
+
+        .mini-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .mini-actions-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
     </style>
 </head>
 
 <body>
     <div class="wrap">
-        <h1>AuthServer SignalR Match Test UI</h1>
+        <h1>AuthServer SignalR Match + Chat Test UI</h1>
         <p class="small">
-            SignalR 기반 기능 테스트용 페이지입니다. 회원가입, 로그인, Hub 연결, 매칭 참가, 상태 조회를 한 화면에서 테스트할 수 있습니다.
+            기존 매칭 테스트에 MatchHub 그룹 채팅 테스트를 추가한 페이지입니다.
             <br>
-            주석을 자세히 넣어두었기 때문에 API 경로, Hub 경로, 응답 구조를 쉽게 수정할 수 있습니다.
+            회원가입 → 로그인 → Hub 연결 → 매칭 참가 → 채팅방 Join → 메시지 전송 순서로 테스트하시면 됩니다.
         </p>
 
         <div class="panel">
@@ -281,9 +321,17 @@
                     <label for="hubPath">Hub Path</label>
                     <input id="hubPath" value="/hubs/match" />
                 </div>
-                <div class="col-12">
+                <div class="col-6">
                     <label for="namePrefix">아이디 Prefix</label>
                     <input id="namePrefix" value="player" />
+                </div>
+                <div class="col-3">
+                    <label for="chatMatchId">채팅용 Match ID</label>
+                    <input id="chatMatchId" value="test-room-1001" />
+                </div>
+                <div class="col-3">
+                    <label for="chatMessage">기본 메시지</label>
+                    <input id="chatMessage" value="안녕하세요. 테스트 메시지입니다." />
                 </div>
             </div>
 
@@ -295,13 +343,20 @@
                 <button onclick="joinFirstTen()">앞 10명 매칭 참가</button>
                 <button onclick="joinAll()">전체 매칭 참가</button>
                 <button onclick="refreshAllStatus()">전체 상태 조회</button>
+                <button onclick="joinChatAll()">전체 채팅방 Join</button>
+                <button onclick="leaveChatAll()">전체 채팅방 Leave</button>
+                <button onclick="broadcastChatFromFirst()">1번 클라이언트로 전체방 메시지 테스트</button>
                 <button onclick="disconnectAllHub()">전체 Hub 종료</button>
                 <button onclick="clearLog()">로그 지우기</button>
             </div>
 
             <p class="small" style="margin-top: 10px;">
-                주석: SignalR 테스트 순서는 보통 회원가입 → 로그인 → Hub 연결 → 매칭 참가입니다.
-                매칭 완료 이벤트는 서버가 <span class="mono">Matched</span> 이름으로 push한다고 가정합니다.
+                서버 Hub 메서드 이름은
+                <span class="mono">JoinMatchChat</span>,
+                <span class="mono">LeaveMatchChat</span>,
+                <span class="mono">SendMatchMessage</span>
+                기준입니다.
+                그룹 메시지는 같은 <span class="mono">match:{matchId}</span> 그룹에 있는 클라이언트 전체로 전송되는 구조입니다. [web:451][web:442]
             </p>
         </div>
 
@@ -318,16 +373,10 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <script>
-        // ============================================================
-        // 전역 상태
-        // ============================================================
         const state = {
             clients: []
         };
 
-        // ============================================================
-        // 공통 유틸
-        // ============================================================
         function log(message) {
             const el = document.getElementById('log');
             const time = new Date().toLocaleTimeString();
@@ -345,6 +394,14 @@
 
         function getHubPath() {
             return document.getElementById('hubPath').value.trim() || '/hubs/match';
+        }
+
+        function getChatMatchId() {
+            return document.getElementById('chatMatchId').value.trim();
+        }
+
+        function getDefaultChatMessage() {
+            return document.getElementById('chatMessage').value;
         }
 
         function getClient(index) {
@@ -390,9 +447,13 @@
             return headers;
         }
 
-        // ============================================================
-        // 클라이언트 생성 / 렌더링
-        // ============================================================
+        function appendClientChatLog(client, message) {
+            client.chatLogs.push(message);
+            if (client.chatLogs.length > 40) {
+                client.chatLogs.shift();
+            }
+        }
+
         function generateClients() {
             const count = Number(document.getElementById('clientCount').value);
             const prefix = document.getElementById('namePrefix').value.trim() || 'player';
@@ -410,7 +471,10 @@
                 status: 'idle',
                 userId: '',
                 matchId: '',
-                serverAddress: ''
+                serverAddress: '',
+                joinedChatMatchId: '',
+                chatInput: '',
+                chatLogs: []
             }));
 
             renderClients();
@@ -424,6 +488,10 @@
             state.clients.forEach(client => {
                 const card = document.createElement('div');
                 card.className = 'client-card';
+
+                const chatLogText = client.chatLogs.length
+                    ? client.chatLogs.join('\n')
+                    : '채팅 로그 없음';
 
                 card.innerHTML = `
           <div class="top-line">
@@ -441,6 +509,7 @@
             <div>userId</div><div>${client.userId || '-'}</div>
             <div>matchId</div><div>${client.matchId || '-'}</div>
             <div>server</div><div>${client.serverAddress || '-'}</div>
+            <div>chatGroup</div><div>${client.joinedChatMatchId || '-'}</div>
             <div>token</div><div>${client.token ? client.token.slice(0, 24) + '...' : '-'}</div>
           </div>
 
@@ -453,16 +522,35 @@
             <button onclick="cancelClient(${client.index})">취소</button>
             <button onclick="disconnectHub(${client.index})">Hub 종료</button>
           </div>
+
+          <div class="section-title chat-title" style="margin-top: 14px;">채팅 테스트</div>
+
+          <label for="chatRoom-${client.index}">채팅 Match ID</label>
+          <input id="chatRoom-${client.index}" value="${client.joinedChatMatchId || getChatMatchId()}" />
+
+          <label for="chatInput-${client.index}" style="margin-top: 8px;">메시지</label>
+          <textarea id="chatInput-${client.index}" placeholder="메시지를 입력하세요">${client.chatInput || ''}</textarea>
+
+          <div class="mini-actions-3">
+            <button onclick="joinChat(${client.index})">채팅 Join</button>
+            <button onclick="leaveChat(${client.index})">채팅 Leave</button>
+            <button onclick="sendChat(${client.index})">메시지 전송</button>
+          </div>
+
+          <div class="chat-log" id="chatLog-${client.index}">${escapeHtml(chatLogText)}</div>
         `;
 
                 grid.appendChild(card);
             });
         }
 
-        // ============================================================
-        // 서버 응답 반영
-        // 주석: DTO 구조가 바뀌면 이 함수만 우선 수정하시면 됩니다.
-        // ============================================================
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;');
+        }
+
         function applyStatus(client, data) {
             client.status = data?.status || client.status;
             client.userId = data?.userId || client.userId;
@@ -471,16 +559,12 @@
         }
 
         function applyMatchedEvent(client, payload) {
-            // 주석: 서버가 SignalR로 보내는 Matched 이벤트 payload 구조가 바뀌면 여기 수정
             client.status = payload?.status || 'Matched';
             client.userId = payload?.userId || client.userId;
             client.matchId = payload?.matchId || client.matchId;
             client.serverAddress = payload?.serverAddress || client.serverAddress;
         }
 
-        // ============================================================
-        // 인증 API
-        // ============================================================
         async function registerClient(index) {
             const client = getClient(index);
             if (!client) return;
@@ -533,12 +617,6 @@
             renderClients();
         }
 
-        // ============================================================
-        // SignalR 연결
-        // 주석:
-        // 1) 서버 Program.cs에서 /hubs/match 로 MapHub 되어 있어야 합니다.
-        // 2) JWT를 query string access_token 으로 받는 설정이 필요합니다.
-        // ============================================================
         async function connectHub(index) {
             const client = getClient(index);
             if (!client || !client.token) {
@@ -570,6 +648,36 @@
                 log(`${client.username} Pong 수신: ${JSON.stringify(payload)}`);
             });
 
+            connection.on('JoinedMatchChat', payload => {
+                client.joinedChatMatchId = payload?.matchId || client.joinedChatMatchId;
+                appendClientChatLog(client, `[JOINED] matchId=${payload?.matchId || '-'} connectionId=${payload?.connectionId || '-'}`);
+                log(`${client.username} JoinedMatchChat 수신: ${JSON.stringify(payload)}`);
+                renderClients();
+            });
+
+            connection.on('LeftMatchChat', payload => {
+                appendClientChatLog(client, `[LEFT] matchId=${payload?.matchId || '-'} connectionId=${payload?.connectionId || '-'}`);
+                if (client.joinedChatMatchId === payload?.matchId) {
+                    client.joinedChatMatchId = '';
+                }
+                log(`${client.username} LeftMatchChat 수신: ${JSON.stringify(payload)}`);
+                renderClients();
+            });
+
+            connection.on('SystemMessage', payload => {
+                const line = `[SYSTEM][${payload?.matchId || '-'}] ${payload?.message || ''}`;
+                appendClientChatLog(client, line);
+                log(`${client.username} SystemMessage 수신: ${line}`);
+                renderClients();
+            });
+
+            connection.on('ReceiveMatchMessage', payload => {
+                const line = `[${payload?.senderName || 'Unknown'}][${payload?.matchId || '-'}] ${payload?.message || ''}`;
+                appendClientChatLog(client, line);
+                log(`${client.username} ReceiveMatchMessage 수신: ${line}`);
+                renderClients();
+            });
+
             connection.onreconnecting(error => {
                 client.hubConnected = false;
                 renderClients();
@@ -595,7 +703,6 @@
                 client.hubConnected = true;
                 log(`${client.username} Hub 연결 성공`);
 
-                // 주석: 서버 Hub에 Ping 메서드가 있으면 연결 확인용으로 호출합니다.
                 try {
                     await connection.invoke('Ping');
                 } catch (pingError) {
@@ -619,6 +726,7 @@
                 await client.hubConnection.stop();
                 client.hubConnection = null;
                 client.hubConnected = false;
+                client.joinedChatMatchId = '';
                 log(`${client.username} Hub 연결 종료`);
             } catch (error) {
                 log(`${client.username} Hub 종료 실패: ${error.message}`);
@@ -627,9 +735,6 @@
             renderClients();
         }
 
-        // ============================================================
-        // 매칭 API
-        // ============================================================
         async function joinClient(index) {
             const client = getClient(index);
             if (!client || !client.token) {
@@ -701,9 +806,92 @@
             renderClients();
         }
 
-        // ============================================================
-        // 일괄 실행
-        // ============================================================
+        async function joinChat(index) {
+            const client = getClient(index);
+            if (!client || !client.hubConnection || !client.hubConnected) {
+                log(`#${index} Hub 연결 없음`);
+                return;
+            }
+
+            const input = document.getElementById(`chatRoom-${index}`);
+            const matchId = input.value.trim();
+
+            if (!matchId) {
+                log(`${client.username} 채팅 Join 실패: matchId 없음`);
+                return;
+            }
+
+            try {
+                await client.hubConnection.invoke('JoinMatchChat', matchId);
+                client.joinedChatMatchId = matchId;
+                log(`${client.username} 채팅방 Join 호출 성공: ${matchId}`);
+            } catch (error) {
+                log(`${client.username} 채팅방 Join 실패: ${error.message}`);
+            }
+
+            renderClients();
+        }
+
+        async function leaveChat(index) {
+            const client = getClient(index);
+            if (!client || !client.hubConnection || !client.hubConnected) {
+                log(`#${index} Hub 연결 없음`);
+                return;
+            }
+
+            const input = document.getElementById(`chatRoom-${index}`);
+            const matchId = input.value.trim() || client.joinedChatMatchId;
+
+            if (!matchId) {
+                log(`${client.username} 채팅 Leave 실패: matchId 없음`);
+                return;
+            }
+
+            try {
+                await client.hubConnection.invoke('LeaveMatchChat', matchId);
+                log(`${client.username} 채팅방 Leave 호출 성공: ${matchId}`);
+            } catch (error) {
+                log(`${client.username} 채팅방 Leave 실패: ${error.message}`);
+            }
+
+            renderClients();
+        }
+
+        async function sendChat(index) {
+            const client = getClient(index);
+            if (!client || !client.hubConnection || !client.hubConnected) {
+                log(`#${index} Hub 연결 없음`);
+                return;
+            }
+
+            const roomInput = document.getElementById(`chatRoom-${index}`);
+            const messageInput = document.getElementById(`chatInput-${index}`);
+
+            const matchId = roomInput.value.trim() || client.joinedChatMatchId;
+            const message = messageInput.value.trim();
+
+            if (!matchId) {
+                log(`${client.username} 채팅 전송 실패: matchId 없음`);
+                return;
+            }
+
+            if (!message) {
+                log(`${client.username} 채팅 전송 실패: message 없음`);
+                return;
+            }
+
+            try {
+                await client.hubConnection.invoke('SendMatchMessage', matchId, message);
+                client.chatInput = '';
+                messageInput.value = '';
+                log(`${client.username} 채팅 전송 성공: ${matchId}`);
+            } catch (error) {
+                log(`${client.username} 채팅 전송 실패: ${error.message}`);
+            }
+
+            renderClients();
+        }
+
         async function registerAll() {
             for (const client of state.clients) {
                 await registerClient(client.index);
@@ -741,9 +929,40 @@
             await Promise.all(state.clients.map(c => statusClient(c.index)));
         }
 
-        // ============================================================
-        // 시작 시 기본 15명 생성
-        // ============================================================
+        async function joinChatAll() {
+            for (const client of state.clients) {
+                const roomInput = document.getElementById(`chatRoom-${client.index}`);
+                if (roomInput) {
+                    roomInput.value = getChatMatchId();
+                }
+                await joinChat(client.index);
+            }
+        }
+
+        async function leaveChatAll() {
+            for (const client of state.clients) {
+                await leaveChat(client.index);
+            }
+        }
+
+        async function broadcastChatFromFirst() {
+            const first = state.clients[0];
+            if (!first) return;
+
+            const roomInput = document.getElementById(`chatRoom-${first.index}`);
+            const messageInput = document.getElementById(`chatInput-${first.index}`);
+
+            if (roomInput) {
+                roomInput.value = getChatMatchId();
+            }
+
+            if (messageInput) {
+                messageInput.value = getDefaultChatMessage();
+            }
+
+            await sendChat(first.index);
+        }
+
         generateClients();
     </script>
 </body>

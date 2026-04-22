@@ -31,8 +31,10 @@ builder.Services.AddOpenApi("v1", options =>
 // web socket
 builder.Services.AddSignalR();
 
+// global fields
+builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("MatchOptions"));
+
 // Service DI
-builder.Services.AddSingleton<GlobalFields>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
@@ -63,6 +65,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ClockSkew = TimeSpan.Zero
     };
 
+    // SignalR Hubs Authorize
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
