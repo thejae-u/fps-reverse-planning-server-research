@@ -1,3 +1,4 @@
+﻿using AuthServer.Dtos;
 using AuthServer.Hubs;
 using AuthServer.Models;
 using Microsoft.AspNetCore.SignalR;
@@ -12,13 +13,16 @@ public class MatchService
     private readonly Dictionary<string, MatchResult> _matchResults = new();
     private readonly object _lock = new();
     private readonly IHubContext<MatchHub> _hubContext;
-
+    private readonly ILogger<MatchService> _logger;
     private readonly MatchOptions _options;
 
-    public MatchService(IHubContext<MatchHub> hubContext, IOptions<MatchOptions> options)
+    private readonly Dictionary<string, string> _userConnections = new();
+
+    public MatchService(IHubContext<MatchHub> hubContext, IOptions<MatchOptions> options, ILogger<MatchService> logger)
     {
         _hubContext = hubContext;
         _options = options.Value;
+        _logger = logger;
     }
 
     public Result<MatchQueueEntry> Join(string userId, string username)
@@ -155,6 +159,9 @@ public class MatchService
 
         foreach (var entry in candidates)
         {
+            if (entry.MatchId is null)
+                throw new Exception("Entry MatchId is null");
+
             await _hubContext.Clients
                 .Group(MatchHub.GetUserGroup(entry.UserId))
                 .SendAsync("Matched", new
@@ -166,6 +173,51 @@ public class MatchService
                     ServerAddress = result?.ServerAddress,
                     MatchedAtUtc = result?.MatchedAtUtc
                 });
+
+            if(_userConnections.TryGetValue(entry.UserId, out var connectionId))
+            {
+                var matchGroup = MatchHub.GetMatchGroup(entry.MatchId);
+                await _hubContext.Groups.AddToGroupAsync(connectionId, matchGroup);
+
+                await _hubContext.Clients.Client(connectionId).SendAsync("JoinedMatchChat", new
+                {
+                    matchId = entry.MatchId,
+                    connectionId = connectionId
+                });
+
+                await _hubContext.Clients.Group(matchGroup).SendAsync("SystemMessage", new
+                {
+                    matchId = entry.MatchId,
+                    message = $"{entry.Username} 님이 입장했습니다.",
+                    sendAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
+    }
+
+    public void AddConnectionId(string userId, string connectionId)
+    {
+        lock(_lock)
+        {
+            if(!_userConnections.TryAdd(userId, connectionId))
+            {
+                throw new Exception($"{userId} already exists in userConnections");
+            }
+
+            _logger.LogInformation("{userId} add to userConnections success", userId);
+        }
+    }
+
+    public void RemoveConnectionId(string userId)
+    {
+        lock(_lock)
+        {
+            if (!_userConnections.Remove(userId))
+            {
+                throw new Exception($"{userId} is not found in userConections");
+            }
+
+            _logger.LogInformation("{userId} remove from userConnections success", userId);
         }
     }
 }

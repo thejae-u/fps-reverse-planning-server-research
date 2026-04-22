@@ -1,6 +1,7 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
+using AuthServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -10,10 +11,12 @@ namespace AuthServer.Hubs;
 public class MatchHub : Hub
 {
     private readonly ILogger<MatchHub> _logger;
+    private readonly MatchService _matchService;
 
-    public MatchHub(ILogger<MatchHub> logger)
+    public MatchHub(ILogger<MatchHub> logger, MatchService matchService)
     {
         _logger = logger;
+        _matchService = matchService;
     }
 
     public override async Task OnConnectedAsync()
@@ -21,7 +24,10 @@ public class MatchHub : Hub
         var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!string.IsNullOrEmpty(userId))
+        {
             await Groups.AddToGroupAsync(Context.ConnectionId, GetUserGroup(userId));
+            _matchService.AddConnectionId(userId, Context.ConnectionId);
+        }
 
         await base.OnConnectedAsync();
     }
@@ -31,10 +37,16 @@ public class MatchHub : Hub
         var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!string.IsNullOrEmpty(userId))
+        {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetUserGroup(userId));
+            _matchService.RemoveConnectionId(userId);
+        }
 
         await base.OnDisconnectedAsync(exception);
     }
+
+    public static string GetUserGroup(string userId) => $"user:{userId}";
+    public static string GetMatchGroup(string matchId) => $"match:{matchId}";
 
     public Task Ping()
     {
@@ -42,34 +54,6 @@ public class MatchHub : Hub
         {
             Message = "connected",
             Time = DateTime.UtcNow
-        });
-    }
-
-    public async Task JoinMatchChat(string matchId)
-    {
-        if (string.IsNullOrWhiteSpace(matchId))
-            throw new HubException("matchId is required.");
-
-        var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-        var nickname = GetNickName();
-
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new HubException("Unauthorized.");
-
-        var matchGroup = GetMatchGroup(matchId);
-        await Groups.AddToGroupAsync(Context.ConnectionId, matchGroup);
-
-        await Clients.Caller.SendAsync("JoinedMatchChat", new
-        {
-            matchId,
-            connectionId = Context.ConnectionId
-        });
-
-        await Clients.Group(matchGroup).SendAsync("SystemMessage", new
-        {
-            matchId,
-            message = $"{nickname} 님이 입장했습니다.",
-            sendAt = DateTimeOffset.UtcNow
         });
     }
 
@@ -99,25 +83,34 @@ public class MatchHub : Hub
 
     public async Task SendMatchMessage(string matchId, string message)
     {
+        // match Id Check
         if (string.IsNullOrWhiteSpace(matchId))
             throw new HubException("matchId is required.");
 
+        // message Check
         if (string.IsNullOrWhiteSpace(message))
             throw new HubException("message is required.");
 
+        // message Length Check
         message = message.Trim();
-
         if (message.Length > 200)
             throw new HubException("messag is too long.");
 
+        // user Id Get
         var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
         var nickname = GetNickName();
 
+        // user id Check
         if (string.IsNullOrWhiteSpace(userId))
             throw new HubException("Unauthorized.");
 
-        var matchGroup = GetMatchGroup(matchId);
+        // invalid match check
+        var userMatch = _matchService.GetMatchResultByUserId(userId);
+        if(userMatch is null || string.IsNullOrEmpty(userMatch.MatchId) || userMatch.MatchId != matchId)
+            throw new HubException("Invalid user match.");
 
+        // message send
+        var matchGroup = GetMatchGroup(matchId);
         await Clients.Group(matchGroup).SendAsync("ReceiveMatchMessage", new
         {
             matchId,
@@ -136,8 +129,4 @@ public class MatchHub : Hub
             ?? Context.User?.FindFirstValue("name")
             ?? "Unknown";
     }
-
-    public static string GetUserGroup(string userId) => $"user:{userId}";
-    public static string GetMatchGroup(string matchId) => $"match:{matchId}";
-
 }

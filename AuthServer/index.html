@@ -290,6 +290,12 @@
             gap: 8px;
             margin-top: 8px;
         }
+
+        .ok-border {
+            border-color: var(--ok) !important;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 
@@ -531,8 +537,7 @@
           <label for="chatInput-${client.index}" style="margin-top: 8px;">메시지</label>
           <textarea id="chatInput-${client.index}" placeholder="메시지를 입력하세요">${client.chatInput || ''}</textarea>
 
-          <div class="mini-actions-3">
-            <button onclick="joinChat(${client.index})">채팅 Join</button>
+          <div class="mini-actions">
             <button onclick="leaveChat(${client.index})">채팅 Leave</button>
             <button onclick="sendChat(${client.index})">메시지 전송</button>
           </div>
@@ -651,7 +656,13 @@
             connection.on('JoinedMatchChat', payload => {
                 client.joinedChatMatchId = payload?.matchId || client.joinedChatMatchId;
                 appendClientChatLog(client, `[JOINED] matchId=${payload?.matchId || '-'} connectionId=${payload?.connectionId || '-'}`);
-                log(`${client.username} JoinedMatchChat 수신: ${JSON.stringify(payload)}`);
+                log(`${client.username} 자동 채팅방 Join 완료: ${payload?.matchId}`);
+
+                // UI의 input 필드에 matchId 자동 입력
+                const input = document.getElementById(`chatRoom-${client.index}`);
+                if (input) {
+                    input.value = payload.matchId;
+                }
                 renderClients();
             });
 
@@ -801,32 +812,6 @@
                 log(`${client.username} 매칭 취소 성공`);
             } else {
                 log(`${client.username} 매칭 취소 실패: ${response.status} ${JSON.stringify(data)}`);
-            }
-
-            renderClients();
-        }
-
-        async function joinChat(index) {
-            const client = getClient(index);
-            if (!client || !client.hubConnection || !client.hubConnected) {
-                log(`#${index} Hub 연결 없음`);
-                return;
-            }
-
-            const input = document.getElementById(`chatRoom-${index}`);
-            const matchId = input.value.trim();
-
-            if (!matchId) {
-                log(`${client.username} 채팅 Join 실패: matchId 없음`);
-                return;
-            }
-
-            try {
-                await client.hubConnection.invoke('JoinMatchChat', matchId);
-                client.joinedChatMatchId = matchId;
-                log(`${client.username} 채팅방 Join 호출 성공: ${matchId}`);
-            } catch (error) {
-                log(`${client.username} 채팅방 Join 실패: ${error.message}`);
             }
 
             renderClients();

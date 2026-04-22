@@ -1,4 +1,4 @@
-namespace AuthServer.Dtos;
+﻿namespace AuthServer.Dtos;
 
 public class MatchJoinResponse
 {
