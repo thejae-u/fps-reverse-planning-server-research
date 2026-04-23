@@ -26,7 +26,7 @@ public class MatchHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, GetUserGroup(userId));
-            _matchService.AddConnectionId(userId, Context.ConnectionId);
+            await _matchService.AddConnectionId(userId, Context.ConnectionId);
         }
 
         await base.OnConnectedAsync();
@@ -39,7 +39,8 @@ public class MatchHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetUserGroup(userId));
-            _matchService.RemoveConnectionId(userId);
+            await _matchService.RemoveConnectionId(userId);
+            await _matchService.RemoveEntryAsync(userId);
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -105,7 +106,7 @@ public class MatchHub : Hub
             throw new HubException("Unauthorized.");
 
         // invalid match check
-        var userMatch = _matchService.GetMatchResultByUserId(userId);
+        var userMatch = await _matchService.GetMatchResultByUserId(userId);
         if(userMatch is null || string.IsNullOrEmpty(userMatch.MatchId) || userMatch.MatchId != matchId)
             throw new HubException("Invalid user match.");
 

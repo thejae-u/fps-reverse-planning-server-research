@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using AuthServer.Hubs;
 using AuthServer.OpenApi;
 using AuthServer.Services;
@@ -6,11 +6,17 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
+// Redis Configuration
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["Redis__ConnectionString"] ?? "redis:6379";
+builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString));
+
+// Cors for dev
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
@@ -106,7 +112,7 @@ app.MapControllers();
 // Server Information Route
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-app.MapGet("/version", () => "AuthServer 0.1.0");
+app.MapGet("/version", () => "AuthServer 0.1.1");
 app.MapGet("/info", () => new
 {
     info = "API Server for Native C++ Game Logic Server",

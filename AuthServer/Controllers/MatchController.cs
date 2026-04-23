@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using AuthServer.Dtos;
 using AuthServer.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -19,7 +19,7 @@ public class MatchController : ControllerBase
     }
 
     [HttpPost("join")]
-    public IActionResult Join()
+    public async Task<IActionResult> Join()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var username = User.FindFirstValue(ClaimTypes.Name);
@@ -33,7 +33,7 @@ public class MatchController : ControllerBase
             });
         }
 
-        var result = _matchService.Join(userId, username);
+        var result = await _matchService.Join(userId, username);
 
         if (!result.IsSuccess)
         {
@@ -59,7 +59,7 @@ public class MatchController : ControllerBase
     }
 
     [HttpPost("cancel")]
-    public IActionResult Cancel()
+    public async Task<IActionResult> Cancel()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -72,7 +72,7 @@ public class MatchController : ControllerBase
             });
         }
 
-        var result = _matchService.Cancel(userId);
+        var result = await _matchService.Cancel(userId);
 
         if (!result.IsSuccess)
         {
@@ -88,6 +88,8 @@ public class MatchController : ControllerBase
             return Problem("Internal match queue error", statusCode: 500);
         }
 
+        var matchResult = await _matchService.GetMatchResultByUserId(result.Data.UserId);
+
         return Ok(new MatchStatusResponse
         {
             UserId = result.Data.UserId,
@@ -95,12 +97,12 @@ public class MatchController : ControllerBase
             Status = result.Data.Status.ToString(),
             JoinedAtUtc = result.Data.JoinedAtUtc,
             MatchId = result.Data.MatchId,
-            ServerAddress = _matchService.GetMatchResultByUserId(result.Data.UserId)?.ServerAddress
+            ServerAddress = matchResult?.ServerAddress
         });
     }
 
     [HttpGet("status")]
-    public IActionResult Status()
+    public async Task<IActionResult> Status()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -113,7 +115,7 @@ public class MatchController : ControllerBase
             });
         }
 
-        var entry = _matchService.GetStatus(userId);
+        var entry = await _matchService.GetStatus(userId);
 
         if (entry is null)
         {
@@ -124,7 +126,7 @@ public class MatchController : ControllerBase
             });
         }
 
-        var matchResult = _matchService.GetMatchResultByUserId(userId);
+        var matchResult = await _matchService.GetMatchResultByUserId(userId);
 
         return Ok(new MatchStatusResponse
         {
