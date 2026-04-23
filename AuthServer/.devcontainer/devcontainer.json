@@ -1,10 +1,11 @@
 {
   "name": "Auth Server Dev Container",
-  "dockerComposeFile": "../compose.yml",
+  "dockerComposeFile": "../docker-compose.yml",
   "service": "auth-server",
   "workspaceFolder": "/workspace",
   "remoteUser": "vscode",
   "postCreateCommand": "dotnet restore AuthServer.csproj",
+  "overrideCommand": true,
   "customizations": {
     "vscode": {
       "extensions": [
