@@ -34,6 +34,10 @@ To understand and implement the full lifecycle of a multiplayer game session, fr
 - **비동기화 및 트랜잭션:** 모든 데이터 접근 로직을 `async/await` 및 Redis Transaction(`ITransaction`)으로 구현하여 데이터 정합성 확보.
 - **Hub Lifecycle 연동:** 유저의 Hub 연결 종료(`OnDisconnectedAsync`) 시 Redis 대기열 및 엔트리 정보를 즉시 삭제하여 불필요한 매칭 방지 로직 구현.
 
+### ✅ Phase 2.3: Distributed Connection Management (Completed)
+- **무상태성(Stateless) 확보:** `MatchService` 내부의 모든 인메모리 컨테이너(`Dictionary`, `Queue`)를 삭제하고 Redis로 완전 교체.
+- **분산 커넥션 관리:** 유저의 SignalR `connectionId` 정보를 Redis Hash에 저장하여 여러 서버 인스턴스 간에 실시간 커넥션 정보를 공유할 수 있도록 구현.
+
 ---
 
 ## Curriculum Roadmap
@@ -42,11 +46,12 @@ To understand and implement the full lifecycle of a multiplayer game session, fr
 - [x] 1.1 SignalR Hub Validation
 - [x] 1.2 Group Management & Connection Tracking
 
-### Phase 2: Persistence & Distributed Caching (Current)
+### Phase 2: Persistence & Distributed Caching (Completed)
 - [x] 2.1 Redis Environment Setup
 - [x] 2.2 Redis Matchmaking Queue Implementation
-- [ ] **2.3 Distributed Connection Management:** `_userConnections` (Dictionary) 정보를 Redis Hash로 전환하여 다중 서버 환경 지원.
+- [x] 2.3 Distributed Connection Management
 - [ ] **2.4 Database Schema:** Design and implement EF Core entities for Users and MatchResults.
+
 
 ### Phase 3: C++ Logic Server Integration
 - **3.1 Communication Protocol:** Define the bridge between ASP.NET and C++ (REST/gRPC/Socket) for match creation and "Ready" signals.

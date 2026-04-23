@@ -26,7 +26,7 @@ public class MatchHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, GetUserGroup(userId));
-            await _matchService.AddConnectionId(userId, Context.ConnectionId);
+            await _matchService.AddConnectionAsync(userId, Context.ConnectionId);
         }
 
         await base.OnConnectedAsync();
@@ -39,7 +39,7 @@ public class MatchHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetUserGroup(userId));
-            await _matchService.RemoveConnectionId(userId);
+            await _matchService.RemoveConnectionAsync(userId);
             await _matchService.RemoveEntryAsync(userId);
         }
 

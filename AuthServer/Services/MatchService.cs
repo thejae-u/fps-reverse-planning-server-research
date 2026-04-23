@@ -10,24 +10,17 @@ namespace AuthServer.Services;
 
 public class MatchService
 {
-    private readonly Dictionary<string, MatchQueueEntry> _entries = new();
-    private readonly Queue<string> _waitingQueue = new();
-    private readonly Dictionary<string, MatchResult> _matchResults = new();
-    private readonly object _lock = new();
-
     // DI
     private readonly IHubContext<MatchHub> _hubContext;
     private readonly ILogger<MatchService> _logger;
     private readonly IDatabase _db;
     private readonly MatchOptions _options;
 
-    // user hub connections
-    private readonly Dictionary<string, string> _userConnections = new();
-
     // Utilities
-    private static readonly string REDIS_ENTRY_PREFIX = "match:entries";
-    private static readonly string REDIS_QUEUE_PREFIX = "match:queue";
-    private static readonly string REDIS_RESULT_PREFIX = "match:result";
+    private static readonly string REDIS_ENTRY_PREFIX = "match:entries"; // Match Entries
+    private static readonly string REDIS_QUEUE_PREFIX = "match:queue"; // Match Waiting Queue
+    private static readonly string REDIS_RESULT_PREFIX = "match:result"; // Match Result
+    private static readonly string REDIS_CONNECTION_PREFIX = "match:connection"; // User Hub Connections
     private async Task<RedisValue> GetValue(string key, string field) => await _db.HashGetAsync(key, field);
 
     public MatchService(IHubContext<MatchHub> hubContext, ILogger<MatchService> logger, IConnectionMultiplexer redis, IOptions<MatchOptions> options)
@@ -147,7 +140,7 @@ public class MatchService
         var candidates = new List<MatchQueueEntry>();
         var poppedUserIds = new List<string>();
 
-        while(poppedUserIds.Count < _options.PlayerCount)
+        while (poppedUserIds.Count < _options.PlayerCount)
         {
             // Pop From Waiting Queue (List Struct)
             var userId = await _db.ListLeftPopAsync(REDIS_QUEUE_PREFIX);
@@ -155,7 +148,7 @@ public class MatchService
 
             // User Status Check
             var entry = await GetStatus(userId!);
-            if(entry is not null && entry.Status == MatchStatus.Waiting)
+            if (entry is not null && entry.Status == MatchStatus.Waiting)
             {
                 candidates.Add(entry);
                 poppedUserIds.Add(userId!);
@@ -163,7 +156,7 @@ public class MatchService
         }
 
         // Unreached Required Count
-        if(poppedUserIds.Count < _options.PlayerCount)
+        if (poppedUserIds.Count < _options.PlayerCount)
         {
             foreach (var userId in poppedUserIds)
                 await _db.ListLeftPushAsync(REDIS_QUEUE_PREFIX, userId);
@@ -183,7 +176,7 @@ public class MatchService
         var tran = _db.CreateTransaction();
         _ = tran.HashSetAsync(REDIS_RESULT_PREFIX, matchId, matchResultJson);
 
-        foreach(var entry in candidates)
+        foreach (var entry in candidates)
         {
             entry.Status = MatchStatus.Matched;
             entry.MatchId = matchId;
@@ -210,15 +203,16 @@ public class MatchService
                     MatchedAtUtc = result?.MatchedAtUtc
                 });
 
-            if(_userConnections.TryGetValue(entry.UserId, out var connectionId))
+            var connectionId = await _db.HashGetAsync(REDIS_CONNECTION_PREFIX, entry.UserId);
+            if (connectionId.HasValue)
             {
                 var matchGroup = MatchHub.GetMatchGroup(entry.MatchId);
-                await _hubContext.Groups.AddToGroupAsync(connectionId, matchGroup);
-
-                await _hubContext.Clients.Client(connectionId).SendAsync("JoinedMatchChat", new
+                var connectionIdStr = connectionId.ToString();
+                await _hubContext.Groups.AddToGroupAsync(connectionIdStr, matchGroup);
+                await _hubContext.Clients.Client(connectionIdStr).SendAsync("JoinedMatchChat", new
                 {
                     matchId = entry.MatchId,
-                    connectionId = connectionId
+                    connectionId = connectionIdStr
                 });
 
                 await _hubContext.Clients.Group(matchGroup).SendAsync("SystemMessage", new
@@ -233,7 +227,7 @@ public class MatchService
 
     public async Task RemoveEntryAsync(string userId)
     {
-        var entry = GetStatus(userId).Result;
+        var entry = await GetStatus(userId);
         if (entry is null)
             return;
 
@@ -250,29 +244,23 @@ public class MatchService
         _logger.LogInformation("User {userId} match entry removed due to disconnection", userId);
     }
 
-    public async Task AddConnectionId(string userId, string connectionId)
+    public async Task AddConnectionAsync(string userId, string connectionId)
     {
-        lock(_lock)
-        {
-            if(!_userConnections.TryAdd(userId, connectionId))
-            {
-                throw new Exception($"{userId} already exists in userConnections");
-            }
+        var connection = await _db.HashGetAsync(REDIS_CONNECTION_PREFIX, userId);
+        if (connection.HasValue)
+            throw new Exception($"{userId} already exists in userConnections");
 
-            _logger.LogInformation("{userId} add to userConnections success", userId);
-        }
+        await _db.HashSetAsync(REDIS_CONNECTION_PREFIX, userId, connectionId);
+        _logger.LogInformation("{userId} add to userConnections success", userId);
     }
 
-    public async Task RemoveConnectionId(string userId)
+    public async Task RemoveConnectionAsync(string userId)
     {
-        lock(_lock)
-        {
-            if (!_userConnections.Remove(userId))
-            {
-                throw new Exception($"{userId}is not found in userConections");
-            }
+        var connection = await _db.HashGetAsync(REDIS_CONNECTION_PREFIX, userId);
+        if (!connection.HasValue)
+            throw new Exception($"{userId}is not found in userConections");
 
-            _logger.LogInformation("{userId} remove from userConnections success", userId);
-        }
+        await _db.HashDeleteAsync(REDIS_CONNECTION_PREFIX, userId);
+        _logger.LogInformation("{userId} remove from userConnections success", userId);
     }
 }
