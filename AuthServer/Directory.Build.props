@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- 컨테이너 내부와 호스트의 빌드 경로를 완전히 분리합니다. -->
+    <!-- _build 폴더를 사용함으로써 기존 root 소유의 bin/obj 폴더와 충돌을 피합니다. -->
+    <BaseIntermediateOutputPath Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' == 'true'">_build/container/obj/</BaseIntermediateOutputPath>
+    <BaseIntermediateOutputPath Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' != 'true'">_build/host/obj/</BaseIntermediateOutputPath>
+    
+    <BaseOutputPath Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' == 'true'">_build/container/bin/</BaseOutputPath>
+    <BaseOutputPath Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' != 'true'">_build/host/bin/</BaseOutputPath>
+  </PropertyGroup>
+</Project>

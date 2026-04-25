@@ -14,20 +14,19 @@ services:
       context: .
       dockerfile: .devcontainer/Dockerfile
     working_dir: /workspace
-    # 핫리로드 없이 서버 상시 실행
-    command: dotnet run --project /workspace/AuthServer.csproj --urls http://0.0.0.0:8080
+    # 서버 자동 실행 대신 컨테이너만 유지 (사용자가 터미널에서 직접 dotnet run/watch 실행)
+    command: ["tail", "-f", "/dev/null"]
     ports:
       - "5289:8080"
+      - "5290:8081" # HTTPS를 위한 추가 포트 매핑 (선택사항)
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Redis__ConnectionString: redis:6379
+      DOTNET_RUNNING_IN_CONTAINER: "true"
     volumes:
       - ./:/workspace
       - nuget-packages:/home/vscode/.nuget/packages
-      # 빌드 폴더 격리 유지
-      - /workspace/bin
-      - /workspace/obj
     depends_on:
       - redis
     stdin_open: true

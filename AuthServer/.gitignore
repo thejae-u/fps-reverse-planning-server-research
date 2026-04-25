@@ -1,0 +1,26 @@
+# Custom build directory
+_build/
+
+# Standard .NET ignore patterns
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docuser
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# User-specific files
+.devcontainer/*
+!.devcontainer/devcontainer.json
+!.devcontainer/Dockerfile
+
+# OS generated files
+.DS_Store
+Thumbs.db

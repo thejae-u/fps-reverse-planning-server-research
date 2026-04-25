@@ -116,7 +116,7 @@ app.MapGet("/version", () => "AuthServer 0.1.1");
 app.MapGet("/info", () => new
 {
     info = "API Server for Native C++ Game Logic Server",
-    detail = "Created thejaeu with Perplexity AI"
+    detail = "Created thejaeu with AI"
 });
 
 // SignalR Match Hub Route
