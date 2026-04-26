@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace AuthServer.Models;
 
 public class MatchResult
 {
+    [Key]
     public string MatchId { get; set; } = Guid.NewGuid().ToString("N");
     public DateTime MatchedAtUtc { get; set; } = DateTime.UtcNow;
     public List<string> UserIds { get; set; } = new();

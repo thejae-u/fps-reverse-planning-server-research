@@ -1,8 +1,10 @@
 ﻿using System.Text;
+using AuthServer.Data;
 using AuthServer.Hubs;
 using AuthServer.OpenApi;
 using AuthServer.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -11,6 +13,10 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+// PostgreSQL configuration
+var dbConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(dbConnectionString));
 
 // Redis Configuration
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["Redis__ConnectionString"] ?? "redis:6379";

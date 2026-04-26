@@ -34,9 +34,10 @@ To understand and implement the full lifecycle of a multiplayer game session, fr
 - **비동기화 및 트랜잭션:** 모든 데이터 접근 로직을 `async/await` 및 Redis Transaction(`ITransaction`)으로 구현하여 데이터 정합성 확보.
 - **Hub Lifecycle 연동:** 유저의 Hub 연결 종료(`OnDisconnectedAsync`) 시 Redis 대기열 및 엔트리 정보를 즉시 삭제하여 불필요한 매칭 방지 로직 구현.
 
-### ✅ Phase 2.3: Distributed Connection Management (Completed)
-- **무상태성(Stateless) 확보:** `MatchService` 내부의 모든 인메모리 컨테이너(`Dictionary`, `Queue`)를 삭제하고 Redis로 완전 교체.
-- **분산 커넥션 관리:** 유저의 SignalR `connectionId` 정보를 Redis Hash에 저장하여 여러 서버 인스턴스 간에 실시간 커넥션 정보를 공유할 수 있도록 구현.
+### ✅ Phase 2.4: Database Schema & Security Hardening (Completed)
+- **Security & Environment:** `.env` 파일을 통한 민감 정보(DB, JWT) 관리 및 Docker 컨테이너 포트 격리(Internal Only)로 보안 강화.
+- **EF Core & PostgreSQL:** `Npgsql` 프로바이더 설치 및 `ApplicationDbContext`를 통한 `User`, `MatchResult` 엔티티 매핑 완료.
+- **Stateless Architecture:** Redis(휘발성/캐시)와 PostgreSQL(영구/저장)의 역할 분담 체계 구축.
 
 ---
 
@@ -50,11 +51,11 @@ To understand and implement the full lifecycle of a multiplayer game session, fr
 - [x] 2.1 Redis Environment Setup
 - [x] 2.2 Redis Matchmaking Queue Implementation
 - [x] 2.3 Distributed Connection Management
-- [ ] **2.4 Database Schema:** Design and implement EF Core entities for Users and MatchResults.
-
+- [x] 2.4 Database Schema & Security Hardening
 
 ### Phase 3: C++ Logic Server Integration
-- **3.1 Communication Protocol:** Define the bridge between ASP.NET and C++ (REST/gRPC/Socket) for match creation and "Ready" signals.
+- [ ] **3.1 Communication Protocol:** Define the bridge between ASP.NET and C++ (REST/gRPC/Socket) for match creation and "Ready" signals.
+
 - **3.2 JWT Handover:** Implement a secure token exchange so the C++ server can authenticate users joining from the ASP.NET server.
 
 ### Phase 4: Game Lifecycle & Post-Processing

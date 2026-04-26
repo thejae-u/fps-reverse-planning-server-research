@@ -2,10 +2,20 @@ services:
   redis:
     image: redis:alpine
     container_name: auth-redis
-    ports:
-      - "6379:6379"
+    # ports removed for security (only accessible within docker network)
     volumes:
       - redis-data:/data
+
+  db:
+    image: postgres:16-alpine
+    container_name: auth-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_DB: ${POSTGRES_DB:-authdb}
+    # ports removed for security (only accessible within docker network)
+    volumes:
+      - db-data:/var/lib/postgresql/data
 
   auth-server:
     image: auth-server-dev
@@ -18,20 +28,24 @@ services:
     command: ["tail", "-f", "/dev/null"]
     ports:
       - "5289:8080"
-      - "5290:8081" # HTTPS를 위한 추가 포트 매핑 (선택사항)
+      - "5290:8081"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Redis__ConnectionString: redis:6379
+      Jwt__SecretKey: ${JWT_SECRET_KEY:-THIS_IS_A_TEMPORARY_SECRET_KEY_FOR_DEVELOPMENT_ONLY}
+      ConnectionStrings__DefaultConnection: "Host=db;Database=${POSTGRES_DB:-authdb};Username=${POSTGRES_USER:-admin};Password=${POSTGRES_PASSWORD:-password123}"
       DOTNET_RUNNING_IN_CONTAINER: "true"
     volumes:
       - ./:/workspace
       - nuget-packages:/home/vscode/.nuget/packages
     depends_on:
       - redis
+      - db
     stdin_open: true
     tty: true
 
 volumes:
   nuget-packages:
   redis-data:
+  db-data:
