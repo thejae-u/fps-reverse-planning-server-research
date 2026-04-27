@@ -121,7 +121,17 @@ app.MapControllers();
 // Server Information Route
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-app.MapGet("/version", () => "AuthServer 0.1.1");
+app.MapGet("/version", () => "AuthServer v0.3.1-develop");
+app.MapGet("/version/detail", () => new
+{
+    Version = "version 0.3.1",
+    Status = "feature",
+    FeatureBranch = new
+    {
+        Name = "feat/7-imp-web-server",
+        Link = "https://thejaeu.com/fps-reverse-planning-server-research/tree/feat/7-impl-web-server"
+    }
+});
 app.MapGet("/info", () => new
 {
     info = "API Server for Native C++ Game Logic Server",
