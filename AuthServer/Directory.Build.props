@@ -7,5 +7,19 @@
     
     <BaseOutputPath Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' == 'true'">_build/container/bin/</BaseOutputPath>
     <BaseOutputPath Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' != 'true'">_build/host/bin/</BaseOutputPath>
+
+    <!-- MSBuild의 자동 파일 검색 대상에서 _build 폴더를 원천 제외 -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);_build/**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <!-- 현재 환경이 아닌 빌드 결과물을 명시적으로 제거 (중복 정의 방지) -->
+  <ItemGroup Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' == 'true'">
+    <Compile Remove="_build/host/**" />
+    <None Remove="_build/host/**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DOTNET_RUNNING_IN_CONTAINER)' != 'true'">
+    <Compile Remove="_build/container/**" />
+    <None Remove="_build/container/**" />
+  </ItemGroup>
 </Project>

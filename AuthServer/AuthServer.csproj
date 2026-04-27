@@ -7,6 +7,11 @@
         <AssemblyName>AuthServer</AssemblyName>
     </PropertyGroup>
     <ItemGroup>
+      <PackageReference Include="Google.Protobuf" Version="3.34.1" />
+      <PackageReference Include="Grpc.Tools" Version="2.80.0">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
       <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.6" />
       <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.6" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
@@ -20,5 +25,9 @@
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
       <PackageReference Include="Scalar.AspNetCore" Version="2.14.1" />
       <PackageReference Include="StackExchange.Redis" Version="2.12.14" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Protobuf Include="Protos\match_communication.proto" GrpcServices="None" />
     </ItemGroup>
 </Project>

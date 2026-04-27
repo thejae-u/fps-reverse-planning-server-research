@@ -1,0 +1,19 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "AuthServer.Protos";
+
+package match;
+
+message MatchCreateRequest {
+	string match_id = 1;
+	string game_type = 2;
+	repeated string user_ids = 3;
+}
+
+message MatchCreateResponse {
+	string match_id = 1;
+	bool success = 2;
+	int32 port = 3;
+	string server_ip = 4;
+	string error_message = 5;
+}

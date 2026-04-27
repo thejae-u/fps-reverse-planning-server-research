@@ -54,9 +54,15 @@ To understand and implement the full lifecycle of a multiplayer game session, fr
 - [x] 2.4 Database Schema & Security Hardening
 
 ### Phase 3: C++ Logic Server Integration
-- [ ] **3.1 Communication Protocol:** Define the bridge between ASP.NET and C++ (REST/gRPC/Socket) for match creation and "Ready" signals.
-
-- **3.2 JWT Handover:** Implement a secure token exchange so the C++ server can authenticate users joining from the ASP.NET server.
+- [ ] **3.1 Protobuf & TCP Connection Pool:**
+  - [x] **3.1.1 Schema Definition:** `.proto` 파일을 통한 ASP.NET ↔ C++ 공용 메시지 규격 확립 및 빌드 환경 최적화.
+  - [x] **3.1.2 Packet Framing:** `Length-Prefix` 기반의 TCP 패킷 구조 설계.
+  - [x] **3.1.3 Connection Pool:** 고성능 통신을 위한 TCP 소켓 관리 로직 구현.
+- [ ] **3.2 Match Creation Workflow:**
+  - [ ] **3.2.1 MatchWorker Integration:** 매칭 성공 시 C++ 서버에 방 생성 요청 연동.
+  - [ ] **3.2.2 Result Handling:** C++ 서버 응답 처리 및 클라이언트 접속 정보 전달.
+- [ ] **3.3 JWT Handover:**
+  - [ ] **3.3.1 Token Exchange:** C++ 서버 인증을 위한 보안 토큰 전달 메커니즘 구현.
 
 ### Phase 4: Game Lifecycle & Post-Processing
 - **4.1 Result Webhook:** Implement an endpoint for the C++ server to report game outcomes (scores, winners).

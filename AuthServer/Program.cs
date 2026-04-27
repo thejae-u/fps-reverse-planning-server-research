@@ -3,6 +3,7 @@ using AuthServer.Data;
 using AuthServer.Hubs;
 using AuthServer.OpenApi;
 using AuthServer.Services;
+using AuthServer.Services.Tcp;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -45,8 +46,10 @@ builder.Services.AddSignalR();
 
 // global fields
 builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("MatchOptions"));
+builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicServer"));
 
 // Service DI
+builder.Services.AddSingleton<LogicServerConnectionPool>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
