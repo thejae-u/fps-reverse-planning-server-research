@@ -3,6 +3,6 @@
 public class TcpOptions
 {
     public string Host { get; set; } = "127.0.0.1";
-    public int Port { get; set; }
-    public int PoolSeize { get; set; } = 10;
+    public int Port { get; set; } = 9000;
+    public int PoolSize { get; set; } = 10;
 }

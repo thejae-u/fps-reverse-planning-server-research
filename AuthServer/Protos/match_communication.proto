@@ -4,6 +4,15 @@ option csharp_namespace = "AuthServer.Protos";
 
 package match;
 
+message GamePacket {
+	uint32 sequence_id = 1;
+
+	oneof payload {
+		MatchCreateRequest match_create_req = 10;
+		MatchCreateResponse	match_create_res = 11;
+	}
+}
+
 message MatchCreateRequest {
 	string match_id = 1;
 	string game_type = 2;

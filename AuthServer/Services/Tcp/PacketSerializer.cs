@@ -1,4 +1,5 @@
-﻿using Google.Protobuf;
+using Google.Protobuf;
+using AuthServer.Protos;
 
 namespace AuthServer.Services.Tcp;
 
@@ -6,26 +7,22 @@ public static class PacketSerializer
 {
     public const int HeaderSize = 2;
 
-    public static byte[] Serialize<T>(T message) where T : IMessage
+    public static byte[] Serialize(GamePacket packet)
     {
-        byte[] protobufData = message.ToByteArray();
-        ushort payloadSize = (ushort)protobufData.Length;
+        byte[] body = packet.ToByteArray();
+        ushort size = (ushort)body.Length;
+        byte[] result = new byte[HeaderSize + size];
 
-        byte[] packet = new byte[HeaderSize + payloadSize];
-
-        // size header
-        byte[] sizeBytes = BitConverter.GetBytes(payloadSize);
+        byte[] sizeBytes = BitConverter.GetBytes(size);
         if (!BitConverter.IsLittleEndian) Array.Reverse(sizeBytes);
-        Buffer.BlockCopy(sizeBytes, 0, packet, 0, 2);
 
-        // protobuf binary
-        Buffer.BlockCopy(protobufData, 0, packet, 2, protobufData.Length);
-
-        return packet;
+        Buffer.BlockCopy(sizeBytes, 0, result, 0, HeaderSize);
+        Buffer.BlockCopy(body, 0, result, HeaderSize, body.Length);
+        return result;
     }
 
-    public static T Deserialize<T>(byte[] payload, MessageParser<T> parser) where T : IMessage<T>
+    public static GamePacket Deserialize(byte[] data)
     {
-        return parser.ParseFrom(payload);
+        return GamePacket.Parser.ParseFrom(data);
     }
 }

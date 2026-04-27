@@ -1,7 +1,6 @@
-﻿using Google.Protobuf;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
-using System.Data;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
+using AuthServer.Protos;
 
 namespace AuthServer.Services.Tcp;
 
@@ -9,67 +8,123 @@ public class LogicServerClient : IDisposable
 {
     private TcpClient? _client;
     private NetworkStream? _stream;
-    private readonly string _host;
-    private readonly int _port;
+    private uint _nextSequenceId = 0;
+    private bool _isDisposed = false;
 
-    public LogicServerClient(string host, int port)
+    private readonly ConcurrentDictionary<uint, TaskCompletionSource<GamePacket>> _pendingRequests = new();
+    private readonly CancellationTokenSource _cts = new();
+
+    public event Action<GamePacket>? OnNotificationReceived;
+
+    public async Task ConnectAsync(string host, int port)
     {
-        _host = host;
-        _port = port;
-    }
-
-    public async Task ConnectAsync()
-    {
-        if (_client is { Connected: true }) return;
-
         _client = new TcpClient();
-        await _client.ConnectAsync(_host, _port);
+        await _client.ConnectAsync(host, port);
         _stream = _client.GetStream();
+        
+        _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
     }
 
-    public async Task SendAsync<T>(T message) where T : IMessage
+    public async Task<GamePacket> SendRequestAsync(GamePacket packet, CancellationToken userToken)
     {
-        if (_stream is null) throw new InvalidOperationException("Not connected");
+        if (_stream == null || _isDisposed) throw new ObjectDisposedException(nameof(LogicServerClient));
 
-        byte[] data = PacketSerializer.Serialize(message);
-        await _stream.WriteAsync(data, 0, data.Length);
-        await _stream.FlushAsync();
-    }
+        uint seqId = Interlocked.Increment(ref _nextSequenceId);
+        packet.SequenceId = seqId;
 
-    public async Task<T> ReceiveAsync<T>(MessageParser<T> parser) where T : IMessage<T>
-    {
-        if (_stream is null) throw new InvalidOperationException("Not connected");
+        var tcs = new TaskCompletionSource<GamePacket>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingRequests[seqId] = tcs;
 
-        byte[] header = new byte[PacketSerializer.HeaderSize];
-        await ReadExactlyAsync(header, PacketSerializer.HeaderSize);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userToken, _cts.Token);
 
-        if (!BitConverter.IsLittleEndian) Array.Reverse(header);
-        ushort payloadSize = BitConverter.ToUInt16(header, 0);
-
-        byte[] payload = new byte[payloadSize];
-        await ReadExactlyAsync(payload, payloadSize);
-
-        return parser.ParseFrom(payload);
-    }
-
-    public async Task ReadExactlyAsync(byte[] buffer, int size)
-    {
-        if (_stream is null) throw new InvalidOperationException("stream is null");
-
-        int totalRead = 0;
-        while (totalRead < size)
+        try
         {
-            int read = await _stream.ReadAsync(buffer, totalRead, size - totalRead);
-            if (read == 0) throw new SocketException((int)SocketError.ConnectionAborted);
-            totalRead += read;
+            byte[] data = PacketSerializer.Serialize(packet);
+            await _stream.WriteAsync(data, linkedCts.Token);
+            await _stream.FlushAsync(linkedCts.Token);
+
+            return await tcs.Task.WaitAsync(linkedCts.Token);
+        }
+        catch (Exception)
+        {
+            _pendingRequests.TryRemove(seqId, out _);
+            throw;
         }
     }
 
-    public bool IsConnected => _client is { Connected: true };
+    private async Task ReceiveLoopAsync(CancellationToken token)
+    {
+        byte[] headerBuffer = new byte[PacketSerializer.HeaderSize];
+
+        try
+        {
+            while (!token.IsCancellationRequested && _client is { Connected: true })
+            {
+                int read = await ReadExactlyAsync(headerBuffer, PacketSerializer.HeaderSize, token);
+                if (read == 0) break;
+
+                if (!BitConverter.IsLittleEndian) Array.Reverse(headerBuffer);
+                ushort bodySize = BitConverter.ToUInt16(headerBuffer, 0);
+
+                byte[] bodyBuffer = new byte[bodySize];
+                await ReadExactlyAsync(bodyBuffer, bodySize, token);
+
+                var packet = PacketSerializer.Deserialize(bodyBuffer);
+                Dispatch(packet);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TCP Client Error] {ex.Message}");
+        }
+        finally
+        {
+            Dispose();
+        }
+    }
+
+    private void Dispatch(GamePacket packet)
+    {
+        if (packet.SequenceId > 0 && _pendingRequests.TryRemove(packet.SequenceId, out var tcs))
+        {
+            tcs.TrySetResult(packet);
+        }
+        else
+        {
+            OnNotificationReceived?.Invoke(packet);
+        }
+    }
+
+    private async Task<int> ReadExactlyAsync(byte[] buffer, int size, CancellationToken token)
+    {
+        int totalRead = 0;
+        while (totalRead < size)
+        {
+            int read = await _stream!.ReadAsync(buffer.AsMemory(totalRead, size - totalRead), token);
+            if (read == 0) return 0;
+            totalRead += read;
+        }
+        return totalRead;
+    }
+
+    public bool IsConnected => _client is { Connected: true } && !_isDisposed;
 
     public void Dispose()
     {
+        if (_isDisposed) return;
+        _isDisposed = true;
+
+        _cts.Cancel();
+        
+        foreach (var tcs in _pendingRequests.Values)
+        {
+            tcs.TrySetException(new SocketException((int)SocketError.ConnectionAborted));
+        }
+        _pendingRequests.Clear();
+
         _stream?.Dispose();
         _client?.Dispose();
+        _cts.Dispose();
     }
 }
