@@ -28,6 +28,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Protobuf Include="Protos\match_communication.proto" GrpcServices="None" />
+      <Protobuf Include="..\proto\Internal.proto" GrpcServices="None" Link="Protos\Internal.proto" />
     </ItemGroup>
 </Project>

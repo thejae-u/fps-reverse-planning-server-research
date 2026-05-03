@@ -44,6 +44,11 @@ builder.Services.AddOpenApi("v1", options =>
 // web socket
 builder.Services.AddSignalR();
 
+// background internal service
+builder.Services.AddHostedService<MatchWorker>();
+builder.Services.AddHostedService<LogicServerListenerService>();
+builder.
+
 // global fields
 builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("MatchOptions"));
 builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicServer"));
@@ -53,10 +58,9 @@ builder.Services.AddSingleton<LogicServerConnectionPool>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
-builder.Services.AddHostedService<MatchWorker>();
 builder.Services.AddLogging();
 
-// JWT Configuation
+// JWT Configuration
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
@@ -121,11 +125,12 @@ app.MapControllers();
 // Server Information Route
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-app.MapGet("/version", () => "AuthServer v0.3.1-develop");
+app.MapGet("/version", () => "AuthServer v0.4.0-develop");
 app.MapGet("/version/detail", () => new
 {
-    Version = "version 0.3.1",
+    Version = "version 0.4.0",
     Status = "feature",
+    Implement = "web server connect to logic server",
     FeatureBranch = new
     {
         Name = "feat/7-imp-web-server",

@@ -1,4 +1,5 @@
-﻿using AuthServer.Dtos;
+﻿using AuthServer.Data;
+using AuthServer.Dtos;
 using AuthServer.Hubs;
 using AuthServer.Models;
 using Microsoft.AspNetCore.SignalR;
@@ -13,7 +14,8 @@ public class MatchService
     // DI
     private readonly IHubContext<MatchHub> _hubContext;
     private readonly ILogger<MatchService> _logger;
-    private readonly IDatabase _db;
+    private readonly IDatabase _redisDB;
+    private readonly ApplicationDbContext _dbContext;
     private readonly MatchOptions _options;
 
     // Utilities
@@ -21,13 +23,14 @@ public class MatchService
     private static readonly string REDIS_QUEUE_PREFIX = "match:queue"; // Match Waiting Queue
     private static readonly string REDIS_RESULT_PREFIX = "match:result"; // Match Result
     private static readonly string REDIS_CONNECTION_PREFIX = "match:connection"; // User Hub Connections
-    private async Task<RedisValue> GetValue(string key, string field) => await _db.HashGetAsync(key, field);
+    private async Task<RedisValue> GetValue(string key, string field) => await _redisDB.HashGetAsync(key, field);
 
-    public MatchService(IHubContext<MatchHub> hubContext, ILogger<MatchService> logger, IConnectionMultiplexer redis, IOptions<MatchOptions> options)
+    public MatchService(IHubContext<MatchHub> hubContext, ILogger<MatchService> logger, IConnectionMultiplexer redis, ApplicationDbContext dbContext, IOptions<MatchOptions> options)
     {
         _hubContext = hubContext;
         _logger = logger;
-        _db = redis.GetDatabase();
+        _redisDB = redis.GetDatabase();
+        _dbContext = dbContext;
         _options = options.Value;
     }
 
@@ -55,7 +58,7 @@ public class MatchService
                 // Redis Update
                 var updatedJson = JsonSerializer.Serialize(existing);
 
-                var innerTran = _db.CreateTransaction();
+                var innerTran = _redisDB.CreateTransaction();
                 _ = innerTran.HashSetAsync(REDIS_ENTRY_PREFIX, userId, updatedJson);
                 _ = innerTran.ListRightPushAsync(REDIS_QUEUE_PREFIX, userId);
 
@@ -76,7 +79,7 @@ public class MatchService
         };
 
         var json = JsonSerializer.Serialize(entry);
-        var tran = _db.CreateTransaction();
+        var tran = _redisDB.CreateTransaction();
 
         _ = tran.HashSetAsync(REDIS_ENTRY_PREFIX, userId, json);
         _ = tran.ListRightPushAsync(REDIS_QUEUE_PREFIX, userId);
@@ -104,7 +107,7 @@ public class MatchService
 
         // Redis Update
         var json = JsonSerializer.Serialize(entry);
-        var tran = _db.CreateTransaction();
+        var tran = _redisDB.CreateTransaction();
 
         _ = tran.HashSetAsync(REDIS_ENTRY_PREFIX, userId, json);
         _ = tran.ListRemoveAsync(REDIS_QUEUE_PREFIX, userId, 1);
@@ -128,14 +131,14 @@ public class MatchService
         if (entry is null || string.IsNullOrEmpty(entry.MatchId))
             return null;
 
-        var resultJson = await _db.HashGetAsync(REDIS_RESULT_PREFIX, entry.MatchId);
+        var resultJson = await _redisDB.HashGetAsync(REDIS_RESULT_PREFIX, entry.MatchId);
         if (!resultJson.HasValue)
             return null;
 
         return JsonSerializer.Deserialize<MatchResult>(resultJson.ToString());
     }
 
-    public async Task TryMakeMatchesAsync()
+    public async Task<MatchResult?> TryMakeMatchesAsync()
     {
         var candidates = new List<MatchQueueEntry>();
         var poppedUserIds = new List<string>();
@@ -143,7 +146,7 @@ public class MatchService
         while (poppedUserIds.Count < _options.PlayerCount)
         {
             // Pop From Waiting Queue (List Struct)
-            var userId = await _db.ListLeftPopAsync(REDIS_QUEUE_PREFIX);
+            var userId = await _redisDB.ListLeftPopAsync(REDIS_QUEUE_PREFIX);
             if (userId.IsNull) break;
 
             // User Status Check
@@ -159,21 +162,23 @@ public class MatchService
         if (poppedUserIds.Count < _options.PlayerCount)
         {
             foreach (var userId in poppedUserIds)
-                await _db.ListLeftPushAsync(REDIS_QUEUE_PREFIX, userId);
-            return;
+                await _redisDB.ListLeftPushAsync(REDIS_QUEUE_PREFIX, userId);
+            return null;
         }
 
+        // make new match information
         var matchId = Guid.NewGuid().ToString("N");
         var result = new MatchResult
         {
             MatchId = matchId,
             MatchedAtUtc = DateTime.UtcNow,
             UserIds = candidates.Select(x => x.UserId).ToList(),
-            ServerAddress = "https://logic.fps.thejaeu.com"
+            ServerAddress = "pending"
         };
 
+        // Redis Transaction execute
         var matchResultJson = JsonSerializer.Serialize(result);
-        var tran = _db.CreateTransaction();
+        var tran = _redisDB.CreateTransaction();
         _ = tran.HashSetAsync(REDIS_RESULT_PREFIX, matchId, matchResultJson);
 
         foreach (var entry in candidates)
@@ -186,24 +191,13 @@ public class MatchService
 
         await tran.ExecuteAsync();
 
+        // SignalR Hub Send
         foreach (var entry in candidates)
         {
             if (entry.MatchId is null)
                 throw new Exception("Entry MatchId is null");
 
-            await _hubContext.Clients
-                .Group(MatchHub.GetUserGroup(entry.UserId))
-                .SendAsync("Matched", new
-                {
-                    UserId = entry.UserId,
-                    Username = entry.Username,
-                    Status = entry.Status.ToString(),
-                    MatchId = entry.MatchId,
-                    ServerAddress = result?.ServerAddress,
-                    MatchedAtUtc = result?.MatchedAtUtc
-                });
-
-            var connectionId = await _db.HashGetAsync(REDIS_CONNECTION_PREFIX, entry.UserId);
+            var connectionId = await _redisDB.HashGetAsync(REDIS_CONNECTION_PREFIX, entry.UserId);
             if (connectionId.HasValue)
             {
                 var matchGroup = MatchHub.GetMatchGroup(entry.MatchId);
@@ -223,6 +217,8 @@ public class MatchService
                 });
             }
         }
+
+        return result;
     }
 
     public async Task RemoveEntryAsync(string userId)
@@ -235,7 +231,7 @@ public class MatchService
         entry.MatchId = null;
         entry.JoinedAtUtc = DateTime.MinValue;
 
-        var tran = _db.CreateTransaction();
+        var tran = _redisDB.CreateTransaction();
 
         _ = tran.HashSetAsync(REDIS_ENTRY_PREFIX, userId, JsonSerializer.Serialize(entry));
         _ = tran.ListRemoveAsync(REDIS_QUEUE_PREFIX, userId, 0);
@@ -246,21 +242,52 @@ public class MatchService
 
     public async Task AddConnectionAsync(string userId, string connectionId)
     {
-        var connection = await _db.HashGetAsync(REDIS_CONNECTION_PREFIX, userId);
+        var connection = await _redisDB.HashGetAsync(REDIS_CONNECTION_PREFIX, userId);
         if (connection.HasValue)
             throw new Exception($"{userId} already exists in userConnections");
 
-        await _db.HashSetAsync(REDIS_CONNECTION_PREFIX, userId, connectionId);
+        await _redisDB.HashSetAsync(REDIS_CONNECTION_PREFIX, userId, connectionId);
         _logger.LogInformation("{userId} add to userConnections success", userId);
     }
 
     public async Task RemoveConnectionAsync(string userId)
     {
-        var connection = await _db.HashGetAsync(REDIS_CONNECTION_PREFIX, userId);
+        var connection = await _redisDB.HashGetAsync(REDIS_CONNECTION_PREFIX, userId);
         if (!connection.HasValue)
             throw new Exception($"{userId}is not found in userConections");
 
-        await _db.HashDeleteAsync(REDIS_CONNECTION_PREFIX, userId);
+        await _redisDB.HashDeleteAsync(REDIS_CONNECTION_PREFIX, userId);
         _logger.LogInformation("{userId} remove from userConnections success", userId);
+    }
+
+    public async Task<bool> FinishMatchAsync(string matchId, string winnerId)
+    {
+        var matchResult = await _dbContext.MatchResults.FindAsync(matchId);
+        if (matchResult is null || matchResult is { IsFinished: true }) return false;
+
+        matchResult.IsFinished = true;
+        matchResult.WinnerId = winnerId;
+        matchResult.FinishedAtUtc = DateTime.UtcNow;
+
+        var tran = _redisDB.CreateTransaction();
+        _ = tran.HashDeleteAsync(REDIS_RESULT_PREFIX, matchId);
+
+        foreach(var userId in matchResult.UserIds)
+        {
+            _ = tran.HashDeleteAsync(REDIS_ENTRY_PREFIX, userId);
+        }
+
+        await _dbContext.SaveChangesAsync();
+        bool redisSuccess = await tran.ExecuteAsync();
+
+        _logger.LogInformation("Match {matchId} finished, winner: {winnerId}", matchId, winnerId);
+
+        await _hubContext.Clients.Group(MatchHub.GetMatchGroup(matchId)).SendAsync("GameFinished", new
+        {
+            winnerId,
+            matchId
+        });
+
+        return true;
     }
 }

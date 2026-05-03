@@ -17,3 +17,11 @@ public class MatchStatusResponse
     public string? MatchId { get; set; }
     public string? ServerAddress { get; set; }
 }
+
+public class GameResultReportDto
+{
+    public string MatchId { get; set; } = string.Empty;
+    public string WinnderId { get; set; } = string.Empty;
+    public DateTime EndTimeUtc { get; set; }
+    public string ApiKey { get; set; } = string.Empty;
+}

@@ -1,4 +1,4 @@
-﻿syntax = "proto3";
+syntax = "proto3";
 
 option csharp_namespace = "AuthServer.Protos";
 
@@ -13,10 +13,15 @@ message GamePacket {
 	}
 }
 
+message UserSessionInfo {
+	string user_id = 1;
+	string session_token = 2;
+}
+
 message MatchCreateRequest {
 	string match_id = 1;
 	string game_type = 2;
-	repeated string user_ids = 3;
+	repeated UserSessionInfo users = 3;
 }
 
 message MatchCreateResponse {

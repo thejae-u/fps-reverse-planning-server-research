@@ -16,12 +16,25 @@ public class LogicServerClient : IDisposable
 
     public event Action<GamePacket>? OnNotificationReceived;
 
+    public LogicServerClient() { }
+
+    public LogicServerClient(TcpClient existingClient)
+    {
+        _client = existingClient;
+        _stream = _client.GetStream();
+        StartReceiveLoop();
+    }
+
     public async Task ConnectAsync(string host, int port)
     {
         _client = new TcpClient();
         await _client.ConnectAsync(host, port);
         _stream = _client.GetStream();
-        
+        StartReceiveLoop();
+    }
+
+    private void StartReceiveLoop()
+    {
         _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
     }
 

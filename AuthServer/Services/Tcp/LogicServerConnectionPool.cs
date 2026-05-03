@@ -18,6 +18,13 @@ public class LogicServerConnectionPool : IDisposable
         _logger = logger;
     }
 
+    public void RegisterExternalConnection(LogicServerClient client)
+    {
+        client.OnNotificationReceived += (packet) => OnGlobalNotificationReceived?.Invoke(packet);
+        _pool.Add(client);
+        _logger.LogInformation("New external connection registered to pool. Total connections in pool: {Count}", _pool.Count);
+    }
+
     public async Task<LogicServerClient> RentAsync()
     {
         while (_pool.TryTake(out var client))
