@@ -54,6 +54,7 @@ private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<SessionManager> _sessionManager;
     uuids::uuid_system_generator _uuidGen;
+    std::mutex _uuidMutex;
 
     // waiting sessions
     std::deque<std::pair<uuids::uuid, std::weak_ptr<Session>>> _waitingQueue;

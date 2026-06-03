@@ -83,7 +83,12 @@ void Matching::TryMatch()
     while(_waitingQueue.size() >= MATCHING_PLAYERS)
     {
         // Matching Sequence (match 10 sessions at the front)
-        auto newRoom = Room::Create(_ioManager, _sessionManager, _uuidGen());
+        uuids::uuid roomId;
+        {
+            std::lock_guard<std::mutex> lock(_uuidMutex);
+            roomId = _uuidGen();
+        }
+        auto newRoom = Room::Create(_ioManager, _sessionManager, roomId);
         newRoom->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& removeRoom) {
             if(auto self = weakSelf.lock())
                 self->RemoveRoom(removeRoom);
@@ -112,7 +117,7 @@ void Matching::TryMatch()
             if(auto nextSession = weakNextSession.lock())
             {
                 nextSession->SetRoom(newRoom->GetId());
-                nextSession->RemoveDiscconectCallback(_sessionCallbackHandles[nextSessionId]);
+                nextSession->RemoveDisconnectCallback(_sessionCallbackHandles[nextSessionId]);
                 _sessionCallbackHandles.erase(nextSessionId);
             }
         }

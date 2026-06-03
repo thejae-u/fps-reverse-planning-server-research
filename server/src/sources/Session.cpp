@@ -6,43 +6,56 @@
 
 void Session::StartTcpRead()
 {
-    if(_disconnectCallbacks.size() == 0)
     {
-        spdlog::error("session {}: disconnect callback not set", uuids::to_string(_id));
-        return;
+        std::lock_guard<std::mutex> lock(_disconnectCallbacksMutex);
+        if(_disconnectCallbacks.empty())
+        {
+            spdlog::error("session {}: disconnect callback not set", uuids::to_string(_id));
+            return;
+        }
     }
 
     // Tcp read open
     ReadSizeAsync();
 }
 
+void Session::Start()
+{
+    // no implement
+}
+
 void Session::Stop()
 {
-    if(_state == SessionState::Invalid) // already stopped
+    // 원자적으로 상태를 변경하여 중복 진입 방지
+    if(_state.exchange(SessionState::Invalid) == SessionState::Invalid)
         return;
 
     _isValid = false;
-    _state = SessionState::Invalid;
     _socketPtr->close();
 
-    if(_disconnectCallbacks.size() == 0)
-        return;
-
-    // execute all disconnect callback
-    for(const auto& [handle, disconnectCallback] : _disconnectCallbacks)
+    // 콜백들을 로컬로 복사하고 원본 맵을 비움 (순회 중 수정 방지)
+    std::unordered_map<CallbackHandle, NotifyDisconnectCallback> callbacks;
     {
-        std::lock_guard<std::mutex> callbacksLock(_disconnectCallbacksMutex);
-        disconnectCallback(shared_from_this());
-        spdlog::info("session {} disconnect handle {} called", uuids::to_string(_id), handle);
+        std::lock_guard<std::mutex> lock(_disconnectCallbacksMutex);
+        callbacks = std::move(_disconnectCallbacks);
+        _disconnectCallbacks.clear();
     }
 
-    _disconnectCallbacks.clear();
+    // 락 외부에서 콜백 실행 (데드락 방지 및 안전한 순회)
+    for(const auto& [handle, disconnectCallback] : callbacks)
+    {
+        if(disconnectCallback)
+        {
+            disconnectCallback(GetShared<Session>());
+            spdlog::info("session {} disconnect handle {} called", uuids::to_string(_id), handle);
+        }
+    }
 }
 
 void Session::Init()
 {
     spdlog::info("session{}: Init", uuids::to_string(_id));
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
+    _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
         if(auto self = weakSelf.lock())
         {
             self->_state = SessionState::Initializing;
@@ -81,7 +94,7 @@ CallbackHandle Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
     return _callbackHandleCount++;
 }
 
-void Session::RemoveDiscconectCallback(CallbackHandle handle)
+void Session::RemoveDisconnectCallback(CallbackHandle handle)
 {
     std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
     _disconnectCallbacks.erase(handle);
@@ -94,7 +107,7 @@ void Session::SetSendToHandler(SendToHandler handler)
 
 void Session::ReadSizeAsync()
 {
-    asio::async_read(*_socketPtr, asio::buffer(&_readNetSize, sizeof(_readNetSize)), asio::bind_executor(_strand, [weakSelf = weak_from_this()](const std::error_code& ec, std::size_t) {
+    asio::async_read(*_socketPtr, asio::buffer(&_readNetSize, sizeof(_readNetSize)), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>()](const std::error_code& ec, std::size_t) {
         if(ec)
         {
             if(auto self = weakSelf.lock())
@@ -125,7 +138,7 @@ void Session::ReadSizeAsync()
 void Session::ReadDataAsync(const std::uint16_t& dataSize)
 {
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(dataSize);
-    asio::async_read(*_socketPtr, asio::buffer(*receiveBuffer), asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, dataSize](const std::error_code& ec, std::size_t) {
+    asio::async_read(*_socketPtr, asio::buffer(*receiveBuffer), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), receiveBuffer, dataSize](const std::error_code& ec, std::size_t) {
         if(ec)
         {
             if(auto self = weakSelf.lock())
@@ -173,7 +186,7 @@ void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::
     if(_isProcessing)
         return;
 
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
+    _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
         if(auto self = weakSelf.lock())
             self->ProcessPacketAsync();
     });
@@ -207,7 +220,7 @@ void Session::ProcessPacketAsync()
             }
 
             _state = SessionState::WaitMatching; // Update State
-            _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
+            _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
                 if(auto self = weakSelf.lock())
                 {
                     if(auto listener = self->_weakListener.lock())
@@ -321,7 +334,7 @@ void Session::DoSendAsyncTcpLoop()
     std::memcpy(payload->data(), &netSize, sizeof(netSize));
     std::memcpy(payload->data() + sizeof(netSize), dataBody->data(), size);
 
-    asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = weak_from_this(), payload](const std::error_code& ec, std::size_t) {
+    asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), payload](const std::error_code& ec, std::size_t) {
         if(auto self = weakSelf.lock())
         {
             if(ec)

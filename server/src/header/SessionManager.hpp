@@ -14,7 +14,7 @@ private:
 
 public:
     explicit SessionManager(SecretKey) { spdlog::info("session manager: initialized complete"); }
-    ~SessionManager() { spdlog::info("sesion manager destroyed"); }
+    ~SessionManager() { spdlog::info("session manager destroyed"); }
 
     static std::shared_ptr<SessionManager> Create()
     {
