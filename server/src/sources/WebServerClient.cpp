@@ -1,15 +1,17 @@
 ﻿#include "WebServerClient.hpp"
 
-WebServerClient::WebServerClient() : _id(0)
+#include <regex>
+
+WebServerClient::WebServerClient(const size_t id, asio::io_context& io, const std::weak_ptr<ConnectionPool>& connectionPool) 
+    : _connectionPool(connectionPool), _isInUse(false), _id(id), _sock(std::make_shared<asio::ip::tcp::socket>(io))
 {
+    UpdateActivityTime();
 }
 
-void WebServerClient::Init(const int id, asio::io_context& io)
+void WebServerClient::Rent()
 {
-    _sock = std::make_shared<asio::ip::tcp::socket>(io); // 소켓 객체 생성
-
-    _id = id;
-    _isInUse = false;
+    _isInUse = true;
+    UpdateActivityTime();
 }
 
 void WebServerClient::Return()
@@ -45,14 +47,14 @@ void WebServerClient::SendAsync(std::shared_ptr<std::string> sendByte)
                 return;
             }
             
-            // do something
+            self->UpdateActivityTime();
         }
     });
 }
 
 void WebServerClient::ReceiveAsync()
 {
-    auto buffer = std::make_shared<std::string>(_bufSize, '\0');
+    auto buffer = std::make_shared<std::string>(BUF_SIZE, '\0');
     _sock->async_read_some(asio::buffer(*buffer), [buffer, weakSelf = weak_from_this()](const std::error_code& ec, std::size_t) {
         if(auto self = weakSelf.lock())
         {
@@ -67,6 +69,7 @@ void WebServerClient::ReceiveAsync()
                 return;
             }    
             
+            self->UpdateActivityTime();
             self->ProcessAsync(buffer);
         }
     });

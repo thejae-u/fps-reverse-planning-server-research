@@ -6,22 +6,42 @@ void ConnectionPool::Start()
 {
     spdlog::info("internal connection pool started on 9000...");
     AcceptWebServerClientAsync();
+    
+    spdlog::info("start connection pool cleanup timer...");
+    StartCleanupTimer();
 }
 
 void ConnectionPool::Stop()
 {
+    _cleanupTimer.cancel();
+    
+    if(_acceptor.is_open())
+        _acceptor.close();
+    
+    std::lock_guard<std::mutex> lock(_poolMutex);
+    for(auto& [id, client] : _pool)
+    {
+        if(client->IsValid())
+            client->GetSocket()->close();
+    }
+    
+    _pool.clear();
 }
 
 void ConnectionPool::AcceptWebServerClientAsync()
 {
-    auto newPool = std::make_shared<WebServerClient>(); // 새 Connection Client 생성
-    newPool->Init(_poolIdCount++, _ioManager->GetIoContext()); // 관리 ID 부여 및 소켓 객체 생성
-
+    auto newPool = std::make_shared<WebServerClient>(_poolIdCount++, _ioManager->GetIoContext(), GetWeak<ConnectionPool>()); // 새 Connection Client 생성
     _acceptor.async_accept(*newPool->GetSocket(), [weakSelf = GetWeak<ConnectionPool>(), newPool](const std::error_code& ec) {
         if(auto self = weakSelf.lock())
         {
             if(ec)
             {
+                if(ec == asio::error::operation_aborted)
+                {
+                    spdlog::info("connection pool acceptor successfully released");
+                    return;
+                }
+                
                 spdlog::error("connection pool acceptor: {}", ec.message());
                 self->AcceptWebServerClientAsync();
                 return;
@@ -31,6 +51,51 @@ void ConnectionPool::AcceptWebServerClientAsync()
             self->_pool[newPool->GetId()] = std::move(newPool);
 
             self->AcceptWebServerClientAsync();
+        }
+    });
+}
+
+void ConnectionPool::StartCleanupTimer()
+{
+    _cleanupTimer.expires_after(std::chrono::minutes(1));
+    _cleanupTimer.async_wait([weakSelf = GetWeak<ConnectionPool>()](const std::error_code& ec) {
+        if(auto self = weakSelf.lock())
+        {
+            if(ec)
+            {
+                if(ec == asio::error::operation_aborted)
+                {
+                    spdlog::info("connection pool cleanup timer successfully stopped");
+                    return;
+                }
+                
+                spdlog::error("connection pool cleanup timer error: {}", ec.message());
+                spdlog::info("restart new cleanup timer...");
+                self->StartCleanupTimer();
+                return;
+            }
+
+            const auto now= std::chrono::steady_clock::now();
+            std::lock_guard<std::mutex> lock(self->_poolMutex);
+            
+            if(self->_pool.size() <= self->_minPoolSize)
+            {
+                self->StartCleanupTimer();
+                return;
+            }
+            
+            for(auto it = self->_pool.begin(); it != self->_pool.end();)
+            {
+                if(auto client = it->second; !client->IsInUse() && now - client->GetLastActivityTime() > self->_idleTimeout)
+                {
+                    spdlog::info("cleanup idle client: {}", client->GetId());
+                    it = self->_pool.erase(it); // erase -> next iteration returned
+                }
+                else // 지우지 않았다면 그대로 증가
+                    ++it;
+            }
+            
+            self->StartCleanupTimer();
         }
     });
 }

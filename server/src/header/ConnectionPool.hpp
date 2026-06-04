@@ -19,7 +19,9 @@ private:
 
 public:
     explicit ConnectionPool(SecretKey, const std::shared_ptr<IOManager>& ioManager, const std::size_t poolSize)
-        : _ioManager(ioManager), _poolSize(poolSize), _tcpEndpoint(asio::ip::tcp::v4(), 9000), _acceptor(ioManager->GetIoContext(), _tcpEndpoint)
+        : _ioManager(ioManager), _poolSize(poolSize),
+          _tcpEndpoint(asio::ip::tcp::v4(), 9000), _acceptor(ioManager->GetIoContext(), _tcpEndpoint),
+          _cleanupTimer(ioManager->GetIoContext())
     {
 
     }
@@ -50,7 +52,13 @@ private:
 
     asio::ip::tcp::endpoint _tcpEndpoint;
     asio::ip::tcp::acceptor _acceptor;
+    
+    // client time-out
+    const std::size_t _minPoolSize = 2;
+    asio::steady_timer _cleanupTimer;
+    const std::chrono::minutes _idleTimeout = std::chrono::minutes(5);
 
 private:
     void AcceptWebServerClientAsync();
+    void StartCleanupTimer();
 };
