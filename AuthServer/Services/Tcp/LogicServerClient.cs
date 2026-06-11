@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using AuthServer.Protos;
+using Serilog;
 
 namespace AuthServer.Services.Tcp;
 
@@ -73,23 +74,31 @@ public class LogicServerClient : IDisposable
         {
             while (!token.IsCancellationRequested && _client is { Connected: true })
             {
-                int read = await ReadExactlyAsync(headerBuffer, PacketSerializer.HeaderSize, token);
-                if (read == 0) break;
+                //int read = await ReadExactlyAsync(headerBuffer, PacketSerializer.HeaderSize, token); // old-version
+                //if (read == 0) break;
+                await _stream!.ReadExactlyAsync(headerBuffer, 0, PacketSerializer.HeaderSize, token);
 
-                if (!BitConverter.IsLittleEndian) Array.Reverse(headerBuffer);
-                ushort bodySize = BitConverter.ToUInt16(headerBuffer, 0);
+                // Serializer를 통해 헤더 파싱 (엔디안 변환 포함)
+                ushort bodySize = PacketSerializer.DeserializeHeader(headerBuffer);
 
                 byte[] bodyBuffer = new byte[bodySize];
-                await ReadExactlyAsync(bodyBuffer, bodySize, token);
+                //await ReadExactlyAsync(bodyBuffer, bodySize, token); // old-version
+                await _stream!.ReadExactlyAsync(bodyBuffer, 0, bodySize, token);
 
                 var packet = PacketSerializer.Deserialize(bodyBuffer);
                 Dispatch(packet);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (EndOfStreamException)
+        {
+            Log.Information("Client disconnected");
+        }
         catch (Exception ex)
         {
-            Console.WriteLine($"[TCP Client Error] {ex.Message}");
+            Log.Error(ex, "[TCP Client Error] {Message}", ex.Message);
         }
         finally
         {

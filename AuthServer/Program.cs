@@ -10,7 +10,11 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
+using Serilog;
 
+Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console().CreateLogger();
+
+Log.Information("Server Starting...");
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
