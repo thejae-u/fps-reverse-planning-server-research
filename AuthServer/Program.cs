@@ -47,7 +47,6 @@ builder.Services.AddSignalR();
 // background internal service
 builder.Services.AddHostedService<MatchWorker>();
 builder.Services.AddHostedService<LogicServerListenerService>();
-builder.
 
 // global fields
 builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("MatchOptions"));
