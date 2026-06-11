@@ -53,7 +53,7 @@ struct TableStruct_Internal_2eproto {
 extern "C" {
 extern const ::google::protobuf::internal::DescriptorTable descriptor_table_Internal_2eproto;
 }  // extern "C"
-namespace match {
+namespace Internal {
 class GamePacket;
 struct GamePacketGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -86,13 +86,13 @@ extern const ::google::protobuf::internal::ClassDataFull UserSessionInfo_class_d
 #else
 extern const UserSessionInfoGlobalsTypeInternal UserSessionInfo_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
-}  // namespace match
+}  // namespace Internal
 namespace google {
 namespace protobuf {
 }  // namespace protobuf
 }  // namespace google
 
-namespace match {
+namespace Internal {
 
 // ===================================================================
 
@@ -100,7 +100,7 @@ namespace match {
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED UserSessionInfo final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:match.UserSessionInfo) */ {
+/* @@protoc_insertion_point(class_definition:Internal.UserSessionInfo) */ {
  public:
   inline UserSessionInfo() : UserSessionInfo(nullptr) {}
   ~UserSessionInfo() PROTOBUF_FINAL;
@@ -222,7 +222,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED UserSessionInfo final : public ::go
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "match.UserSessionInfo"; }
+  static ::absl::string_view FullMessageName() { return "Internal.UserSessionInfo"; }
 
   explicit UserSessionInfo(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   UserSessionInfo(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const UserSessionInfo& from);
@@ -280,12 +280,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED UserSessionInfo final : public ::go
   ::std::string* PROTOBUF_NONNULL _internal_mutable_session_token();
 
   public:
-  // @@protoc_insertion_point(class_scope:match.UserSessionInfo)
+  // @@protoc_insertion_point(class_scope:Internal.UserSessionInfo)
  private:
   class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<1, 2,
-                          0, 50,
+                          0, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -323,7 +323,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED UserSessionInfo final : public ::go
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateResponse final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:match.MatchCreateResponse) */ {
+/* @@protoc_insertion_point(class_definition:Internal.MatchCreateResponse) */ {
  public:
   inline MatchCreateResponse() : MatchCreateResponse(nullptr) {}
   ~MatchCreateResponse() PROTOBUF_FINAL;
@@ -445,7 +445,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateResponse final : public 
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "match.MatchCreateResponse"; }
+  static ::absl::string_view FullMessageName() { return "Internal.MatchCreateResponse"; }
 
   explicit MatchCreateResponse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   MatchCreateResponse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const MatchCreateResponse& from);
@@ -541,12 +541,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateResponse final : public 
   void _internal_set_port(::int32_t value);
 
   public:
-  // @@protoc_insertion_point(class_scope:match.MatchCreateResponse)
+  // @@protoc_insertion_point(class_scope:Internal.MatchCreateResponse)
  private:
   class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<3, 5,
-                          0, 64,
+                          0, 67,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -587,7 +587,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateResponse final : public 
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:match.MatchCreateRequest) */ {
+/* @@protoc_insertion_point(class_definition:Internal.MatchCreateRequest) */ {
  public:
   inline MatchCreateRequest() : MatchCreateRequest(nullptr) {}
   ~MatchCreateRequest() PROTOBUF_FINAL;
@@ -709,7 +709,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public :
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "match.MatchCreateRequest"; }
+  static ::absl::string_view FullMessageName() { return "Internal.MatchCreateRequest"; }
 
   explicit MatchCreateRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   MatchCreateRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const MatchCreateRequest& from);
@@ -738,7 +738,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public :
     kMatchIdFieldNumber = 1,
     kGameTypeFieldNumber = 2,
   };
-  // repeated .match.UserSessionInfo users = 3;
+  // repeated .Internal.UserSessionInfo users = 3;
   [[nodiscard]] int users_size()
       const;
   private:
@@ -746,17 +746,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public :
 
   public:
   void clear_users() ;
-  [[nodiscard]] const ::match::UserSessionInfo& users(int index) const;
-  [[nodiscard]] ::match::UserSessionInfo* PROTOBUF_NONNULL mutable_users(int index);
-  ::match::UserSessionInfo* PROTOBUF_NONNULL add_users();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>&
+  [[nodiscard]] const ::Internal::UserSessionInfo& users(int index) const;
+  [[nodiscard]] ::Internal::UserSessionInfo* PROTOBUF_NONNULL mutable_users(int index);
+  ::Internal::UserSessionInfo* PROTOBUF_NONNULL add_users();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>&
   users() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>* PROTOBUF_NONNULL
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>* PROTOBUF_NONNULL
   mutable_users();
 
   private:
-  const ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>& _internal_users() const;
-  ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>* PROTOBUF_NONNULL _internal_mutable_users();
+  const ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>& _internal_users() const;
+  ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>* PROTOBUF_NONNULL _internal_mutable_users();
 
   public:
   // string match_id = 1;
@@ -789,12 +789,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public :
   ::std::string* PROTOBUF_NONNULL _internal_mutable_game_type();
 
   public:
-  // @@protoc_insertion_point(class_scope:match.MatchCreateRequest)
+  // @@protoc_insertion_point(class_scope:Internal.MatchCreateRequest)
  private:
   class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<2, 3,
-                          1, 50,
+                          1, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -822,7 +822,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public :
         const MatchCreateRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::match::UserSessionInfo > users_;
+    ::google::protobuf::RepeatedPtrField< ::Internal::UserSessionInfo > users_;
     ::google::protobuf::internal::ArenaStringPtr match_id_;
     ::google::protobuf::internal::ArenaStringPtr game_type_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -833,7 +833,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MatchCreateRequest final : public :
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GamePacket final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:match.GamePacket) */ {
+/* @@protoc_insertion_point(class_definition:Internal.GamePacket) */ {
  public:
   inline GamePacket() : GamePacket(nullptr) {}
   ~GamePacket() PROTOBUF_FINAL;
@@ -960,7 +960,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GamePacket final : public ::google:
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "match.GamePacket"; }
+  static ::absl::string_view FullMessageName() { return "Internal.GamePacket"; }
 
   explicit GamePacket(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   GamePacket(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const GamePacket& from);
@@ -999,7 +999,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GamePacket final : public ::google:
   void _internal_set_sequence_id(::uint32_t value);
 
   public:
-  // .match.MatchCreateRequest match_create_req = 10;
+  // .Internal.MatchCreateRequest match_create_req = 10;
   [[nodiscard]] bool has_match_create_req()
       const;
   private:
@@ -1007,19 +1007,19 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GamePacket final : public ::google:
 
   public:
   void clear_match_create_req() ;
-  [[nodiscard]] const ::match::MatchCreateRequest& match_create_req() const;
-  [[nodiscard]] ::match::MatchCreateRequest* PROTOBUF_NULLABLE release_match_create_req();
-  ::match::MatchCreateRequest* PROTOBUF_NONNULL mutable_match_create_req();
-  void set_allocated_match_create_req(::match::MatchCreateRequest* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_match_create_req(::match::MatchCreateRequest* PROTOBUF_NULLABLE value);
-  ::match::MatchCreateRequest* PROTOBUF_NULLABLE unsafe_arena_release_match_create_req();
+  [[nodiscard]] const ::Internal::MatchCreateRequest& match_create_req() const;
+  [[nodiscard]] ::Internal::MatchCreateRequest* PROTOBUF_NULLABLE release_match_create_req();
+  ::Internal::MatchCreateRequest* PROTOBUF_NONNULL mutable_match_create_req();
+  void set_allocated_match_create_req(::Internal::MatchCreateRequest* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_match_create_req(::Internal::MatchCreateRequest* PROTOBUF_NULLABLE value);
+  ::Internal::MatchCreateRequest* PROTOBUF_NULLABLE unsafe_arena_release_match_create_req();
 
   private:
-  const ::match::MatchCreateRequest& _internal_match_create_req() const;
-  ::match::MatchCreateRequest* PROTOBUF_NONNULL _internal_mutable_match_create_req();
+  const ::Internal::MatchCreateRequest& _internal_match_create_req() const;
+  ::Internal::MatchCreateRequest* PROTOBUF_NONNULL _internal_mutable_match_create_req();
 
   public:
-  // .match.MatchCreateResponse match_create_res = 11;
+  // .Internal.MatchCreateResponse match_create_res = 11;
   [[nodiscard]] bool has_match_create_res()
       const;
   private:
@@ -1027,21 +1027,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GamePacket final : public ::google:
 
   public:
   void clear_match_create_res() ;
-  [[nodiscard]] const ::match::MatchCreateResponse& match_create_res() const;
-  [[nodiscard]] ::match::MatchCreateResponse* PROTOBUF_NULLABLE release_match_create_res();
-  ::match::MatchCreateResponse* PROTOBUF_NONNULL mutable_match_create_res();
-  void set_allocated_match_create_res(::match::MatchCreateResponse* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_match_create_res(::match::MatchCreateResponse* PROTOBUF_NULLABLE value);
-  ::match::MatchCreateResponse* PROTOBUF_NULLABLE unsafe_arena_release_match_create_res();
+  [[nodiscard]] const ::Internal::MatchCreateResponse& match_create_res() const;
+  [[nodiscard]] ::Internal::MatchCreateResponse* PROTOBUF_NULLABLE release_match_create_res();
+  ::Internal::MatchCreateResponse* PROTOBUF_NONNULL mutable_match_create_res();
+  void set_allocated_match_create_res(::Internal::MatchCreateResponse* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_match_create_res(::Internal::MatchCreateResponse* PROTOBUF_NULLABLE value);
+  ::Internal::MatchCreateResponse* PROTOBUF_NULLABLE unsafe_arena_release_match_create_res();
 
   private:
-  const ::match::MatchCreateResponse& _internal_match_create_res() const;
-  ::match::MatchCreateResponse* PROTOBUF_NONNULL _internal_mutable_match_create_res();
+  const ::Internal::MatchCreateResponse& _internal_match_create_res() const;
+  ::Internal::MatchCreateResponse* PROTOBUF_NONNULL _internal_mutable_match_create_res();
 
   public:
   void clear_payload();
   PayloadCase payload_case() const;
-  // @@protoc_insertion_point(class_scope:match.GamePacket)
+  // @@protoc_insertion_point(class_scope:Internal.GamePacket)
  private:
   class _Internal;
   void set_has_match_create_req();
@@ -1082,8 +1082,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GamePacket final : public ::google:
     union PayloadUnion {
       constexpr PayloadUnion() : _constinit_{} {}
       ::google::protobuf::internal::ConstantInitialized _constinit_;
-      ::match::MatchCreateRequest* PROTOBUF_NULLABLE match_create_req_;
-      ::match::MatchCreateResponse* PROTOBUF_NULLABLE match_create_res_;
+      ::Internal::MatchCreateRequest* PROTOBUF_NULLABLE match_create_req_;
+      ::Internal::MatchCreateResponse* PROTOBUF_NULLABLE match_create_res_;
     } payload_;
     ::uint32_t _oneof_case_[1];
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -1115,13 +1115,13 @@ inline void GamePacket::clear_sequence_id() {
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline ::uint32_t GamePacket::sequence_id() const {
-  // @@protoc_insertion_point(field_get:match.GamePacket.sequence_id)
+  // @@protoc_insertion_point(field_get:Internal.GamePacket.sequence_id)
   return _internal_sequence_id();
 }
 inline void GamePacket::set_sequence_id(::uint32_t value) {
   _internal_set_sequence_id(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_set:match.GamePacket.sequence_id)
+  // @@protoc_insertion_point(field_set:Internal.GamePacket.sequence_id)
 }
 inline ::uint32_t GamePacket::_internal_sequence_id() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1132,7 +1132,7 @@ inline void GamePacket::_internal_set_sequence_id(::uint32_t value) {
   _impl_.sequence_id_ = value;
 }
 
-// .match.MatchCreateRequest match_create_req = 10;
+// .Internal.MatchCreateRequest match_create_req = 10;
 inline bool GamePacket::has_match_create_req() const {
   return payload_case() == kMatchCreateReq;
 }
@@ -1153,8 +1153,8 @@ inline void GamePacket::clear_match_create_req() {
     clear_has_payload();
   }
 }
-inline ::match::MatchCreateRequest* PROTOBUF_NULLABLE GamePacket::release_match_create_req() {
-  // @@protoc_insertion_point(field_release:match.GamePacket.match_create_req)
+inline ::Internal::MatchCreateRequest* PROTOBUF_NULLABLE GamePacket::release_match_create_req() {
+  // @@protoc_insertion_point(field_release:Internal.GamePacket.match_create_req)
   if (payload_case() == kMatchCreateReq) {
     clear_has_payload();
     auto* temp = _impl_.payload_.match_create_req_;
@@ -1167,16 +1167,16 @@ inline ::match::MatchCreateRequest* PROTOBUF_NULLABLE GamePacket::release_match_
     return nullptr;
   }
 }
-inline const ::match::MatchCreateRequest& GamePacket::_internal_match_create_req() const {
-  return payload_case() == kMatchCreateReq ? static_cast<const ::match::MatchCreateRequest&>(*_impl_.payload_.match_create_req_)
-                     : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::match::MatchCreateRequest>(&::match::MatchCreateRequest_globals_);
+inline const ::Internal::MatchCreateRequest& GamePacket::_internal_match_create_req() const {
+  return payload_case() == kMatchCreateReq ? static_cast<const ::Internal::MatchCreateRequest&>(*_impl_.payload_.match_create_req_)
+                     : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::Internal::MatchCreateRequest>(&::Internal::MatchCreateRequest_globals_);
 }
-inline const ::match::MatchCreateRequest& GamePacket::match_create_req() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.GamePacket.match_create_req)
+inline const ::Internal::MatchCreateRequest& GamePacket::match_create_req() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Internal.GamePacket.match_create_req)
   return _internal_match_create_req();
 }
-inline ::match::MatchCreateRequest* PROTOBUF_NULLABLE GamePacket::unsafe_arena_release_match_create_req() {
-  // @@protoc_insertion_point(field_unsafe_arena_release:match.GamePacket.match_create_req)
+inline ::Internal::MatchCreateRequest* PROTOBUF_NULLABLE GamePacket::unsafe_arena_release_match_create_req() {
+  // @@protoc_insertion_point(field_unsafe_arena_release:Internal.GamePacket.match_create_req)
   if (payload_case() == kMatchCreateReq) {
     clear_has_payload();
     auto* temp = _impl_.payload_.match_create_req_;
@@ -1187,7 +1187,7 @@ inline ::match::MatchCreateRequest* PROTOBUF_NULLABLE GamePacket::unsafe_arena_r
   }
 }
 inline void GamePacket::unsafe_arena_set_allocated_match_create_req(
-    ::match::MatchCreateRequest* PROTOBUF_NULLABLE value) {
+    ::Internal::MatchCreateRequest* PROTOBUF_NULLABLE value) {
   // We rely on the oneof clear method to free the earlier contents
   // of this oneof. We can directly use the pointer we're given to
   // set the new value.
@@ -1196,25 +1196,25 @@ inline void GamePacket::unsafe_arena_set_allocated_match_create_req(
     set_has_match_create_req();
     _impl_.payload_.match_create_req_ = value;
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:match.GamePacket.match_create_req)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:Internal.GamePacket.match_create_req)
 }
-inline ::match::MatchCreateRequest* PROTOBUF_NONNULL GamePacket::_internal_mutable_match_create_req() {
+inline ::Internal::MatchCreateRequest* PROTOBUF_NONNULL GamePacket::_internal_mutable_match_create_req() {
   if (payload_case() != kMatchCreateReq) {
     clear_payload();
     set_has_match_create_req();
     _impl_.payload_.match_create_req_ = 
-        ::google::protobuf::Message::DefaultConstruct<::match::MatchCreateRequest>(GetArena());
+        ::google::protobuf::Message::DefaultConstruct<::Internal::MatchCreateRequest>(GetArena());
   }
   return _impl_.payload_.match_create_req_;
 }
-inline ::match::MatchCreateRequest* PROTOBUF_NONNULL GamePacket::mutable_match_create_req()
+inline ::Internal::MatchCreateRequest* PROTOBUF_NONNULL GamePacket::mutable_match_create_req()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::match::MatchCreateRequest* _msg = _internal_mutable_match_create_req();
-  // @@protoc_insertion_point(field_mutable:match.GamePacket.match_create_req)
+  ::Internal::MatchCreateRequest* _msg = _internal_mutable_match_create_req();
+  // @@protoc_insertion_point(field_mutable:Internal.GamePacket.match_create_req)
   return _msg;
 }
 
-// .match.MatchCreateResponse match_create_res = 11;
+// .Internal.MatchCreateResponse match_create_res = 11;
 inline bool GamePacket::has_match_create_res() const {
   return payload_case() == kMatchCreateRes;
 }
@@ -1235,8 +1235,8 @@ inline void GamePacket::clear_match_create_res() {
     clear_has_payload();
   }
 }
-inline ::match::MatchCreateResponse* PROTOBUF_NULLABLE GamePacket::release_match_create_res() {
-  // @@protoc_insertion_point(field_release:match.GamePacket.match_create_res)
+inline ::Internal::MatchCreateResponse* PROTOBUF_NULLABLE GamePacket::release_match_create_res() {
+  // @@protoc_insertion_point(field_release:Internal.GamePacket.match_create_res)
   if (payload_case() == kMatchCreateRes) {
     clear_has_payload();
     auto* temp = _impl_.payload_.match_create_res_;
@@ -1249,16 +1249,16 @@ inline ::match::MatchCreateResponse* PROTOBUF_NULLABLE GamePacket::release_match
     return nullptr;
   }
 }
-inline const ::match::MatchCreateResponse& GamePacket::_internal_match_create_res() const {
-  return payload_case() == kMatchCreateRes ? static_cast<const ::match::MatchCreateResponse&>(*_impl_.payload_.match_create_res_)
-                     : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::match::MatchCreateResponse>(&::match::MatchCreateResponse_globals_);
+inline const ::Internal::MatchCreateResponse& GamePacket::_internal_match_create_res() const {
+  return payload_case() == kMatchCreateRes ? static_cast<const ::Internal::MatchCreateResponse&>(*_impl_.payload_.match_create_res_)
+                     : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::Internal::MatchCreateResponse>(&::Internal::MatchCreateResponse_globals_);
 }
-inline const ::match::MatchCreateResponse& GamePacket::match_create_res() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.GamePacket.match_create_res)
+inline const ::Internal::MatchCreateResponse& GamePacket::match_create_res() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:Internal.GamePacket.match_create_res)
   return _internal_match_create_res();
 }
-inline ::match::MatchCreateResponse* PROTOBUF_NULLABLE GamePacket::unsafe_arena_release_match_create_res() {
-  // @@protoc_insertion_point(field_unsafe_arena_release:match.GamePacket.match_create_res)
+inline ::Internal::MatchCreateResponse* PROTOBUF_NULLABLE GamePacket::unsafe_arena_release_match_create_res() {
+  // @@protoc_insertion_point(field_unsafe_arena_release:Internal.GamePacket.match_create_res)
   if (payload_case() == kMatchCreateRes) {
     clear_has_payload();
     auto* temp = _impl_.payload_.match_create_res_;
@@ -1269,7 +1269,7 @@ inline ::match::MatchCreateResponse* PROTOBUF_NULLABLE GamePacket::unsafe_arena_
   }
 }
 inline void GamePacket::unsafe_arena_set_allocated_match_create_res(
-    ::match::MatchCreateResponse* PROTOBUF_NULLABLE value) {
+    ::Internal::MatchCreateResponse* PROTOBUF_NULLABLE value) {
   // We rely on the oneof clear method to free the earlier contents
   // of this oneof. We can directly use the pointer we're given to
   // set the new value.
@@ -1278,21 +1278,21 @@ inline void GamePacket::unsafe_arena_set_allocated_match_create_res(
     set_has_match_create_res();
     _impl_.payload_.match_create_res_ = value;
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:match.GamePacket.match_create_res)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:Internal.GamePacket.match_create_res)
 }
-inline ::match::MatchCreateResponse* PROTOBUF_NONNULL GamePacket::_internal_mutable_match_create_res() {
+inline ::Internal::MatchCreateResponse* PROTOBUF_NONNULL GamePacket::_internal_mutable_match_create_res() {
   if (payload_case() != kMatchCreateRes) {
     clear_payload();
     set_has_match_create_res();
     _impl_.payload_.match_create_res_ = 
-        ::google::protobuf::Message::DefaultConstruct<::match::MatchCreateResponse>(GetArena());
+        ::google::protobuf::Message::DefaultConstruct<::Internal::MatchCreateResponse>(GetArena());
   }
   return _impl_.payload_.match_create_res_;
 }
-inline ::match::MatchCreateResponse* PROTOBUF_NONNULL GamePacket::mutable_match_create_res()
+inline ::Internal::MatchCreateResponse* PROTOBUF_NONNULL GamePacket::mutable_match_create_res()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::match::MatchCreateResponse* _msg = _internal_mutable_match_create_res();
-  // @@protoc_insertion_point(field_mutable:match.GamePacket.match_create_res)
+  ::Internal::MatchCreateResponse* _msg = _internal_mutable_match_create_res();
+  // @@protoc_insertion_point(field_mutable:Internal.GamePacket.match_create_res)
   return _msg;
 }
 
@@ -1317,7 +1317,7 @@ inline void UserSessionInfo::clear_user_id() {
 }
 inline const ::std::string& UserSessionInfo::user_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.UserSessionInfo.user_id)
+  // @@protoc_insertion_point(field_get:Internal.UserSessionInfo.user_id)
   return _internal_user_id();
 }
 template <typename Arg_, typename... Args_>
@@ -1325,13 +1325,13 @@ PROTOBUF_ALWAYS_INLINE void UserSessionInfo::set_user_id(Arg_&& arg, Args_... ar
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   _impl_.user_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.UserSessionInfo.user_id)
+  // @@protoc_insertion_point(field_set:Internal.UserSessionInfo.user_id)
 }
 inline ::std::string* PROTOBUF_NONNULL UserSessionInfo::mutable_user_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::std::string* _s = _internal_mutable_user_id();
-  // @@protoc_insertion_point(field_mutable:match.UserSessionInfo.user_id)
+  // @@protoc_insertion_point(field_mutable:Internal.UserSessionInfo.user_id)
   return _s;
 }
 inline const ::std::string& UserSessionInfo::_internal_user_id() const {
@@ -1348,7 +1348,7 @@ inline ::std::string* PROTOBUF_NONNULL UserSessionInfo::_internal_mutable_user_i
 }
 inline ::std::string* PROTOBUF_NULLABLE UserSessionInfo::release_user_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.UserSessionInfo.user_id)
+  // @@protoc_insertion_point(field_release:Internal.UserSessionInfo.user_id)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
     return nullptr;
   }
@@ -1370,7 +1370,7 @@ inline void UserSessionInfo::set_allocated_user_id(::std::string* PROTOBUF_NULLA
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.user_id_.IsDefault()) {
     _impl_.user_id_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.UserSessionInfo.user_id)
+  // @@protoc_insertion_point(field_set_allocated:Internal.UserSessionInfo.user_id)
 }
 
 // string session_token = 2;
@@ -1381,7 +1381,7 @@ inline void UserSessionInfo::clear_session_token() {
 }
 inline const ::std::string& UserSessionInfo::session_token() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.UserSessionInfo.session_token)
+  // @@protoc_insertion_point(field_get:Internal.UserSessionInfo.session_token)
   return _internal_session_token();
 }
 template <typename Arg_, typename... Args_>
@@ -1389,13 +1389,13 @@ PROTOBUF_ALWAYS_INLINE void UserSessionInfo::set_session_token(Arg_&& arg, Args_
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.session_token_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.UserSessionInfo.session_token)
+  // @@protoc_insertion_point(field_set:Internal.UserSessionInfo.session_token)
 }
 inline ::std::string* PROTOBUF_NONNULL UserSessionInfo::mutable_session_token()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_session_token();
-  // @@protoc_insertion_point(field_mutable:match.UserSessionInfo.session_token)
+  // @@protoc_insertion_point(field_mutable:Internal.UserSessionInfo.session_token)
   return _s;
 }
 inline const ::std::string& UserSessionInfo::_internal_session_token() const {
@@ -1412,7 +1412,7 @@ inline ::std::string* PROTOBUF_NONNULL UserSessionInfo::_internal_mutable_sessio
 }
 inline ::std::string* PROTOBUF_NULLABLE UserSessionInfo::release_session_token() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.UserSessionInfo.session_token)
+  // @@protoc_insertion_point(field_release:Internal.UserSessionInfo.session_token)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
@@ -1434,7 +1434,7 @@ inline void UserSessionInfo::set_allocated_session_token(::std::string* PROTOBUF
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.session_token_.IsDefault()) {
     _impl_.session_token_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.UserSessionInfo.session_token)
+  // @@protoc_insertion_point(field_set_allocated:Internal.UserSessionInfo.session_token)
 }
 
 // -------------------------------------------------------------------
@@ -1449,7 +1449,7 @@ inline void MatchCreateRequest::clear_match_id() {
 }
 inline const ::std::string& MatchCreateRequest::match_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.MatchCreateRequest.match_id)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateRequest.match_id)
   return _internal_match_id();
 }
 template <typename Arg_, typename... Args_>
@@ -1457,13 +1457,13 @@ PROTOBUF_ALWAYS_INLINE void MatchCreateRequest::set_match_id(Arg_&& arg, Args_..
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.match_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.MatchCreateRequest.match_id)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateRequest.match_id)
 }
 inline ::std::string* PROTOBUF_NONNULL MatchCreateRequest::mutable_match_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_match_id();
-  // @@protoc_insertion_point(field_mutable:match.MatchCreateRequest.match_id)
+  // @@protoc_insertion_point(field_mutable:Internal.MatchCreateRequest.match_id)
   return _s;
 }
 inline const ::std::string& MatchCreateRequest::_internal_match_id() const {
@@ -1480,7 +1480,7 @@ inline ::std::string* PROTOBUF_NONNULL MatchCreateRequest::_internal_mutable_mat
 }
 inline ::std::string* PROTOBUF_NULLABLE MatchCreateRequest::release_match_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.MatchCreateRequest.match_id)
+  // @@protoc_insertion_point(field_release:Internal.MatchCreateRequest.match_id)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
@@ -1502,7 +1502,7 @@ inline void MatchCreateRequest::set_allocated_match_id(::std::string* PROTOBUF_N
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.match_id_.IsDefault()) {
     _impl_.match_id_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.MatchCreateRequest.match_id)
+  // @@protoc_insertion_point(field_set_allocated:Internal.MatchCreateRequest.match_id)
 }
 
 // string game_type = 2;
@@ -1513,7 +1513,7 @@ inline void MatchCreateRequest::clear_game_type() {
 }
 inline const ::std::string& MatchCreateRequest::game_type() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.MatchCreateRequest.game_type)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateRequest.game_type)
   return _internal_game_type();
 }
 template <typename Arg_, typename... Args_>
@@ -1521,13 +1521,13 @@ PROTOBUF_ALWAYS_INLINE void MatchCreateRequest::set_game_type(Arg_&& arg, Args_.
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.game_type_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.MatchCreateRequest.game_type)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateRequest.game_type)
 }
 inline ::std::string* PROTOBUF_NONNULL MatchCreateRequest::mutable_game_type()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_game_type();
-  // @@protoc_insertion_point(field_mutable:match.MatchCreateRequest.game_type)
+  // @@protoc_insertion_point(field_mutable:Internal.MatchCreateRequest.game_type)
   return _s;
 }
 inline const ::std::string& MatchCreateRequest::_internal_game_type() const {
@@ -1544,7 +1544,7 @@ inline ::std::string* PROTOBUF_NONNULL MatchCreateRequest::_internal_mutable_gam
 }
 inline ::std::string* PROTOBUF_NULLABLE MatchCreateRequest::release_game_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.MatchCreateRequest.game_type)
+  // @@protoc_insertion_point(field_release:Internal.MatchCreateRequest.game_type)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
@@ -1566,10 +1566,10 @@ inline void MatchCreateRequest::set_allocated_game_type(::std::string* PROTOBUF_
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.game_type_.IsDefault()) {
     _impl_.game_type_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.MatchCreateRequest.game_type)
+  // @@protoc_insertion_point(field_set_allocated:Internal.MatchCreateRequest.game_type)
 }
 
-// repeated .match.UserSessionInfo users = 3;
+// repeated .Internal.UserSessionInfo users = 3;
 inline int MatchCreateRequest::_internal_users_size() const {
   return _internal_users().size();
 }
@@ -1581,44 +1581,44 @@ inline void MatchCreateRequest::clear_users() {
   _impl_.users_.Clear();
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline const ::match::UserSessionInfo& MatchCreateRequest::users(int index) const
+inline const ::Internal::UserSessionInfo& MatchCreateRequest::users(int index) const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.MatchCreateRequest.users)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateRequest.users)
   return _internal_users().Get(index);
 }
-inline ::match::UserSessionInfo* PROTOBUF_NONNULL MatchCreateRequest::mutable_users(int index)
+inline ::Internal::UserSessionInfo* PROTOBUF_NONNULL MatchCreateRequest::mutable_users(int index)
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:match.MatchCreateRequest.users)
+  // @@protoc_insertion_point(field_mutable:Internal.MatchCreateRequest.users)
   return _internal_mutable_users()->Mutable(index);
 }
-inline ::match::UserSessionInfo* PROTOBUF_NONNULL MatchCreateRequest::add_users()
+inline ::Internal::UserSessionInfo* PROTOBUF_NONNULL MatchCreateRequest::add_users()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::match::UserSessionInfo* _add =
+  ::Internal::UserSessionInfo* _add =
       _internal_mutable_users()->InternalAddWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), GetArena());
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:match.MatchCreateRequest.users)
+  // @@protoc_insertion_point(field_add:Internal.MatchCreateRequest.users)
   return _add;
 }
-inline const ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>& MatchCreateRequest::users() const
+inline const ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>& MatchCreateRequest::users() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:match.MatchCreateRequest.users)
+  // @@protoc_insertion_point(field_list:Internal.MatchCreateRequest.users)
   return _internal_users();
 }
-inline ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>* PROTOBUF_NONNULL
+inline ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>* PROTOBUF_NONNULL
 MatchCreateRequest::mutable_users() ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:match.MatchCreateRequest.users)
+  // @@protoc_insertion_point(field_mutable_list:Internal.MatchCreateRequest.users)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   return _internal_mutable_users();
 }
-inline const ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>&
+inline const ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>&
 MatchCreateRequest::_internal_users() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.users_;
 }
-inline ::google::protobuf::RepeatedPtrField<::match::UserSessionInfo>* PROTOBUF_NONNULL
+inline ::google::protobuf::RepeatedPtrField<::Internal::UserSessionInfo>* PROTOBUF_NONNULL
 MatchCreateRequest::_internal_mutable_users() {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return &_impl_.users_;
@@ -1636,7 +1636,7 @@ inline void MatchCreateResponse::clear_match_id() {
 }
 inline const ::std::string& MatchCreateResponse::match_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.MatchCreateResponse.match_id)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateResponse.match_id)
   return _internal_match_id();
 }
 template <typename Arg_, typename... Args_>
@@ -1644,13 +1644,13 @@ PROTOBUF_ALWAYS_INLINE void MatchCreateResponse::set_match_id(Arg_&& arg, Args_.
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   _impl_.match_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.MatchCreateResponse.match_id)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateResponse.match_id)
 }
 inline ::std::string* PROTOBUF_NONNULL MatchCreateResponse::mutable_match_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::std::string* _s = _internal_mutable_match_id();
-  // @@protoc_insertion_point(field_mutable:match.MatchCreateResponse.match_id)
+  // @@protoc_insertion_point(field_mutable:Internal.MatchCreateResponse.match_id)
   return _s;
 }
 inline const ::std::string& MatchCreateResponse::_internal_match_id() const {
@@ -1667,7 +1667,7 @@ inline ::std::string* PROTOBUF_NONNULL MatchCreateResponse::_internal_mutable_ma
 }
 inline ::std::string* PROTOBUF_NULLABLE MatchCreateResponse::release_match_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.MatchCreateResponse.match_id)
+  // @@protoc_insertion_point(field_release:Internal.MatchCreateResponse.match_id)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
     return nullptr;
   }
@@ -1689,7 +1689,7 @@ inline void MatchCreateResponse::set_allocated_match_id(::std::string* PROTOBUF_
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.match_id_.IsDefault()) {
     _impl_.match_id_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.MatchCreateResponse.match_id)
+  // @@protoc_insertion_point(field_set_allocated:Internal.MatchCreateResponse.match_id)
 }
 
 // bool success = 2;
@@ -1699,13 +1699,13 @@ inline void MatchCreateResponse::clear_success() {
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline bool MatchCreateResponse::success() const {
-  // @@protoc_insertion_point(field_get:match.MatchCreateResponse.success)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateResponse.success)
   return _internal_success();
 }
 inline void MatchCreateResponse::set_success(bool value) {
   _internal_set_success(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:match.MatchCreateResponse.success)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateResponse.success)
 }
 inline bool MatchCreateResponse::_internal_success() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1723,13 +1723,13 @@ inline void MatchCreateResponse::clear_port() {
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t MatchCreateResponse::port() const {
-  // @@protoc_insertion_point(field_get:match.MatchCreateResponse.port)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateResponse.port)
   return _internal_port();
 }
 inline void MatchCreateResponse::set_port(::int32_t value) {
   _internal_set_port(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:match.MatchCreateResponse.port)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateResponse.port)
 }
 inline ::int32_t MatchCreateResponse::_internal_port() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1748,7 +1748,7 @@ inline void MatchCreateResponse::clear_server_ip() {
 }
 inline const ::std::string& MatchCreateResponse::server_ip() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.MatchCreateResponse.server_ip)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateResponse.server_ip)
   return _internal_server_ip();
 }
 template <typename Arg_, typename... Args_>
@@ -1756,13 +1756,13 @@ PROTOBUF_ALWAYS_INLINE void MatchCreateResponse::set_server_ip(Arg_&& arg, Args_
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.server_ip_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.MatchCreateResponse.server_ip)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateResponse.server_ip)
 }
 inline ::std::string* PROTOBUF_NONNULL MatchCreateResponse::mutable_server_ip()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_server_ip();
-  // @@protoc_insertion_point(field_mutable:match.MatchCreateResponse.server_ip)
+  // @@protoc_insertion_point(field_mutable:Internal.MatchCreateResponse.server_ip)
   return _s;
 }
 inline const ::std::string& MatchCreateResponse::_internal_server_ip() const {
@@ -1779,7 +1779,7 @@ inline ::std::string* PROTOBUF_NONNULL MatchCreateResponse::_internal_mutable_se
 }
 inline ::std::string* PROTOBUF_NULLABLE MatchCreateResponse::release_server_ip() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.MatchCreateResponse.server_ip)
+  // @@protoc_insertion_point(field_release:Internal.MatchCreateResponse.server_ip)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
@@ -1801,7 +1801,7 @@ inline void MatchCreateResponse::set_allocated_server_ip(::std::string* PROTOBUF
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.server_ip_.IsDefault()) {
     _impl_.server_ip_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.MatchCreateResponse.server_ip)
+  // @@protoc_insertion_point(field_set_allocated:Internal.MatchCreateResponse.server_ip)
 }
 
 // string error_message = 5;
@@ -1812,7 +1812,7 @@ inline void MatchCreateResponse::clear_error_message() {
 }
 inline const ::std::string& MatchCreateResponse::error_message() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:match.MatchCreateResponse.error_message)
+  // @@protoc_insertion_point(field_get:Internal.MatchCreateResponse.error_message)
   return _internal_error_message();
 }
 template <typename Arg_, typename... Args_>
@@ -1820,13 +1820,13 @@ PROTOBUF_ALWAYS_INLINE void MatchCreateResponse::set_error_message(Arg_&& arg, A
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:match.MatchCreateResponse.error_message)
+  // @@protoc_insertion_point(field_set:Internal.MatchCreateResponse.error_message)
 }
 inline ::std::string* PROTOBUF_NONNULL MatchCreateResponse::mutable_error_message()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:match.MatchCreateResponse.error_message)
+  // @@protoc_insertion_point(field_mutable:Internal.MatchCreateResponse.error_message)
   return _s;
 }
 inline const ::std::string& MatchCreateResponse::_internal_error_message() const {
@@ -1843,7 +1843,7 @@ inline ::std::string* PROTOBUF_NONNULL MatchCreateResponse::_internal_mutable_er
 }
 inline ::std::string* PROTOBUF_NULLABLE MatchCreateResponse::release_error_message() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:match.MatchCreateResponse.error_message)
+  // @@protoc_insertion_point(field_release:Internal.MatchCreateResponse.error_message)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
@@ -1865,7 +1865,7 @@ inline void MatchCreateResponse::set_allocated_error_message(::std::string* PROT
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
     _impl_.error_message_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:match.MatchCreateResponse.error_message)
+  // @@protoc_insertion_point(field_set_allocated:Internal.MatchCreateResponse.error_message)
 }
 
 #ifdef __GNUC__
@@ -1873,7 +1873,7 @@ inline void MatchCreateResponse::set_allocated_error_message(::std::string* PROT
 #endif  // __GNUC__
 
 // @@protoc_insertion_point(namespace_scope)
-}  // namespace match
+}  // namespace Internal
 
 
 // @@protoc_insertion_point(global_scope)

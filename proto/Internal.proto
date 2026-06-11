@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option csharp_namespace = "AuthServer.Protos";
 
-package match;
+package Internal;
 
 message GamePacket {
 	uint32 sequence_id = 1;
