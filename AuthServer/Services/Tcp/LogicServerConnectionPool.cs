@@ -33,12 +33,12 @@ public class LogicServerConnectionPool : IDisposable
             client.Dispose();
         }
 
-        _logger.LogInformation("Creating new multiplexed TCP connection to {Host}:{Port}", _options.Host, _options.Port);
+        _logger.LogInformation("Creating new multiplexed TCP connection to {Host}:{Port}", _options.Host, _options.ReqPort);
         
         var newClient = new LogicServerClient();
         newClient.OnNotificationReceived += (packet) => OnGlobalNotificationReceived?.Invoke(packet);
 
-        await newClient.ConnectAsync(_options.Host, _options.Port);
+        await newClient.ConnectAsync(_options.Host, _options.ReqPort);
         return newClient;
     }
 

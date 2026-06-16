@@ -22,10 +22,10 @@ public class LogicServerListenerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var listener = new TcpListener(IPAddress.Any, _options.Port);
+        var listener = new TcpListener(IPAddress.Any, _options.ListenPort);
         listener.Start();
         
-        _logger.LogInformation("LogicServerListenerService started on port {Port}", _options.Port);
+        _logger.LogInformation("LogicServerListenerService started on port {Port}", _options.ListenPort);
 
         while (!stoppingToken.IsCancellationRequested)
         {
