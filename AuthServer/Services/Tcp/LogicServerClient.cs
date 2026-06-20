@@ -30,6 +30,9 @@ public class LogicServerClient : IDisposable
     {
         _client = new TcpClient();
         await _client.ConnectAsync(host, port);
+        
+        Log.Information("Client connected");
+        
         _stream = _client.GetStream();
         StartReceiveLoop();
     }

@@ -20,6 +20,10 @@ int main()
     constexpr auto internalPoolSize = 5;
 
     const auto ioManager = IOManager::Create("first manager", threadCount, blockingThreadCount);
+    
+    if(!ioManager)
+        throw std::runtime_error("failed to create io manager");
+    
     const auto internalConnectionPool = ConnectionPool::Create(ioManager, internalPoolSize);
     const auto sessionManager = SessionManager::Create();
     const auto matching = Matching::Create(ioManager, sessionManager);

@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using AuthServer.Data;
 using AuthServer.Hubs;
 using AuthServer.OpenApi;
@@ -16,6 +16,8 @@ Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console().Cr
 
 Log.Information("Server Starting...");
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 
@@ -148,5 +150,16 @@ app.MapGet("/info", () => new
 
 // SignalR Match Hub Route
 app.MapHub<MatchHub>("/hubs/match");
+
+// Application Connection verification check
+var connectionPool = app.Services.GetRequiredService<LogicServerConnectionPool>();
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    Task.Run(async () =>
+    {
+        await Task.Delay(2000); // C++ 서버 기동 시차 대기
+        await connectionPool.InternalTestAsync();
+    });
+});
 
 app.Run();

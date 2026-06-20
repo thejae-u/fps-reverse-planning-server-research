@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <memory>
 #include <map>
 #include <mutex>
@@ -15,15 +15,18 @@ private:
     struct SecretKey {};
 
     // Internal Connection Port
-    std::uint16_t _internalPort = 9000;
+    std::uint16_t _internalPort = 9100;
 
 public:
     explicit ConnectionPool(SecretKey, const std::shared_ptr<IOManager>& ioManager, const std::size_t poolSize)
         : _ioManager(ioManager), _poolSize(poolSize),
-          _tcpEndpoint(asio::ip::tcp::v4(), 9000), _acceptor(ioManager->GetIoContext(), _tcpEndpoint),
+          _tcpEndpoint(asio::ip::tcp::v4(), _internalPort), _acceptor(ioManager->GetIoContext()),
           _cleanupTimer(ioManager->GetIoContext())
     {
-
+        if(!_ioManager)
+        {
+            throw std::runtime_error("connection pool: io manager is null");
+        }
     }
 
     ~ConnectionPool() override
@@ -39,16 +42,21 @@ public:
 public:
     void Start() override;
     void Stop() override;
-    std::shared_ptr<WebServerClient> Rent();
+    void RentAsync(std::function<void(std::shared_ptr<WebServerClient>)> callback);
     void Return(std::shared_ptr<WebServerClient> client);
     void NotifyExpired(std::shared_ptr<WebServerClient> client);
+    void InternalTest();
 
 private:
     std::shared_ptr<IOManager> _ioManager;
     std::size_t _poolSize;
     std::size_t _poolIdCount = 1;
     std::mutex _poolMutex;
-    std::map<int, std::shared_ptr<WebServerClient>> _pool;
+    std::map<std::size_t, std::shared_ptr<WebServerClient>> _pool;
+
+    // Auth Server Connection Info
+    std::string _authServerHost = "127.0.0.1";
+    std::uint16_t _authServerPort = 9102;
 
     asio::ip::tcp::endpoint _tcpEndpoint;
     asio::ip::tcp::acceptor _acceptor;

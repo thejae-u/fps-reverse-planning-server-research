@@ -1,8 +1,9 @@
-﻿using AuthServer.Data;
+using AuthServer.Data;
 using AuthServer.Dtos;
 using AuthServer.Hubs;
 using AuthServer.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Text.Json;
@@ -15,7 +16,7 @@ public class MatchService
     private readonly IHubContext<MatchHub> _hubContext;
     private readonly ILogger<MatchService> _logger;
     private readonly IDatabase _redisDB;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly MatchOptions _options;
 
     // Utilities
@@ -25,12 +26,12 @@ public class MatchService
     private static readonly string REDIS_CONNECTION_PREFIX = "match:connection"; // User Hub Connections
     private async Task<RedisValue> GetValue(string key, string field) => await _redisDB.HashGetAsync(key, field);
 
-    public MatchService(IHubContext<MatchHub> hubContext, ILogger<MatchService> logger, IConnectionMultiplexer redis, ApplicationDbContext dbContext, IOptions<MatchOptions> options)
+    public MatchService(IHubContext<MatchHub> hubContext, ILogger<MatchService> logger, IConnectionMultiplexer redis, IServiceScopeFactory scopeFactory, IOptions<MatchOptions> options)
     {
         _hubContext = hubContext;
         _logger = logger;
         _redisDB = redis.GetDatabase();
-        _dbContext = dbContext;
+        _scopeFactory = scopeFactory;
         _options = options.Value;
     }
 
@@ -262,7 +263,10 @@ public class MatchService
 
     public async Task<bool> FinishMatchAsync(string matchId, string winnerId)
     {
-        var matchResult = await _dbContext.MatchResults.FindAsync(matchId);
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var matchResult = await dbContext.MatchResults.FindAsync(matchId);
         if (matchResult is null || matchResult is { IsFinished: true }) return false;
 
         matchResult.IsFinished = true;
@@ -277,7 +281,7 @@ public class MatchService
             _ = tran.HashDeleteAsync(REDIS_ENTRY_PREFIX, userId);
         }
 
-        await _dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
         bool redisSuccess = await tran.ExecuteAsync();
 
         _logger.LogInformation("Match {matchId} finished, winner: {winnerId}", matchId, winnerId);

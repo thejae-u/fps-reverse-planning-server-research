@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Packet.pb.h"
+#include "Internal.pb.h"
 
 enum class SessionState
 {
@@ -123,6 +124,35 @@ inline std::string ConvertTypeToString(Protocol::PacketType type)
     default:
         return "INVALID_TYPE_ERROR";
     }
+}
+
+inline std::shared_ptr<std::string> InternalPacketSerializer(const Internal::GamePacket& packet)
+{
+    const std::uint16_t bodySize = static_cast<std::uint16_t>(packet.ByteSizeLong());
+    const std::uint16_t networkSize = htons(bodySize);
+    auto payload = std::make_shared<std::string>(2 + bodySize, '\0');
+    
+    // first 2bytes Length
+    memcpy(&(*payload)[0], &networkSize, 2);
+    
+    // 2bytes after Packet
+    if(!packet.SerializeToArray(&(*payload)[2], bodySize))
+    {
+        return nullptr;
+    }
+    
+    return payload;
+}
+
+inline std::shared_ptr<Internal::GamePacket> InternalPacketDeserializer(const char* data, std::size_t size)
+{
+    auto packet = std::make_shared<Internal::GamePacket>();
+    if(!packet->ParseFromArray(data, static_cast<int>(size)))
+    {
+        return nullptr;
+    }
+    
+    return packet;
 }
 
 } // namespace CUtility

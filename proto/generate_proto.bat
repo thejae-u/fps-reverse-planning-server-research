@@ -7,10 +7,12 @@ cd /d "%SCRIPT_DIR%"
 
 :: vcpkg protoc discovery
 set "VCPKG_PROTOC="
-if exist "..\server\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe" (
+if exist "..\server\build\x64-debug\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe" (
+    set "VCPKG_PROTOC=..\server\build\x64-debug\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe"
+) else if exist "..\server\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe" (
     set "VCPKG_PROTOC=..\server\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe"
-) else if exist "..\client\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe" (
-    set "VCPKG_PROTOC=..\client\build\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe"
+) else if exist "..\client\build\x64-debug\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe" (
+    set "VCPKG_PROTOC=..\client\build\x64-debug\vcpkg_installed\x64-windows\tools\protobuf\protoc.exe"
 ) else (
     where protoc >nul 2>nul
     if !errorlevel! equ 0 (
