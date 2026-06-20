@@ -11,6 +11,7 @@
 #include <atomic>
 #include <mutex>
 
+#include "Base.hpp"
 #include "Packet.pb.h"
 #include "CustomUtility.hpp"
 using namespace Protocol;
@@ -23,7 +24,7 @@ class Session;
 
 constexpr std::uint16_t BUF_SIZE = 65535;
 
-class Listener : public std::enable_shared_from_this<Listener>
+class Listener : public IBase
 {
 private:
     struct SecretKey {};
@@ -39,8 +40,8 @@ public:
     }
 
 public:
-    void Start();
-    void Stop();
+    virtual void Start() override;
+    virtual void Stop() override;
 
     void AcceptAsync();
     void AddRoom(std::shared_ptr<Room> room);
@@ -75,6 +76,7 @@ private:
     asio::ip::udp::endpoint _udpEndpoint;
 
     uuids::uuid_system_generator _uuidGen;
+    std::mutex _uuidMutex;
 
     std::unordered_map<uuids::uuid /*room id*/, std::shared_ptr<Room> /*room object*/> _rooms;
     std::mutex _roomsMutex;

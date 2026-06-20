@@ -1,0 +1,31 @@
+{
+  "name": "Auth Server Dev Container",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "auth-server",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "vscode",
+  "postCreateCommand": "dotnet restore AuthServer.csproj",
+  "overrideCommand": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+        "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "fullSolution",
+        "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "fullSolution"
+      }
+    }
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "Auth Server API",
+      "onAutoForward": "notify"
+    }
+  }
+}

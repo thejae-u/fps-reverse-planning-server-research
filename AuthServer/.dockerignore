@@ -1,0 +1,10 @@
+_build/
+bin/
+obj/
+.git/
+.gitignore
+.vscode/
+.idea/
+Dockerfile*
+compose*.yml
+README.md

@@ -1,4 +1,5 @@
 ﻿#include "SessionManager.hpp"
+
 #include "Session.hpp"
 
 void SessionManager::Clear()

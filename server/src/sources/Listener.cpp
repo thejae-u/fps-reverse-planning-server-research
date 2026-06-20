@@ -18,12 +18,12 @@ void Listener::Start()
 {
     spdlog::info("listener started...");
 
-    _matching->SetRegisterRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& room) {
+    _matching->SetRegisterRoomCallback([weakSelf = GetWeak<Listener>()](const std::shared_ptr<Room>& room) {
         if(auto self = weakSelf.lock())
             self->AddRoom(room);
     });
 
-    _matching->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& room) {
+    _matching->SetRemoveRoomCallback([weakSelf = GetWeak<Listener>()](const std::shared_ptr<Room>& room) {
         if(auto self = weakSelf.lock())
             self->RemoveRoom(room);
     });
@@ -45,8 +45,12 @@ void Listener::Stop()
 
 void Listener::AcceptAsync()
 {
-    auto newSession = Session::Create(_ioManager, weak_from_this(), _uuidGen(), _udpEndpoint.port());
-    auto sessionId = newSession->GetId();
+    uuids::uuid sessionId;
+    {
+        std::lock_guard<std::mutex> lock(_uuidMutex);
+        sessionId = _uuidGen();
+    }
+    auto newSession = Session::Create(_ioManager, GetWeak<Listener>(), sessionId, _udpEndpoint.port());
 
     std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
     if(_sessions.find(sessionId) != _sessions.end())
@@ -56,7 +60,7 @@ void Listener::AcceptAsync()
         return;
     }
 
-    auto handle = newSession->AddDisconnectCallback([weakSelf = weak_from_this(), sessionId](const std::weak_ptr<Session>& weakSession) {
+    auto handle = newSession->AddDisconnectCallback([weakSelf = GetWeak<Listener>(), sessionId](const std::shared_ptr<Session>& session) {
         if(auto self = weakSelf.lock())
         {
             std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
@@ -67,7 +71,7 @@ void Listener::AcceptAsync()
     });
 
     // Udp Send handler register
-    newSession->SetSendToHandler([weakSelf = weak_from_this()](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
+    newSession->SetSendToHandler([weakSelf = GetWeak<Listener>()](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
         if(auto self = weakSelf.lock())
             self->EnqueueSendData(ep, std::move(data));
     });
@@ -80,7 +84,7 @@ void Listener::AcceptAsync()
     // async accept new client
     if(auto session = weakSession.lock())
     {
-        _acceptor.async_accept(*session->GetSocket(), [weakSelf = weak_from_this(), weakSession, sessionId](const std::error_code& ec) {
+        _acceptor.async_accept(*session->GetSocket(), [weakSelf = GetWeak<Listener>(), weakSession, sessionId](const std::error_code& ec) {
             if(ec)
             {
                 if(ec == asio::error::connection_aborted ||
@@ -129,7 +133,7 @@ void Listener::SendAsyncByUdp()
     _payloadQueue.pop();
 
     _udpSocket.async_send_to(
-    asio::buffer(*payload), ep, asio::bind_executor(_strand, [weakSelf = weak_from_this(), payload, ep](const std::error_code& ec, std::size_t) {
+    asio::buffer(*payload), ep, asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), payload, ep](const std::error_code& ec, std::size_t) {
         if(ec)
         {
             spdlog::error("listener: udp send error occured({})", ec.message());
@@ -157,7 +161,7 @@ void Listener::ReceiveAsyncByUdp()
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
     auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
     _udpSocket.async_receive_from(
-    asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = weak_from_this(), receiveBuffer, senderEndpoint](const std::error_code& ec, const std::size_t bytesRead) {
+    asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), receiveBuffer, senderEndpoint](const std::error_code& ec, const std::size_t bytesRead) {
         if(ec)
         {
             if(ec == asio::error::operation_aborted)

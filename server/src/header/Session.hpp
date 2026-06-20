@@ -12,6 +12,7 @@
 #include <uuid.h>
 #include <asio.hpp>
 
+#include "Base.hpp"
 #include "IOManager.hpp"
 #include "Packet.pb.h"
 #include "CustomUtility.hpp"
@@ -20,7 +21,7 @@ class Listener;
 
 using namespace Protocol;
 
-class Session : public std::enable_shared_from_this<Session>
+class Session : public IBase
 {
 private:
     using Raw = std::vector<unsigned char>;
@@ -28,11 +29,13 @@ private:
 
 public:
     explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener, uuids::uuid sessionId, std::uint16_t udpPort)
-    : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _strand(ioManager->GetIoContext()),
-      _weakListener(listener), _serverUdpPort(udpPort), _state(SessionState::Initializing), _clientUdpPort(0), _isValid(false),
-      _id(sessionId), _readSize(0), _readNetSize(0) {}
+        : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _strand(ioManager->GetIoContext()),
+          _serverUdpPort(udpPort), _clientUdpPort(0), _weakListener(listener), _isValid(false), _state(SessionState::Initializing),
+          _id(sessionId), _readSize(0), _readNetSize(0), _callbackHandleCount(0)
+    {
+    }
 
-    ~Session() { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
+    ~Session() override { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
     static std::shared_ptr<Session> Create(std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener, uuids::uuid sessionId, std::uint16_t udpPort)
     {
@@ -43,12 +46,13 @@ public:
 public:
     std::shared_ptr<asio::ip::tcp::socket> GetSocket() { return _socketPtr; }
 
-    asio::ip::tcp::endpoint GetEndpoint() { return _socketPtr->remote_endpoint(); }
+    asio::ip::tcp::endpoint GetEndpoint() const { return _socketPtr->remote_endpoint(); }
     void StartTcpRead();
-    void Stop();
+    void Start() override;
+    void Stop() override;
 
     void Init();
-    void PunchUdpHole(asio::ip::udp::endpoint ep) { _clientUdpEp = ep; }
+    void PunchUdpHole(const asio::ip::udp::endpoint& ep) { _clientUdpEp = ep; }
 
     bool IsValid() const { return _isValid; }
 
@@ -59,7 +63,7 @@ public:
 
     using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
     CallbackHandle AddDisconnectCallback(NotifyDisconnectCallback callback);
-    void RemoveDiscconectCallback(CallbackHandle handle);
+    void RemoveDisconnectCallback(CallbackHandle handle);
 
     using SendToHandler = std::function<void(asio::ip::udp::endpoint, std::shared_ptr<Raw>)>;
     void SetSendToHandler(SendToHandler handler);
@@ -84,7 +88,7 @@ private:
 
     std::uint16_t _readSize;
     std::uint16_t _readNetSize;
-    const std::uint16_t MAX_BUF_SIZE = 65535;
+    const std::uint16_t _maxBufSize = 65535;
     std::vector<unsigned char> _readBuffer;
 
     NotifyDisconnectCallback _disconnectCallback;
@@ -106,8 +110,8 @@ private:
     std::atomic<bool> _isProcessing;
 
 public:
-    void EnqueueUdpSendPacket(const std::shared_ptr<Packet> data);
-    void EnqueueTcpSendPacket(const std::shared_ptr<Packet> data);
+    void EnqueueUdpSendPacket(std::shared_ptr<Packet> data);
+    void EnqueueTcpSendPacket(std::shared_ptr<Packet> data);
 
 private:
     // Tcp Async Send Data

@@ -1,6 +1,16 @@
 @echo off
 set PRESET=x64-debug
 
+where cl.exe >nul 2>nul
+if %errorlevel% neq 0 (
+    echo cl.exe not found in PATH. Loading Visual Studio Developer Environment...
+    if exist "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" (
+        call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
+    ) else (
+        echo WARNING: vcvars64.bat not found at the expected path. Build might fail.
+    )
+)
+
 echo Building for Windows using preset %PRESET%...
 
 :: Server 빌드
