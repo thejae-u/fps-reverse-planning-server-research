@@ -1,20 +1,30 @@
-# Internal Connection Implementation TODO
+# Internal Connection Implementation & Integration Status
 
-현재 C# AuthServer와 C++ Logic Server 간의 내부 통신 연동을 위한 잔여 작업 목록입니다.
+현재 C# AuthServer와 C++ Logic Server 간의 내부 통신 연동 및 환경 구성 완료 상태와 향후 잔여 작업 목록입니다.
 
-## 1. Logic Server (C++) 작업
-- [ ] **Packet Framing 구현**: `WebServerClient::ReceiveAsync`에서 받은 데이터를 헤더(2바이트, Big Endian)와 바디로 분리하는 로직 추가.
-- [ ] **Protobuf Deserialization**: 분리된 바디 데이터를 `Internal::GamePacket` 객체로 파싱.
-- [ ] **Packet Dispatcher 구현**: `GamePacket`의 `payload_case`에 따라 적절한 핸들러 함수로 분기.
-- [ ] **MatchCreateRequest 핸들러 구현**:
-    - [ ] 전달받은 `match_id`와 유저 정보를 바탕으로 실제 게임 룸(Room) 생성 로직 호출.
-    - [ ] 생성된 룸의 포트 정보를 포함한 `MatchCreateResponse` 생성.
-- [ ] **Response 전송 로직**: 생성된 응답 패킷을 다시 `Length-Prefix` 형식으로 직렬화하여 AuthServer에 전송.
+## 1. 완료된 작업 (Completed)
+- [x] **양방향 포트 충돌 우회 및 연동 설정**:
+  - Windows 가상 포트 예약 제외 범위(`8955 - 9054`)와의 충돌을 피하기 위해 통신 포트를 조정 완료 (C++ 리슨: `9100` / C# 리슨: `9102`).
+  - [appsettings.json](file:///C:/Dev/reverse-planning-project/AuthServer/appsettings.json) 및 [ConnectionPool.hpp](file:///C:/Dev/reverse-planning-project/server/src/header/ConnectionPool.hpp) 포트 설정 동기화 완료.
+- [x] **인프라 환경 호스트 포트 노출**:
+  - Docker Compose 파일([docker-compose.yml](file:///C:/Dev/reverse-planning-project/AuthServer/docker-compose.yml))의 Redis 포트(6379)를 호스트로 노출하여 로컬 개발 환경에서의 연동 지원.
+- [x] **AuthServer DI(의존성 주입) 수명 불일치 버그 해결**:
+  - 싱글톤 `MatchService`가 스코프 수명의 `ApplicationDbContext`를 캡처하여 예외를 발생시키던 구조를 `IServiceScopeFactory` 기반 스코프 생성 방식으로 변경 완료 ([MatchService.cs](file:///C:/Dev/reverse-planning-project/AuthServer/Services/MatchService.cs)).
+- [x] **누락된 빌드 종속성 및 스크립트 수정**:
+  - C# 프로젝트의 `Serilog.AspNetCore` 패키지 참조 추가 및 빌드 오류 해결.
+  - C++ `cl.exe` 컴파일러 경로를 찾기 위해 `build.bat`에 Visual Studio 개발자 명령 프롬프트 환경을 자동 로드하는 기능 보완.
+- [x] **양방향 자동 연결성 검증(InternalTest) 및 재시도 정책**:
+  - 서버 실행 시 비동기적으로 상대 서버의 활성화 여부를 확인하는 연결 테스트 메서드 구현 완료.
+  - 서버 시차 기동 상황을 지원하기 위해 최대 10회(3초 간격, 30초 대기)의 논블로킹 재시도 루프 검증 완료.
 
-## 2. AuthServer (C#) 작업
-- [ ] **에러 핸들링 강화**: Logic Server로부터 응답이 오지 않거나(Timeout), 실패 응답을 받았을 때의 예외 처리 로직 보완.
-- [ ] **연결 상태 모니터링**: `LogicServerConnectionPool`에서 끊어진 연결을 감지하고 재연결하는 메커니즘 점검.
+---
 
-## 3. 통합 테스트
-- [ ] **로컬 연동 테스트**: AuthServer에서 매칭 시뮬레이션을 돌려 Logic Server에 방 생성이 실제로 요청되고 응답이 돌아오는지 확인.
-- [ ] **데이터 정합성 검증**: 전달된 JWT 토큰 및 유저 ID가 Logic Server 세션 정보에 올바르게 기록되는지 확인.
+## 2. 향후 잔여 작업 (Remaining To-Do)
+- [ ] **실제 게임 룸 생성 로직 연동 (C++ WebServerClient)**:
+  - C++ 서버가 [MatchCreateRequest](file:///C:/Dev/reverse-planning-project/proto/Internal.proto#L21) 패킷을 수신했을 때, `HandleMatchCreateRequest` 내부에서 실제 게임 룸(Room) 클래스의 생성 및 초기화 로직 연동.
+- [ ] **MatchCreateResponse 응답 전송**:
+  - 생성된 룸의 동적 포트 번호 등을 담아 [MatchCreateResponse](file:///C:/Dev/reverse-planning-project/proto/Internal.proto#L27) 패킷을 C# 서버로 전송하는 응답 시나리오 완료.
+- [ ] **JWT 토큰 검증 핸드오버 (Security)**:
+  - 매칭 성공 유저들이 C++ 로직 서버로 직접 접속할 때, AuthServer 측에서 발행한 JWT 세션 토큰 정보를 대조 및 검증하는 세션 매칭 구현.
+- [ ] **게임 결과 피드백 웹훅 (Webhook)**:
+  - 게임 종료 시 C++ 서버에서 AuthServer에 승리팀 및 매치 스코어 통계 정보를 쏘아주는 웹훅 엔드포인트 구현 (Phase 4 진입을 위한 사전 준비).
