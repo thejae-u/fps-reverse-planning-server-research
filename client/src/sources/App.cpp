@@ -1,4 +1,4 @@
-﻿#include "App.hpp"
+#include "App.hpp"
 #include "IOManager.hpp"
 
 App::App() {}
@@ -265,7 +265,22 @@ void App::SendIngamePacketsFromAll(IngameType type)
     {
         if (client->IsConnected() && !client->GetRoomId().empty())
         {
-            client->SendIngamePacket(type, "TestClientPacket");
+            if (type == IngameType::Move)
+            {
+                struct MoveData {
+                    std::int32_t dx = 1;
+                    std::int32_t dy = 0;
+                    std::int32_t dz = 0;
+                    std::int32_t speed = 10;
+                } data;
+                std::string sendData(sizeof(MoveData), '\0');
+                std::memcpy(&sendData[0], &data, sizeof(MoveData));
+                client->SendIngamePacket(type, sendData);
+            }
+            else
+            {
+                client->SendIngamePacket(type, "TestClientPacket");
+            }
         }
     }
 }

@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include <asio.hpp>
 #include <deque>
+#include <queue>
 #include <functional>
 #include <memory>
 #include <mutex>
