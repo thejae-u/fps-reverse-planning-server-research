@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <thread>
 #include <vector>
 
@@ -8,12 +8,18 @@
 #include "Listener.hpp"
 #include "SessionManager.hpp"
 #include "ConnectionPool.hpp"
+#include "TestWorld.hpp"
 
 // Test Server Port
 constexpr std::uint16_t SERVER_PORT = 52800;
 
-int main()
+int main(int argc, char* argv[])
 {
+    if (argc > 1 && std::string(argv[1]) == "--test")
+    {
+        return RunWorldUpdateTest();
+    }
+
     spdlog::info("type 'quit' to stop server");
     const auto threadCount = std::thread::hardware_concurrency() * 2;
     const auto blockingThreadCount = std::thread::hardware_concurrency() * 2;
