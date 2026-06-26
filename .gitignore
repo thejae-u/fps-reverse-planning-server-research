@@ -672,6 +672,9 @@ imgui.ini
 # vscode
 .vscode/
 
+# AI
+.agents/
+
 ### VisualStudio ###
 
 # User-specific files
