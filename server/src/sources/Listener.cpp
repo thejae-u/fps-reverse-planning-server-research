@@ -1,10 +1,11 @@
-﻿#include "Listener.hpp"
+#include "Listener.hpp"
 
 #include "IOManager.hpp"
 #include "SessionManager.hpp"
 #include "Matching.hpp"
 #include "Room.hpp"
 #include "Session.hpp"
+#include "IngamePacketPool.hpp"
 
 Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
 : _ioManager(ioManager), _strand(ioManager->GetIoContext()), _sessionManager(sessionManager), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
@@ -232,7 +233,7 @@ void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, st
 
     if(packet.type() == PacketType::Ingame)
     {
-        auto ingamePacket = std::make_shared<IngamePacket>();
+        auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
         if(!ingamePacket->ParseFromString(packet.data()))
         {
             spdlog::error("listener: parsing ingame packet error");
@@ -300,10 +301,8 @@ void Listener::RemoveRoom(std::shared_ptr<Room> room)
 {
     std::lock_guard<std::mutex> roomsLock(_roomsMutex);
     auto removeId = room->GetId();
-    if(_rooms.find(removeId) != _rooms.end())
-    {
+    if(_rooms.contains(removeId))
         _rooms.erase(removeId);
-    }
 
     spdlog::info("listener: remove room {} from listener", uuids::to_string(removeId));
 }

@@ -61,8 +61,13 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
     std::lock_guard<std::mutex> lock(_sessionsMutex);
     if(auto removeSession = weakRemoveSession.lock())
     {
-        spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
-        _sessions.erase(removeSession->GetId());
+        // 수정 부분: 삭제된 세션이 없으면(이미 정리되었거나 존재하지 않는 세션이면) 조기 리턴
+        if (_sessions.erase(removeSession->GetId()) == 0)
+        {
+            return;
+        }
+
+        spdlog::info("room {}: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
 
         if(!_sessions.empty())
             return;

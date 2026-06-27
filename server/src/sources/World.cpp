@@ -1,6 +1,7 @@
 #include "World.hpp"
 #include "Session.hpp"
 #include "Room.hpp"
+#include "IngamePacketPool.hpp"
 
 void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions)
 {
@@ -144,7 +145,7 @@ void World::Update()
             if (!player)
                 continue;
 
-            auto ingamePacket = std::make_shared<Protocol::IngamePacket>();
+            auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
             ingamePacket->set_sessionid(uuids::to_string(id));
             ingamePacket->set_roomid(uuids::to_string(_roomId));
             ingamePacket->set_method(Protocol::IngameType::Move);
@@ -167,7 +168,17 @@ void World::Update()
 
     auto end = std::chrono::high_resolution_clock::now();
     auto elapsedUs = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    spdlog::info("Update End in {} ms, {}", elapsedUs, _tickCount.load());
+    
+    // 수정 부분: 1.0ms(1000us)를 초과하는 지연 스파이크 감지 시 경고 로그 기록
+    const std::int64_t SPIKE_THRESHOLD_US = 1000;
+    if (elapsedUs > SPIKE_THRESHOLD_US)
+    {
+        spdlog::warn("world(room id) {}: Update Spike Detected! Elapsed: {:.3f} ms (Tick Count: {})", 
+            uuids::to_string(_roomId), 
+            static_cast<double>(elapsedUs) / 1000.0, 
+            _tickCount.load());
+    }
+
     ++_tickCount;
     
     {

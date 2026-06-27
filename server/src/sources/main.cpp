@@ -24,16 +24,17 @@ int main(int argc, char* argv[])
     spdlog::info("type 'quit' to stop server");
     const auto threadCount = std::thread::hardware_concurrency() * 2;
     const auto blockingThreadCount = std::thread::hardware_concurrency() * 2;
-    constexpr auto internalPoolSize = 5;
-    constexpr auto ingamePacketPoolSize = 100;
-
     const auto ioManager = IOManager::Create("first manager", threadCount, blockingThreadCount);
     
     if(!ioManager)
         throw std::runtime_error("failed to create io manager");
     
+    constexpr auto ingamePacketPoolSize = 100;
     IngamePacketPool::Init(ingamePacketPoolSize);
+    
+    constexpr auto internalPoolSize = 5;
     const auto internalConnectionPool = ConnectionPool::Create(ioManager, internalPoolSize);
+    
     const auto sessionManager = SessionManager::Create();
     const auto matching = Matching::Create(ioManager, sessionManager);
     const auto listener = Listener::Create(ioManager, sessionManager, matching, SERVER_PORT);
@@ -58,6 +59,8 @@ int main(int argc, char* argv[])
 
     sessionManager->Clear();
     ioManager->Stop();
+    
+    IngamePacketPool::Release();
 
     return 0;
 }
