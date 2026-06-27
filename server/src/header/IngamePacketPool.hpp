@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <queue>
 #include <mutex>
 #include <memory>
@@ -21,16 +21,43 @@ public:
         : _maxSize(maxSize)
     {
     }
+    
+    ~IngamePacketPool()
+    {
+        Node* current = _head.load(std::memory_order_acquire);
+        while(current != nullptr)
+        {
+            Node* nextNode = current->next;
+            delete current;
+            
+            current = nextNode;
+        }
+        _head.store(nullptr, std::memory_order_relaxed);
+        _poolSize.store(0, std::memory_order_relaxed);
+    }
 
     static void Init(const std::size_t maxSize)
     {
         std::lock_guard<std::mutex> lock(_initMtx);
         if(_instance == nullptr)
             _instance = std::make_shared<IngamePacketPool>(SecretKey{}, maxSize);
+        
+        spdlog::info("ingame packet init complete");
+    }
+    
+    static void Release()
+    {
+        std::lock_guard<std::mutex> lock(_initMtx);
+        if (_instance != nullptr)
+        {
+            spdlog::info("ingame packet pool release requested");
+            _instance = nullptr;
+        }
     }
 
     static std::shared_ptr<IngamePacketPool> GetInstance()
     {
+        assert(_instance != nullptr && "IngamePacketPool has NOT been initialized! Call Init() first.");
         return _instance;
     }
 
