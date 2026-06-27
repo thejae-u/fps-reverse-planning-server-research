@@ -16,6 +16,7 @@
 #include "Session.hpp"
 #include "World.hpp"
 #include "Packet.pb.h"
+#include "IngamePacketPool.hpp"
 
 int RunWorldUpdateTest()
 {
@@ -25,6 +26,8 @@ int RunWorldUpdateTest()
     spdlog::info("=========================================");
     spdlog::info("Starting 30-Second Load Test (10 Clients)...");
     spdlog::info("=========================================");
+    
+    IngamePacketPool::Init(100);
 
     const int clientCount = 10;
     auto ioManager = IOManager::Create("TestIOManager", 4, 4);
@@ -73,7 +76,7 @@ int RunWorldUpdateTest()
         clientThreads.emplace_back([&runClients, room, sessionId, roomId]() {
             while (runClients)
             {
-                auto ingamePacket = std::make_shared<Protocol::IngamePacket>();
+                auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
                 ingamePacket->set_sessionid(uuids::to_string(sessionId));
                 ingamePacket->set_roomid(uuids::to_string(roomId));
                 ingamePacket->set_method(Protocol::IngameType::Move);
@@ -87,7 +90,49 @@ int RunWorldUpdateTest()
                 std::memcpy(&moveData[0], &data, sizeof(MoveData));
                 ingamePacket->set_data(moveData);
 
-                room->EnqueuePacket(ingamePacket);
+                // 수정 부분: 패킷 직렬화 및 역직렬화 전 과정 테스트 시뮬레이션
+                // 1. 클라이언트: IngamePacket -> string 직렬화
+                std::string ingameData;
+                if (!ingamePacket->SerializeToString(&ingameData))
+                {
+                    spdlog::error("TestWorld: IngamePacket Serialize failed");
+                    continue;
+                }
+
+                // 2. 클라이언트: 공용 Packet -> string 직렬화 (UDP 전송 포맷)
+                Protocol::Packet sendPacket;
+                sendPacket.set_type(Protocol::PacketType::Ingame);
+                sendPacket.set_data(ingameData);
+
+                std::string packetStream;
+                if (!sendPacket.SerializeToString(&packetStream))
+                {
+                    spdlog::error("TestWorld: Packet Serialize failed");
+                    continue;
+                }
+
+                // 3. 서버: 수신 데이터 역직렬화 (ProcessPacket 재현)
+                Protocol::Packet recvPacket;
+                if (recvPacket.ParseFromString(packetStream))
+                {
+                    if (recvPacket.type() == Protocol::PacketType::Ingame)
+                    {
+                        // 역직렬화할 타겟 패킷을 풀에서 대여
+                        auto recvIngamePacket = IngamePacketPool::GetInstance()->Rent();
+                        if (recvIngamePacket->ParseFromString(recvPacket.data()))
+                        {
+                            room->EnqueuePacket(recvIngamePacket);
+                        }
+                        else
+                        {
+                            spdlog::error("TestWorld: IngamePacket Deserialization failed");
+                        }
+                    }
+                }
+                else
+                {
+                    spdlog::error("TestWorld: Packet Deserialization failed");
+                }
 
                 std::this_thread::sleep_for(std::chrono::microseconds(16666)); // ~60FPS client updates
             }
@@ -130,5 +175,6 @@ int RunWorldUpdateTest()
     spdlog::info("Avg Delay: {:.3f} ms", static_cast<float>(avgUs) / 1000.0);
     spdlog::info("=========================================");
 
+    IngamePacketPool::Release();
     return 0;
 }
