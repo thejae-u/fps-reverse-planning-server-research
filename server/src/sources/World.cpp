@@ -8,10 +8,13 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
     std::lock_guard<std::mutex> playerLock(_playerMutex);
     _playerSize = sessions.size();
 
+    int index = 0;
     for(const auto [id, session] : sessions)
     {
         auto newPlayer = std::make_unique<Player>();
+        newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f);
         _players.insert({ id, std::move(newPlayer) });
+        index++;
     }
 
     // some init logics: team division, role assignment
@@ -29,20 +32,20 @@ void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
     }
 
     // Validation 1: Speed check (no negative speed, cap at MAX_SPEED)
-    if (speed < 0)
+    if(speed < 0)
     {
         speed = 0;
     }
-    else if (speed > MAX_SPEED)
+    else if(speed > MAX_SPEED)
     {
         speed = MAX_SPEED;
     }
 
     // Validation 2: Direction vector components constraint [-1, 1]
-    if (std::abs(direction.x) > 1 || std::abs(direction.y) > 1 || std::abs(direction.z) > 1)
+    if(std::abs(direction.x) > 1 || std::abs(direction.y) > 1 || std::abs(direction.z) > 1)
     {
         spdlog::warn("world(room id) {}: player {} sent invalid direction ({}, {}, {})",
-            uuids::to_string(_roomId), uuids::to_string(playerId), direction.x, direction.y, direction.z);
+                     uuids::to_string(_roomId), uuids::to_string(playerId), direction.x, direction.y, direction.z);
         return;
     }
 
@@ -51,15 +54,98 @@ void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
 
 void World::Jump(uuids::uuid player)
 {
+    std::lock_guard<std::mutex> lock(_playerMutex);
+    if(!_players.contains(player))
+    {
+        spdlog::error("world(room id) {}: player {} is not found.", uuids::to_string(_roomId), uuids::to_string(player));
+        return;
+    }
+
+    auto& targetPlayer = _players[player];
+    if(targetPlayer->isGrounded)
+    {
+        targetPlayer->velocity.y = JUMP_SPEED;
+        targetPlayer->isGrounded = false;
+    }
 }
 
-void World::Shoot(uuids::uuid player, Vector3 direction)
+void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick)
 {
+    std::lock_guard<std::mutex> lock(_playerMutex);
+    if(!_players.contains(shooterId) || !_players[shooterId])
+        return;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // 1. Rewind Players
+    auto backup = RewindPlayers(shooterId, targetTick);
+    auto rewindEnd = std::chrono::high_resolution_clock::now();
+
+    Vector3 origin = _players[shooterId]->position;
+
+    // 2. Perform simple distance-based hit detection
+    int hitCount = 0;
+    constexpr float HIT_RADIUS = 3.0f;                       // hit area size (generous for latency testing)
+    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS; // square
+    float len = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+    Vector3 dirNorm = (len > 0.0f) ? Vector3(direction.x / len, direction.y / len, direction.z / len) : Vector3(0, 0, 1);
+
+    for(auto& [id, targetPlayer] : _players)
+    {
+        if(id == shooterId || !targetPlayer)
+            continue;
+
+        // V = enemy - shooter 
+        Vector3 v(targetPlayer->position.x - origin.x, targetPlayer->position.y - origin.y, targetPlayer->position.z - origin.z);
+
+        // t = V dot D
+        float t = v.x * dirNorm.x + v.y * dirNorm.y + v.z * dirNorm.z;
+
+        // behind pass
+        if(t < 0.0f)
+            continue;
+
+        // P = O + t * D 
+        Vector3 p(origin.x + t * dirNorm.x, origin.y + t * dirNorm.y, origin.z + t * dirNorm.z);
+
+        // d^2 = ||P - C||^2
+        float distSq = std::pow(p.x - targetPlayer->position.x, 2) +
+                       std::pow(p.y - targetPlayer->position.y, 2) +
+                       std::pow(p.z - targetPlayer->position.z, 2);
+        
+        if(distSq <= HIT_RADIUS_SQ)
+        {
+            hitCount++;
+            targetPlayer->hp -= 10; // test damage 
+            if(targetPlayer->hp <= 0)
+            {
+                targetPlayer->hp = 100;
+                targetPlayer->death++;
+                _players[shooterId]->kill++;
+                spdlog::info("world {}: player {} killed player {}", uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(id));
+            }
+        }
+    }
+    auto collisionEnd = std::chrono::high_resolution_clock::now();
+
+    // 3. Restore Players
+    RestorePlayers(backup);
+    auto restoreEnd = std::chrono::high_resolution_clock::now();
+
+    auto rewindUs = std::chrono::duration_cast<std::chrono::microseconds>(rewindEnd - start).count();
+    auto collisionUs = std::chrono::duration_cast<std::chrono::microseconds>(collisionEnd - rewindEnd).count();
+    auto restoreUs = std::chrono::duration_cast<std::chrono::microseconds>(restoreEnd - collisionEnd).count();
+    auto totalUs = std::chrono::duration_cast<std::chrono::microseconds>(restoreEnd - start).count();
+
+    spdlog::info("[Shoot Performance] Shooter: {}, TargetTick: {}, HitCount: {}, "
+                 "Rewind: {}us, Collision: {}us, Restore: {}us, Total: {}us",
+                 uuids::to_string(shooterId), targetTick, hitCount,
+                 rewindUs, collisionUs, restoreUs, totalUs);
 }
 
 void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microseconds interval)
 {
-    if (_isUpdating.exchange(true))
+    if(_isUpdating.exchange(true))
         return; // Already updating
 
     _weakRoom = weakRoom;
@@ -70,7 +156,7 @@ void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microse
 
 void World::StopUpdate()
 {
-    if (!_isUpdating.exchange(false))
+    if(!_isUpdating.exchange(false))
         return; // Not updating
 
     _timer.cancel();
@@ -85,14 +171,14 @@ void World::EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet)
 
 void World::ScheduleNextTick()
 {
-    if (!_isUpdating)
+    if(!_isUpdating)
         return;
 
     _timer.expires_at(_timer.expiry() + _tickInterval);
     _timer.async_wait([weakRoom = _weakRoom, roomId = _roomId](const std::error_code& ec) {
-        if (ec)
+        if(ec)
         {
-            if (ec == asio::error::operation_aborted)
+            if(ec == asio::error::operation_aborted)
             {
                 spdlog::info("world(room id) {}: update timer cancelled", uuids::to_string(roomId));
             }
@@ -102,21 +188,21 @@ void World::ScheduleNextTick()
             }
             return;
         }
-        
+
         if(const auto room = weakRoom.lock())
         {
             if(const auto world = room->GetWorld())
             {
                 auto now = std::chrono::steady_clock::now();
                 const int MAX_CATCHUP_TICKS = 5;
-                
+
                 // 극단적인 랙 발생 시에만 강제 리셋
                 if(now - world->_timer.expiry() > world->_tickInterval * MAX_CATCHUP_TICKS)
                 {
                     world->_timer.expires_at(now);
-                        spdlog::warn("world(room id) {}: heavy lag detected. resetting timer anchor.", uuids::to_string(roomId));
+                    spdlog::warn("world(room id) {}: heavy lag detected. resetting timer anchor.", uuids::to_string(roomId));
                 }
-                
+
                 // callback 1회 당 Update 1회 수행
                 world->Update();
                 world->ScheduleNextTick();
@@ -137,12 +223,12 @@ void World::Update()
 
     // 3. Broadcast updated player states to all clients in the room
     auto room = _weakRoom.lock();
-    if (room)
+    if(room)
     {
         std::lock_guard<std::mutex> playerLock(_playerMutex);
-        for (const auto& [id, player] : _players)
+        for(const auto& [id, player] : _players)
         {
-            if (!player)
+            if(!player)
                 continue;
 
             auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
@@ -156,7 +242,7 @@ void World::Update()
             ingamePacket->set_data(posData);
 
             std::string sendBuffer;
-            if (ingamePacket->SerializeToString(&sendBuffer))
+            if(ingamePacket->SerializeToString(&sendBuffer))
             {
                 auto sendPacket = std::make_shared<Protocol::Packet>();
                 sendPacket->set_type(Protocol::PacketType::Ingame);
@@ -168,19 +254,19 @@ void World::Update()
 
     auto end = std::chrono::high_resolution_clock::now();
     auto elapsedUs = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    
+
     // 수정 부분: 1.0ms(1000us)를 초과하는 지연 스파이크 감지 시 경고 로그 기록
-    const std::int64_t SPIKE_THRESHOLD_US = 1000;
-    if (elapsedUs > SPIKE_THRESHOLD_US)
+    const std::int64_t SPIKE_THRESHOLD_US = 5000;
+    if(elapsedUs > SPIKE_THRESHOLD_US)
     {
-        spdlog::warn("world(room id) {}: Update Spike Detected! Elapsed: {:.3f} ms (Tick Count: {})", 
-            uuids::to_string(_roomId), 
-            static_cast<double>(elapsedUs) / 1000.0, 
-            _tickCount.load());
+        spdlog::warn("world(room id) {}: Update Spike Detected! Elapsed: {:.3f} ms (Tick Count: {})",
+                     uuids::to_string(_roomId),
+                     static_cast<double>(elapsedUs) / 1000.0,
+                     _tickCount.load());
     }
 
     ++_tickCount;
-    
+
     {
         std::lock_guard<std::mutex> lock(_metricsMutex);
         _tickDurationsUs.push_back(elapsedUs);
@@ -201,7 +287,7 @@ void World::ProcessQueue()
         localQueue.pop();
 
         auto playerIdOpt = uuids::uuid::from_string(packet->sessionid());
-        if (!playerIdOpt.has_value())
+        if(!playerIdOpt.has_value())
         {
             spdlog::warn("world(room id) {}: invalid session id in packet", uuids::to_string(_roomId));
             continue;
@@ -209,39 +295,41 @@ void World::ProcessQueue()
 
         uuids::uuid playerId = playerIdOpt.value();
 
-        switch (packet->method())
+        switch(packet->method())
         {
-            case Protocol::IngameType::Move:
+        case Protocol::IngameType::Move: {
+            if(packet->data().size() >= sizeof(std::int32_t) * 4)
             {
-                if (packet->data().size() >= sizeof(std::int32_t) * 4)
-                {
-                    Vector3 direction;
-                    std::int32_t speed;
-                    std::memcpy(&direction.x, packet->data().data(), sizeof(std::int32_t));
-                    std::memcpy(&direction.y, packet->data().data() + sizeof(std::int32_t), sizeof(std::int32_t));
-                    std::memcpy(&direction.z, packet->data().data() + sizeof(std::int32_t) * 2, sizeof(std::int32_t));
-                    std::memcpy(&speed, packet->data().data() + sizeof(std::int32_t) * 3, sizeof(std::int32_t));
-                    Move(playerId, direction, speed);
-                }
-                break;
+                Vector3 direction;
+                std::int32_t speed;
+                std::memcpy(&direction.x, packet->data().data(), sizeof(std::int32_t));
+                std::memcpy(&direction.y, packet->data().data() + sizeof(std::int32_t), sizeof(std::int32_t));
+                std::memcpy(&direction.z, packet->data().data() + sizeof(std::int32_t) * 2, sizeof(std::int32_t));
+                std::memcpy(&speed, packet->data().data() + sizeof(std::int32_t) * 3, sizeof(std::int32_t));
+                Move(playerId, direction, speed);
             }
-            case Protocol::IngameType::Jump:
+            break;
+        }
+        case Protocol::IngameType::Jump: {
+            Jump(playerId);
+            break;
+        }
+        case Protocol::IngameType::Shoot: {
+            Vector3 direction(0.0f, 0.0f, 1.0f); // Test forward
+
+            if(packet->data().size() >= sizeof(Vector3))
             {
-                spdlog::info("world(room id) {}: player {} jump", uuids::to_string(_roomId), uuids::to_string(playerId));
-                break;
+                std::memcpy(&direction.x, packet->data().data(), sizeof(Vector3));
             }
-            case Protocol::IngameType::Shoot:
-            {
-                spdlog::info("world(room id) {}: player {} shoot", uuids::to_string(_roomId), uuids::to_string(playerId));
-                break;
-            }
-            case Protocol::IngameType::Hit:
-            {
-                spdlog::info("world(room id) {}: player {} hit", uuids::to_string(_roomId), uuids::to_string(playerId));
-                break;
-            }
-            default:
-                break;
+
+            Shoot(playerId, direction, packet->clienttick());
+            break;
+        }
+        case Protocol::IngameType::Hit: {
+            spdlog::info("world(room id) {}: player {} hit", uuids::to_string(_roomId), uuids::to_string(playerId));
+            break;
+        }
+        default: break;
         }
     }
 }
@@ -249,21 +337,41 @@ void World::ProcessQueue()
 void World::UpdateState()
 {
     std::lock_guard<std::mutex> playerLock(_playerMutex);
-    
-    // 수정 부분: 60fps 고정 틱에 맞춰 초 단위의 dt(델타 타임)를 산출하고 중력을 적용
-    float dt = static_cast<float>(_tickInterval.count()) / 1000000.0f;
-    
-    // Apply velocity to position as a basic tick update step
+
+    // 60fps 고정 틱에 맞춰 초 단위의 dt(델타 타임)를 산출하고 중력을 적용
+    constexpr float div = 1'000'000.0f;
+    const float dt = static_cast<float>(_tickInterval.count()) / div;
+
     for(auto& [id, player] : _players)
     {
-        if (player)
+        if(player)
         {
-            // 수정 부분: 공중에 있는 플레이어에게 고정 틱 기반 중력(9.8 * dt) 가속도 누적
-            if (!player->isGrounded)
+            // position history for rewind
+            PlayerSnapshot snapshot;
+            snapshot.tick = _tickCount.load();
+            snapshot.position = player->position;
+
+            player->positionHistory.push_back(snapshot);
+
+            if(player->positionHistory.size() > 60) // 60틱 초과 시 오래된 순 제거
+            {
+                player->positionHistory.pop_front();
+            }
+
+            // 고정 틱 기반 중력(9.8 * dt) 가속도 누적
+            if(!player->isGrounded)
             {
                 player->velocity.y -= GRAVITY * dt;
             }
-            player->position += player->velocity;
+
+            player->position += player->velocity * dt;
+
+            if(player->position.y <= 0.0f)
+            {
+                player->position.y = 0.0f;
+                player->velocity.y = 0.0f;
+                player->isGrounded = true;
+            }
         }
     }
 }
@@ -280,6 +388,48 @@ bool World::GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition)
     return true;
 }
 
+std::unordered_map<uuids::uuid, Vector3> World::RewindPlayers(uuids::uuid shooterId, std::size_t targetTick)
+{
+    std::unordered_map<uuids::uuid, Vector3> currentPositionsBackup;
+    for(auto& [id, player] : _players)
+    {
+        if(id == shooterId) // 자기 자신
+            continue;
+
+        // backup current position
+        currentPositionsBackup[id] = player->position;
+
+        // targetTick에 가장 가까운 스냅샷 find
+        Vector3 rewoundPosition = player->position;
+        float minDiff = std::numeric_limits<float>::max();
+
+        for(const auto& snapshot : player->positionHistory)
+        {
+            float diff = std::abs(static_cast<float>(snapshot.tick) - static_cast<float>(targetTick));
+            if(diff < minDiff)
+            {
+                minDiff = diff;
+                rewoundPosition = snapshot.position;
+            }
+        }
+
+        player->position = rewoundPosition;
+    }
+
+    return currentPositionsBackup;
+}
+
+void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup)
+{
+    for(const auto& [id, originPosition] : backup)
+    {
+        if(_players.contains(id) && _players[id])
+        {
+            _players[id]->position = originPosition;
+        }
+    }
+}
+
 void World::ClearMetrics()
 {
     std::lock_guard<std::mutex> lock(_metricsMutex);
@@ -289,7 +439,7 @@ void World::ClearMetrics()
 void World::GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs)
 {
     std::lock_guard<std::mutex> lock(_metricsMutex);
-    if (_tickDurationsUs.empty())
+    if(_tickDurationsUs.empty())
     {
         minUs = maxUs = 0;
         avgUs = 0.0;
@@ -298,9 +448,26 @@ void World::GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs)
     minUs = *std::ranges::min_element(_tickDurationsUs);
     maxUs = *std::ranges::max_element(_tickDurationsUs);
     std::int64_t sum = 0;
-    for (auto val : _tickDurationsUs)
+    for(auto val : _tickDurationsUs)
     {
         sum += val;
     }
     avgUs = static_cast<double>(sum) / _tickDurationsUs.size();
+}
+
+void World::PrintScoreboard()
+{
+    std::lock_guard<std::mutex> lock(_playerMutex);
+    spdlog::info("=========================================");
+    spdlog::info("              SCOREBOARD                 ");
+    spdlog::info("-----------------------------------------");
+    for(const auto& [id, player] : _players)
+    {
+        if(player)
+        {
+            spdlog::info("Player {}: Kills: {}, Deaths: {}, HP: {}", 
+                         uuids::to_string(id).substr(0, 8), player->kill, player->death, player->hp);
+        }
+    }
+    spdlog::info("=========================================");
 }

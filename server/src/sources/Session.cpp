@@ -64,6 +64,30 @@ void Session::Init()
     });
 }
 
+void Session::PunchUdpHole(const asio::ip::udp::endpoint& ep)
+{
+    auto expected = SessionState::Initializing;
+    if(_state.compare_exchange_strong(expected, SessionState::WaitMatching))
+    {
+        _clientUdpEp = ep;
+        spdlog::info("session {}: udp hole punched successfully. ip: {}, port: {}",
+            uuids::to_string(_id), ep.address().to_string(), ep.port());
+        
+        auto ackPacket = std::make_shared<Packet>();
+        ackPacket->set_type(PacketType::Authentication);
+        
+        AuthenticationPacket authResult;
+        authResult.set_method(AuthenticationType::AuthenticationOk);
+        authResult.set_sessionid(uuids::to_string(_id));
+        
+        std::string serialized;
+        authResult.SerializeToString(&serialized);
+        ackPacket->set_data(serialized);
+        
+        EnqueueUdpSendPacket(ackPacket);
+    }
+}
+
 void Session::SetRoom(uuids::uuid roomId)
 {
     _roomId = roomId;

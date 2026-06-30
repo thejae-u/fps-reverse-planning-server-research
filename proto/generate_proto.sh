@@ -6,14 +6,14 @@ cd "$SCRIPT_DIR"
 
 # Protoc discovery
 VCPKG_PROTOC=""
-if [[ -f "../server/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../server/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
-elif [[ -f "../server/build/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../server/build/vcpkg_installed/x64-osx/tools/protobuf/protoc"
-elif [[ -f "../client/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../client/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
-elif [[ -f "../client/build/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../client/build/vcpkg_installed/x64-osx/tools/protobuf/protoc"
+if [[ -f "../server/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../server/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
+elif [[ -f "../server/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../server/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc"
+elif [[ -f "../client/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../client/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
+elif [[ -f "../client/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../client/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc"
 else
   VCPKG_PROTOC=$(which protoc)
 fi

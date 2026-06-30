@@ -16,6 +16,7 @@ class Room;
 
 constexpr float GRAVITY = 9.8f;
 constexpr float DELTA_TIME = 0.05f;
+constexpr float JUMP_SPEED = 5.0f;
 
 struct Vector3
 {
@@ -45,6 +46,11 @@ struct Vector3
     {
         return this->x == other.x && this->y == other.y && this->z == other.z;
     }
+    
+    std::string to_string() const
+    {
+        return "(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")";
+    }
 
     Vector3()
         : x(0), y(0), z(0)
@@ -55,6 +61,12 @@ struct Vector3
         : x(x), y(y), z(z)
     {
     }
+};
+
+struct PlayerSnapshot
+{
+    std::size_t tick;
+    Vector3 position; // tick 당시 위치
 };
 
 struct Player
@@ -73,6 +85,8 @@ struct Player
     std::int32_t damage;
     std::int32_t heal;
     std::int32_t guard;
+    
+    std::deque<PlayerSnapshot> positionHistory;
 
     Player()
         : position(), velocity(), isGrounded(true), hp(100), ammo(30), kill(0), death(0), assist(0), damage(0), heal(0), guard(0)
@@ -95,6 +109,8 @@ public:
 
     void Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions);
     bool GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition);
+    std::unordered_map<uuids::uuid, Vector3> RewindPlayers(uuids::uuid shooterId, std::size_t targetTick);
+    void RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup);
 
     void StartUpdate(std::weak_ptr<Room> weakRoom, std::chrono::microseconds interval = std::chrono::microseconds(16666));
     void StopUpdate();
@@ -103,6 +119,8 @@ public:
     // Added metrics for test/monitoring
     void ClearMetrics();
     void GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs);
+    std::size_t GetTickCount() const { return _tickCount.load(); }
+    void PrintScoreboard();
 
 private:
     void ScheduleNextTick();
@@ -113,7 +131,7 @@ private:
 private:
     void Move(uuids::uuid player, Vector3 direction, std::int32_t speed);
     void Jump(uuids::uuid player);
-    void Shoot(uuids::uuid player, Vector3 direction);
+    void Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick);
     
 
 private:

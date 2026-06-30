@@ -1,4 +1,4 @@
-﻿syntax = "proto3";
+syntax = "proto3";
 
 package Protocol;
 
@@ -58,6 +58,7 @@ message IngamePacket {
    bytes roomId = 2; 
    IngameType method = 3;
    bytes data = 4;
+   uint64 clientTick = 5;
 } 
 
 message AuthenticationPacket {

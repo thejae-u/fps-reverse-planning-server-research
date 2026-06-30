@@ -52,7 +52,7 @@ public:
     void Stop() override;
 
     void Init();
-    void PunchUdpHole(const asio::ip::udp::endpoint& ep) { _clientUdpEp = ep; }
+    void PunchUdpHole(const asio::ip::udp::endpoint& ep);
 
     bool IsValid() const { return _isValid; }
 

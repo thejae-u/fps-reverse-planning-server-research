@@ -73,22 +73,60 @@ int RunWorldUpdateTest()
     for (int i = 0; i < clientCount; ++i)
     {
         auto sessionId = clientIds[i];
-        clientThreads.emplace_back([&runClients, room, sessionId, roomId]() {
+        clientThreads.emplace_back([&runClients, room, sessionId, roomId, i, clientCount, &clientIds]() {
             while (runClients)
             {
+                static thread_local int loopCount = 0;
+                loopCount++;
+
                 auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
                 ingamePacket->set_sessionid(uuids::to_string(sessionId));
                 ingamePacket->set_roomid(uuids::to_string(roomId));
-                ingamePacket->set_method(Protocol::IngameType::Move);
 
-                // 수정 부분: 16바이트 MoveData 패킹 전송 (방향 Vector3 + 속도 int32_t)
-                struct MoveData {
-                    Vector3 direction{1.0f, 0.0f, 1.0f};
-                    std::int32_t speed = 10;
-                } data;
-                std::string moveData(sizeof(MoveData), '\0');
-                std::memcpy(&moveData[0], &data, sizeof(MoveData));
-                ingamePacket->set_data(moveData);
+                if (loopCount % 50 == 0)
+                {
+                    ingamePacket->set_method(Protocol::IngameType::Shoot);
+                    
+                    // Aim at the next player in the list
+                    uuids::uuid targetId = clientIds[(i + 1) % clientCount];
+                    Vector3 targetPos;
+                    Vector3 shooterPos;
+                    Vector3 direction(1.0f, 0.0f, 0.0f);
+                    
+                    if (room->GetWorld()->GetPlayerPosition(targetId, targetPos) &&
+                        room->GetWorld()->GetPlayerPosition(sessionId, shooterPos))
+                    {
+                        direction = Vector3(targetPos.x - shooterPos.x,
+                                            targetPos.y - shooterPos.y,
+                                            targetPos.z - shooterPos.z);
+                    }
+                    
+                    std::string shootData(sizeof(Vector3), '\0');
+                    std::memcpy(&shootData[0], &direction, sizeof(Vector3));
+                    ingamePacket->set_data(shootData);
+
+                    // Simulate 6 ticks RTT lag (approx 100ms)
+                    std::size_t curServerTick = room->GetWorld()->GetTickCount();
+                    std::size_t targetTick = (curServerTick > 6) ? (curServerTick - 6) : 0;
+                    ingamePacket->set_clienttick(targetTick);
+                }
+                else
+                {
+                    ingamePacket->set_method(Protocol::IngameType::Move);
+
+                    // Strafe back and forth along the Z axis
+                    struct MoveData {
+                        Vector3 direction;
+                        std::int32_t speed;
+                    } data;
+                    float zDir = std::sin(static_cast<float>(loopCount) * 0.05f);
+                    data.direction = Vector3(0.0f, 0.0f, zDir);
+                    data.speed = 2;
+                    
+                    std::string moveData(sizeof(MoveData), '\0');
+                    std::memcpy(&moveData[0], &data, sizeof(MoveData));
+                    ingamePacket->set_data(moveData);
+                }
 
                 // 수정 부분: 패킷 직렬화 및 역직렬화 전 과정 테스트 시뮬레이션
                 // 1. 클라이언트: IngamePacket -> string 직렬화
@@ -174,6 +212,8 @@ int RunWorldUpdateTest()
     spdlog::info("Max Delay: {:.3f} ms", static_cast<float>(maxUs) / 1000.0);
     spdlog::info("Avg Delay: {:.3f} ms", static_cast<float>(avgUs) / 1000.0);
     spdlog::info("=========================================");
+
+    world->PrintScoreboard();
 
     IngamePacketPool::Release();
     return 0;

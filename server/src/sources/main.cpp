@@ -22,8 +22,8 @@ int main(int argc, char* argv[])
     }
 
     spdlog::info("type 'quit' to stop server");
-    const auto threadCount = std::thread::hardware_concurrency() * 2;
-    const auto blockingThreadCount = std::thread::hardware_concurrency() * 2;
+    const auto threadCount = std::thread::hardware_concurrency();
+    const auto blockingThreadCount = 4;
     const auto ioManager = IOManager::Create("first manager", threadCount, blockingThreadCount);
     
     if(!ioManager)
