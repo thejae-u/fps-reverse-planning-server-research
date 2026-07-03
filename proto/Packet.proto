@@ -67,3 +67,12 @@ message AuthenticationPacket {
     AuthenticationType method = 3;
     bytes data = 4;
 }
+
+message HitPacket {
+    bytes hitPlayerId = 1;
+    bytes shooterId = 2;
+    int32 currentHp = 3;
+    int32 deaths = 4;
+    bool isDead = 5;
+    int32 damage = 6;
+}
