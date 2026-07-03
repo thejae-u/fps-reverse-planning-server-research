@@ -5,7 +5,7 @@
 
 void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions)
 {
-    std::lock_guard<std::mutex> playerLock(_playerMutex);
+    std::lock_guard playerLock(_playerMutex);
     _playerSize = sessions.size();
 
     int index = 0;
@@ -24,7 +24,7 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
 
 void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
 {
-    std::lock_guard<std::mutex> playerLock(_playerMutex);
+    std::lock_guard playerLock(_playerMutex);
     if(!_players.contains(playerId))
     {
         spdlog::info("world(room id) {}: no player {}", uuids::to_string(_roomId), uuids::to_string(playerId));
@@ -54,7 +54,7 @@ void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
 
 void World::Jump(uuids::uuid player)
 {
-    std::lock_guard<std::mutex> lock(_playerMutex);
+    std::lock_guard lock(_playerMutex);
     if(!_players.contains(player))
     {
         spdlog::error("world(room id) {}: player {} is not found.", uuids::to_string(_roomId), uuids::to_string(player));
@@ -71,31 +71,27 @@ void World::Jump(uuids::uuid player)
 
 void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick)
 {
-    std::lock_guard<std::mutex> lock(_playerMutex);
+    std::lock_guard lock(_playerMutex);
     if(!_players.contains(shooterId) || !_players[shooterId])
         return;
 
-    auto start = std::chrono::high_resolution_clock::now();
-
     // 1. Rewind Players
     auto backup = RewindPlayers(shooterId, targetTick);
-    auto rewindEnd = std::chrono::high_resolution_clock::now();
-
     Vector3 origin = _players[shooterId]->position;
 
-    // 2. Perform simple distance-based hit detection
+    // 2. Perform distance-based hit detection
     int hitCount = 0;
-    constexpr float HIT_RADIUS = 3.0f;                       // hit area size (generous for latency testing)
-    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS; // square
+    constexpr float HIT_RADIUS = 3.0f;
+    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS;
     float len = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
     Vector3 dirNorm = (len > 0.0f) ? Vector3(direction.x / len, direction.y / len, direction.z / len) : Vector3(0, 0, 1);
 
-    for(auto& [id, targetPlayer] : _players)
+    for(auto& [targetId, targetPlayer] : _players)
     {
-        if(id == shooterId || !targetPlayer)
+        if(targetId == shooterId || !targetPlayer)
             continue;
 
-        // V = enemy - shooter 
+        // V = enemy - shooter
         Vector3 v(targetPlayer->position.x - origin.x, targetPlayer->position.y - origin.y, targetPlayer->position.z - origin.z);
 
         // t = V dot D
@@ -105,42 +101,99 @@ void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTi
         if(t < 0.0f)
             continue;
 
-        // P = O + t * D 
+        // P = O + t * D
         Vector3 p(origin.x + t * dirNorm.x, origin.y + t * dirNorm.y, origin.z + t * dirNorm.z);
 
         // d^2 = ||P - C||^2
         float distSq = std::pow(p.x - targetPlayer->position.x, 2) +
                        std::pow(p.y - targetPlayer->position.y, 2) +
                        std::pow(p.z - targetPlayer->position.z, 2);
-        
+
         if(distSq <= HIT_RADIUS_SQ)
         {
             hitCount++;
-            targetPlayer->hp -= 10; // test damage 
-            if(targetPlayer->hp <= 0)
-            {
-                targetPlayer->hp = 100;
-                targetPlayer->death++;
-                _players[shooterId]->kill++;
-                spdlog::info("world {}: player {} killed player {}", uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(id));
-            }
+            Hit(targetId, 10, shooterId);
         }
     }
-    auto collisionEnd = std::chrono::high_resolution_clock::now();
 
     // 3. Restore Players
     RestorePlayers(backup);
-    auto restoreEnd = std::chrono::high_resolution_clock::now();
+}
 
-    auto rewindUs = std::chrono::duration_cast<std::chrono::microseconds>(rewindEnd - start).count();
-    auto collisionUs = std::chrono::duration_cast<std::chrono::microseconds>(collisionEnd - rewindEnd).count();
-    auto restoreUs = std::chrono::duration_cast<std::chrono::microseconds>(restoreEnd - collisionEnd).count();
-    auto totalUs = std::chrono::duration_cast<std::chrono::microseconds>(restoreEnd - start).count();
+void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
+{
+    if(!_players.contains(shooterId) || !_players[shooterId])
+    {
+        spdlog::warn("world(room id) {}: shooter {} not found on hit", uuids::to_string(_roomId), uuids::to_string(shooterId));
+        return;
+    }
 
-    spdlog::info("[Shoot Performance] Shooter: {}, TargetTick: {}, HitCount: {}, "
-                 "Rewind: {}us, Collision: {}us, Restore: {}us, Total: {}us",
-                 uuids::to_string(shooterId), targetTick, hitCount,
-                 rewindUs, collisionUs, restoreUs, totalUs);
+    if(!_players.contains(hitId) || !_players[hitId])
+    {
+        spdlog::warn("world(room id) {}: hit target {} not found", uuids::to_string(_roomId), uuids::to_string(hitId));
+        return;
+    }
+
+    if(damage < 0)
+    {
+        spdlog::warn("world(room id) {}: invalid damage (damage is negative)", uuids::to_string(_roomId));
+        return;
+    }
+
+    auto& targetPlayer = _players[hitId];
+    targetPlayer->hp -= damage;
+
+    bool isDead = false;
+    if(targetPlayer->hp <= 0)
+    {
+        isDead = true;
+        targetPlayer->death++;
+        targetPlayer->hp = 100; // reset
+
+        _players[shooterId]->kill++;
+
+        spdlog::info("world {}: player {} killed player {}",
+                     uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(hitId));
+    }
+
+    if(auto room = _weakRoom.lock())
+    {
+        // 1. Create and populate HitPacket protobuf message
+        Protocol::HitPacket hitPacket;
+        hitPacket.set_hitplayerid(uuids::to_string(hitId));
+        hitPacket.set_shooterid(uuids::to_string(shooterId));
+        hitPacket.set_currenthp(targetPlayer->hp);
+        hitPacket.set_deaths(targetPlayer->death);
+        hitPacket.set_isdead(isDead);
+        hitPacket.set_damage(damage);
+
+        // 2. Serialize HitPacket
+        std::string serializedData;
+        if(hitPacket.SerializeToString(&serializedData))
+        {
+            auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
+            ingamePacket->set_sessionid(uuids::to_string(hitId));
+            ingamePacket->set_roomid(uuids::to_string(_roomId));
+            ingamePacket->set_method(Protocol::IngameType::Hit);
+            ingamePacket->set_data(serializedData);
+
+            // 3. Serialize outer IngamePacket and broadcast
+            std::string serializedIngame;
+            if (ingamePacket->SerializeToString(&serializedIngame))
+            {
+                auto sendPacket = std::make_shared<Protocol::Packet>();
+                sendPacket->set_type(Protocol::PacketType::Ingame);
+                sendPacket->set_data(serializedIngame);
+                room->Broadcast(std::move(sendPacket));
+            }
+        }
+    }
+}
+
+void World::PublicHit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
+{
+    std::lock_guard lock(_playerMutex);
+    Hit(hitId, damage, shooterId);
 }
 
 void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microseconds interval)
@@ -151,7 +204,6 @@ void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microse
     _weakRoom = weakRoom;
     _tickInterval = interval;
     ScheduleNextTick();
-    spdlog::info("world(room id) {}: update loop started with interval {}ms", uuids::to_string(_roomId), _tickInterval.count());
 }
 
 void World::StopUpdate()
@@ -165,7 +217,7 @@ void World::StopUpdate()
 
 void World::EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet)
 {
-    std::lock_guard<std::mutex> lock(_queueMutex);
+    std::lock_guard lock(_queueMutex);
     _packetQueue.push(packet);
 }
 
@@ -213,8 +265,6 @@ void World::ScheduleNextTick()
 
 void World::Update()
 {
-    auto start = std::chrono::high_resolution_clock::now();
-
     // 1. Process queued inputs from clients
     ProcessQueue();
 
@@ -225,7 +275,7 @@ void World::Update()
     auto room = _weakRoom.lock();
     if(room)
     {
-        std::lock_guard<std::mutex> playerLock(_playerMutex);
+        std::lock_guard playerLock(_playerMutex);
         for(const auto& [id, player] : _players)
         {
             if(!player)
@@ -252,32 +302,14 @@ void World::Update()
         }
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto elapsedUs = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-
-    // 수정 부분: 1.0ms(1000us)를 초과하는 지연 스파이크 감지 시 경고 로그 기록
-    const std::int64_t SPIKE_THRESHOLD_US = 5000;
-    if(elapsedUs > SPIKE_THRESHOLD_US)
-    {
-        spdlog::warn("world(room id) {}: Update Spike Detected! Elapsed: {:.3f} ms (Tick Count: {})",
-                     uuids::to_string(_roomId),
-                     static_cast<double>(elapsedUs) / 1000.0,
-                     _tickCount.load());
-    }
-
     ++_tickCount;
-
-    {
-        std::lock_guard<std::mutex> lock(_metricsMutex);
-        _tickDurationsUs.push_back(elapsedUs);
-    }
 }
 
 void World::ProcessQueue()
 {
     std::queue<std::shared_ptr<Protocol::IngamePacket>> localQueue;
     {
-        std::lock_guard<std::mutex> lock(_queueMutex);
+        std::lock_guard lock(_queueMutex);
         std::swap(localQueue, _packetQueue);
     }
 
@@ -336,7 +368,7 @@ void World::ProcessQueue()
 
 void World::UpdateState()
 {
-    std::lock_guard<std::mutex> playerLock(_playerMutex);
+    std::lock_guard playerLock(_playerMutex);
 
     // 60fps 고정 틱에 맞춰 초 단위의 dt(델타 타임)를 산출하고 중력을 적용
     constexpr float div = 1'000'000.0f;
@@ -378,7 +410,7 @@ void World::UpdateState()
 
 bool World::GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition)
 {
-    std::lock_guard<std::mutex> playerLock(_playerMutex);
+    std::lock_guard playerLock(_playerMutex);
     auto it = _players.find(playerId);
     if(it == _players.end() || !it->second)
     {
@@ -432,13 +464,13 @@ void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backu
 
 void World::ClearMetrics()
 {
-    std::lock_guard<std::mutex> lock(_metricsMutex);
+    std::lock_guard lock(_metricsMutex);
     _tickDurationsUs.clear();
 }
 
 void World::GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs)
 {
-    std::lock_guard<std::mutex> lock(_metricsMutex);
+    std::lock_guard lock(_metricsMutex);
     if(_tickDurationsUs.empty())
     {
         minUs = maxUs = 0;
@@ -457,7 +489,7 @@ void World::GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs)
 
 void World::PrintScoreboard()
 {
-    std::lock_guard<std::mutex> lock(_playerMutex);
+    std::lock_guard lock(_playerMutex);
     spdlog::info("=========================================");
     spdlog::info("              SCOREBOARD                 ");
     spdlog::info("-----------------------------------------");
@@ -465,7 +497,7 @@ void World::PrintScoreboard()
     {
         if(player)
         {
-            spdlog::info("Player {}: Kills: {}, Deaths: {}, HP: {}", 
+            spdlog::info("Player {}: Kills: {}, Deaths: {}, HP: {}",
                          uuids::to_string(id).substr(0, 8), player->kill, player->death, player->hp);
         }
     }
