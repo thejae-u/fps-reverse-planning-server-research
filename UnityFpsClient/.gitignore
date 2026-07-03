@@ -6,11 +6,11 @@
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
-/[Build]/
-/[Builds]/
-/[Logs]/
-/[UserSettings]/
-/[MemoryCaptures]/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emory[Cc]aptures/
 
 # 2. Asset Store tools
 /Assets/AssetStoreTools*
