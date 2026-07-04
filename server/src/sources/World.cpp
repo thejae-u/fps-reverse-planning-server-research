@@ -462,31 +462,6 @@ void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backu
     }
 }
 
-void World::ClearMetrics()
-{
-    std::lock_guard lock(_metricsMutex);
-    _tickDurationsUs.clear();
-}
-
-void World::GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs)
-{
-    std::lock_guard lock(_metricsMutex);
-    if(_tickDurationsUs.empty())
-    {
-        minUs = maxUs = 0;
-        avgUs = 0.0;
-        return;
-    }
-    minUs = *std::ranges::min_element(_tickDurationsUs);
-    maxUs = *std::ranges::max_element(_tickDurationsUs);
-    std::int64_t sum = 0;
-    for(auto val : _tickDurationsUs)
-    {
-        sum += val;
-    }
-    avgUs = static_cast<double>(sum) / _tickDurationsUs.size();
-}
-
 void World::PrintScoreboard()
 {
     std::lock_guard lock(_playerMutex);

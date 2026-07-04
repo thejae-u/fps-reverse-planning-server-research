@@ -1,12 +1,10 @@
 #include "TestWorld.hpp"
 
-#include <iostream>
 #include <thread>
 #include <cassert>
 #include <chrono>
 #include <vector>
 #include <atomic>
-#include <cstring>
 #include <uuid.h>
 #include <spdlog/spdlog.h>
 
@@ -23,14 +21,17 @@ int RunWorldUpdateTest()
     // Set log level to info to prevent log flooding during the 30-second test
     spdlog::set_level(spdlog::level::info);
     
-    spdlog::info("=========================================");
-    spdlog::info("Starting 30-Second Load Test (10 Clients)...");
-    spdlog::info("=========================================");
+    constexpr std::uint32_t testTime = 10;
+    constexpr std::uint32_t clientCount = 10;
+    const auto threadCount = std::thread::hardware_concurrency();
+    
+    spdlog::info("===============TEST MODE================");
+    spdlog::info("Starting {}-Second Load Test ({} Clients)...", testTime, clientCount);
+    spdlog::info("========================================");
     
     IngamePacketPool::Init(100);
 
-    const int clientCount = 10;
-    auto ioManager = IOManager::Create("TestIOManager", 4, 4);
+    auto ioManager = IOManager::Create("TestIOManager", threadCount, 4);
     auto sessionManager = SessionManager::Create();
     
     auto roomId = uuids::uuid_system_generator{}();
@@ -63,7 +64,6 @@ int RunWorldUpdateTest()
 
     World* world = room->GetWorld();
     assert(world != nullptr);
-    world->ClearMetrics();
 
     spdlog::info("Spawning 10 simulated client threads (sending inputs every 16ms)...");
 
@@ -177,8 +177,8 @@ int RunWorldUpdateTest()
         });
     }
 
-    spdlog::info("Simulation running for 30 seconds...");
-    std::this_thread::sleep_for(std::chrono::seconds(30));
+    spdlog::info("Simulation running for {} seconds...", testTime);
+    std::this_thread::sleep_for(std::chrono::seconds(testTime));
     spdlog::info("Simulation finished. Stopping threads and collecting stats...");
 
     // Stop client threads
@@ -198,20 +198,6 @@ int RunWorldUpdateTest()
         session->Stop();
     }
     ioManager->Stop();
-
-    // Query and print latency metrics
-    std::int64_t minUs = 0;
-    std::int64_t maxUs = 0;
-    double avgUs = 0.0;
-    world->GetMetrics(minUs, maxUs, avgUs);
-
-    spdlog::info("=========================================");
-    spdlog::info("Load Test Results (World Tick Update Duration):");
-    spdlog::info("-----------------------------------------");
-    spdlog::info("Min Delay: {:.3f} ms", static_cast<float>(minUs) / 1000.0);
-    spdlog::info("Max Delay: {:.3f} ms", static_cast<float>(maxUs) / 1000.0);
-    spdlog::info("Avg Delay: {:.3f} ms", static_cast<float>(avgUs) / 1000.0);
-    spdlog::info("=========================================");
 
     world->PrintScoreboard();
 

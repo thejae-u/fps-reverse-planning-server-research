@@ -10,6 +10,8 @@
 #include <atomic>
 #include <chrono>
 #include "Packet.pb.h"
+#include "Vector3.hpp"
+#include "Player.hpp"
 
 class Session;
 class Room;
@@ -17,82 +19,6 @@ class Room;
 constexpr float GRAVITY = 9.8f;
 constexpr float DELTA_TIME = 0.05f;
 constexpr float JUMP_SPEED = 5.0f;
-
-struct Vector3
-{
-    float x;
-    float y;
-    float z;
-
-    Vector3 operator+(const Vector3& other) const
-    {
-        return { x + other.x, y + other.y, z + other.z };
-    }
-
-    Vector3 operator*(float scalar) const
-    {
-        return { x * scalar, y * scalar, z * scalar };
-    }
-
-    Vector3& operator+=(const Vector3& other)
-    {
-        x += other.x;
-        y += other.y;
-        z += other.z;
-        return *this;
-    }
-
-    bool operator==(const Vector3& other)
-    {
-        return this->x == other.x && this->y == other.y && this->z == other.z;
-    }
-    
-    std::string to_string() const
-    {
-        return "(" + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z) + ")";
-    }
-
-    Vector3()
-        : x(0), y(0), z(0)
-    {
-    }
-
-    Vector3(const float x, const float y, const float z)
-        : x(x), y(y), z(z)
-    {
-    }
-};
-
-struct PlayerSnapshot
-{
-    std::size_t tick;
-    Vector3 position; // tick 당시 위치
-};
-
-struct Player
-{
-    Vector3 position;
-    Vector3 velocity;
-    bool isGrounded;
-
-    std::int16_t hp;
-    std::int16_t ammo;
-
-    std::int16_t kill;
-    std::int16_t death;
-    std::int16_t assist;
-
-    std::int32_t damage;
-    std::int32_t heal;
-    std::int32_t guard;
-    
-    std::deque<PlayerSnapshot> positionHistory;
-
-    Player()
-        : position(), velocity(), isGrounded(true), hp(100), ammo(30), kill(0), death(0), assist(0), damage(0), heal(0), guard(0)
-    {
-    }
-};
 
 class World
 {
@@ -116,10 +42,9 @@ public:
     void StopUpdate();
     void EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet);
 
-    // Added metrics for test/monitoring
-    void ClearMetrics();
-    void GetMetrics(std::int64_t& minUs, std::int64_t& maxUs, double& avgUs);
     std::size_t GetTickCount() const { return _tickCount.load(); }
+    
+    // TEST MONITORING
     void PrintScoreboard();
 
 private:
