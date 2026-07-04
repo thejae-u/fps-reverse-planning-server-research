@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.22)
+cmake_minimum_required (VERSION 3.22)
 
 # 지원되는 경우 MSVC 컴파일러에 대해 핫 다시 로드 사용하도록 설정합니다.
 if (POLICY CMP0141)
@@ -13,6 +13,11 @@ file(GLOB_RECURSE HEADERS "src/header/*.h" "src/header/*.hpp")
 
 # 이 프로젝트의 실행 파일에 소스를 추가합니다.
 add_executable(main ${SOURCES} ${HEADERS})
+
+# Precompiled Header 추가
+target_precompile_headers(main PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/header/pch.h>"
+)
 
 target_include_directories(main
     PUBLIC 
