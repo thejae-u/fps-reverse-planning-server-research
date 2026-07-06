@@ -221,6 +221,43 @@ void App::RenderUI()
     }
     ImGui::End();
 
+    ImGui::Begin("Scoreboard");
+    ImGui::BeginTable("Scores", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable);
+
+    ImGui::TableSetupColumn("PlayerId");
+    ImGui::TableSetupColumn("Kill");
+    ImGui::TableSetupColumn("Death");
+    ImGui::TableSetupColumn("Heal");
+    ImGui::TableHeadersRow();
+
+    {
+        std::lock_guard<std::mutex> lock(_testClientsMutex);
+        if(!_testClients.empty())
+        {
+            auto scores = _testClients[0]->GetScores();
+
+            for(const auto [id, score] : scores)
+            {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%s", id.substr(0, 8).c_str());
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%s", std::to_string(score.kill()).c_str());
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%s", std::to_string(score.death()).c_str());
+
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%s", std::to_string(score.heal()).c_str());
+            }
+        }
+    }
+
+    ImGui::EndTable();
+
+    ImGui::End();
+
     ImGui::Begin("World Visualization (2D Arena)");
     {
         std::shared_ptr<NetworkClient> activeClient = nullptr;
@@ -255,11 +292,11 @@ void App::RenderUI()
             }
             else
             {
-                if (ImGui::TreeNode("Player Coordinates (Debug)"))
+                if(ImGui::TreeNode("Player Coordinates (Debug)"))
                 {
-                    for (const auto& p : players)
+                    for(const auto& p : players)
                     {
-                        ImGui::Text("[%s]: Pos(%.2f, %.2f, %.2f) | HP: %d | K/D: %d/%d", 
+                        ImGui::Text("[%s]: Pos(%.2f, %.2f, %.2f) | HP: %d | K/D: %d/%d",
                                     p.id.substr(0, 8).c_str(), p.x, p.y, p.z, p.hp, p.kills, p.deaths);
                     }
                     ImGui::TreePop();

@@ -83,6 +83,8 @@ public:
     using MessageCallback = std::function<void(const std::string&)>;
     void SetMessageCallback(MessageCallback callback);
     void SetUdpMessageCallback(MessageCallback callback);
+    
+    std::unordered_map<std::string, Scoreboard> GetScores();
 
 private:
     void AddLog(const std::string& msg, spdlog::level::level_enum level = spdlog::level::info);
@@ -115,6 +117,9 @@ private:
 
     std::unordered_map<std::string, PlayerState> _roomPlayers;
     mutable std::mutex _roomPlayersMutex;
+    
+    std::mutex _scoresMutex;
+    std::unordered_map<std::string, Scoreboard> _scores;
 
     // Read-related members
     uint16_t _readNetSize;

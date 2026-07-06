@@ -66,26 +66,36 @@ void Session::Init()
 
 void Session::PunchUdpHole(const asio::ip::udp::endpoint& ep)
 {
-    auto expected = SessionState::Initializing;
-    if(_state.compare_exchange_strong(expected, SessionState::WaitMatching))
-    {
-        _clientUdpEp = ep;
-        spdlog::info("session {}: udp hole punched successfully. ip: {}, port: {}",
-            uuids::to_string(_id), ep.address().to_string(), ep.port());
-        
-        auto ackPacket = std::make_shared<Packet>();
-        ackPacket->set_type(PacketType::Authentication);
-        
-        AuthenticationPacket authResult;
-        authResult.set_method(AuthenticationType::AuthenticationOk);
-        authResult.set_sessionid(uuids::to_string(_id));
-        
-        std::string serialized;
-        authResult.SerializeToString(&serialized);
-        ackPacket->set_data(serialized);
-        
-        EnqueueUdpSendPacket(ackPacket);
-    }
+    asio::post(_strand, [weakSelf = GetWeak<Session>(), ep]() {
+        if(auto self = weakSelf.lock())
+        {
+            auto state = self->_state.load();
+            if(state == SessionState::Initializing || state == SessionState::WaitMatching)
+            {
+                if(self->_clientUdpEp.port() == 0)
+                {
+                    self->_clientUdpEp = ep;
+                    self->_state = SessionState::WaitMatching;
+                    
+                    spdlog::info("session {}: udp hole punched successfully. ip: {}, port: {}",
+                        uuids::to_string(self->_id), ep.address().to_string(), ep.port());
+                    
+                    auto ackPacket = std::make_shared<Packet>();
+                    ackPacket->set_type(PacketType::Authentication);
+                    
+                    AuthenticationPacket authResult;
+                    authResult.set_method(AuthenticationType::AuthenticationOk);
+                    authResult.set_sessionid(uuids::to_string(self->_id));
+                    
+                    std::string serialized;
+                    authResult.SerializeToString(&serialized);
+                    ackPacket->set_data(serialized);
+                    
+                    self->EnqueueUdpSendPacket(ackPacket);
+                }
+            }
+        }
+    });
 }
 
 void Session::SetRoom(uuids::uuid roomId)
@@ -361,8 +371,6 @@ void Session::DoSendAsyncTcpLoop()
     auto payload = std::make_shared<Raw>(totalSize);
     std::memcpy(payload->data(), &netSize, sizeof(netSize));
     std::memcpy(payload->data() + sizeof(netSize), dataBody->data(), size);
-
-    spdlog::info("session {} calling async_write with totalSize: {}, remaining queue: {}", uuids::to_string(GetId()), totalSize, queueSize);
 
     asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), payload, totalSize](const std::error_code& ec, std::size_t bytesTransferred) {
         if(auto self = weakSelf.lock())

@@ -429,7 +429,37 @@ void NetworkClient::AsyncRead()
                         }
                         else if(packet.type() == PacketType::Ingame)
                         {
-                            AddLog("Warning: Received Ingame packet via TCP. Ingame packets should be UDP only.", spdlog::level::warn);
+                            IngamePacket ingamePacket;
+                            if(!ingamePacket.ParseFromString(packet.data()))
+                            {
+                                AddLog("Parsing Ingame packet Error.", spdlog::level::err);
+                                AsyncRead();
+                                return;
+                            }
+                            
+                            if(ingamePacket.method() != IngameType::Score)
+                            {
+                                AddLog("Invalid Packet Income.", spdlog::level::warn) ;
+                                AsyncRead();
+                                return;
+                            }
+                            
+                            ScoreboardPacket scoreboardPacket;
+                            if(!scoreboardPacket.ParseFromString(ingamePacket.data()))
+                            {
+                                AddLog("Parsing Scoreboard packet Error.", spdlog::level::err);
+                                AsyncRead();
+                                return;
+                            }
+                            
+                            auto scores = scoreboardPacket.scores();
+                            if(scores.empty())
+                                AddLog("scores empty");
+                            for(const auto score : scores)
+                            {
+                                std::lock_guard<std::mutex> lock(_scoresMutex);
+                                _scores[score.playerid()] = score;
+                            }
                         }
                         else if(_messageCallback)
                         {
@@ -642,6 +672,12 @@ void NetworkClient::SetMessageCallback(MessageCallback callback)
 void NetworkClient::SetUdpMessageCallback(MessageCallback callback)
 {
     _udpMessageCallback = std::move(callback);
+}
+
+std::unordered_map<std::string, Scoreboard> NetworkClient::GetScores() 
+{
+    std::lock_guard<std::mutex> lock(_scoresMutex);
+    return _scores;
 }
 
 void NetworkClient::SendUdpHolePunching()

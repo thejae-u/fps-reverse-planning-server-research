@@ -68,7 +68,12 @@ private:
 private:
     static constexpr std::int32_t MAX_SPEED = 20;
     uuids::uuid _roomId;
+    
+    // Session Info
+    std::mutex _sessionsMutex;
+    std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
 
+    // Player updates
     std::size_t _playerSize;
     std::unordered_map<uuids::uuid, std::unique_ptr<Player>> _players;
     std::mutex _playerMutex;
@@ -84,6 +89,7 @@ private:
     // Input queue
     std::queue<std::shared_ptr<Protocol::IngamePacket>> _packetQueue;
     std::mutex _queueMutex;
+    
     // Metrics storage
     std::vector<std::int64_t> _tickDurationsUs;
     std::mutex _metricsMutex;

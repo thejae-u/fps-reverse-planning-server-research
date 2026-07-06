@@ -14,6 +14,7 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
         auto newPlayer = std::make_unique<Player>();
         newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f);
         _players.insert({ id, std::move(newPlayer) });
+        _sessions.insert({ id, session });
         index++;
     }
 
@@ -538,6 +539,9 @@ void World::PrintScoreboard()
     spdlog::info("=========================================");
     spdlog::info("              SCOREBOARD                 ");
     spdlog::info("-----------------------------------------");
+
+    Protocol::ScoreboardPacket scorePacket;
+    scorePacket.set_roomid(uuids::to_string(_roomId));
     for(const auto& [id, player] : _players)
     {
         if(player)
@@ -545,7 +549,48 @@ void World::PrintScoreboard()
             spdlog::info("Player {}: Pos: ({:.2f}, {:.2f}, {:.2f}) | HP: {} | Kills: {} | Deaths: {}",
                          uuids::to_string(id).substr(0, 8), player->position.x, player->position.y, player->position.z,
                          player->hp, player->kill, player->death);
+
+            auto* score = scorePacket.add_scores();
+            score->set_playerid(uuids::to_string(id));
+            score->set_kill(player->kill);
+            score->set_death(player->death);
+            score->set_heal(player->heal);
         }
     }
+
     spdlog::info("=========================================");
+
+    std::string serializedScoreboard;
+    if(!scorePacket.SerializeToString(&serializedScoreboard))
+    {
+        spdlog::error("world(room id) {}: failed to serialize scoreboard", uuids::to_string(_roomId));
+        return;
+    }
+
+    Protocol::IngamePacket ingamePacket;
+    ingamePacket.set_roomid(uuids::to_string(_roomId));
+    ingamePacket.set_method(Protocol::IngameType::Score);
+    ingamePacket.set_data(serializedScoreboard);
+    ingamePacket.set_clienttick(_tickCount.load());
+
+    std::string serializedIngamePacket;
+    if(!ingamePacket.SerializeToString(&serializedIngamePacket))
+    {
+        spdlog::error("world(room id) {}: failed to serialize ingamePacket", uuids::to_string(_roomId));
+        return;
+    }
+
+    Protocol::Packet packet;
+    packet.set_type(Protocol::PacketType::Ingame);
+    packet.set_data(serializedIngamePacket);
+
+    auto sendPacket = std::make_shared<Packet>(packet);
+    for(const auto& [id, weakSession] : _sessions)
+    {
+        if(auto session = weakSession.lock())
+        {
+            if(session->IsValid())
+                session->EnqueueTcpSendPacket(sendPacket);
+        }
+    }
 }
