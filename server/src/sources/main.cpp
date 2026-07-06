@@ -32,8 +32,10 @@ int main(int argc, char* argv[])
     constexpr auto ingamePacketPoolSize = 100;
     IngamePacketPool::Init(ingamePacketPoolSize);
     
+    /*
     constexpr auto internalPoolSize = 5;
     const auto internalConnectionPool = ConnectionPool::Create(ioManager, internalPoolSize);
+    */
     
     const auto sessionManager = SessionManager::Create();
     const auto matching = Matching::Create(ioManager, sessionManager);
@@ -41,7 +43,7 @@ int main(int argc, char* argv[])
 
     // Start, Stop을 처리하기 위한 컨테이너
     std::vector<std::shared_ptr<IBase>> components;
-    components.emplace_back(internalConnectionPool);
+    //components.emplace_back(internalConnectionPool);
     components.emplace_back(listener);
 
     for(const auto& component : components)

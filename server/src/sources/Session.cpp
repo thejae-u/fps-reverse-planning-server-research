@@ -1,4 +1,4 @@
-﻿#include "Session.hpp"
+#include "Session.hpp"
 
 #include "asio.hpp"
 #include "Listener.hpp"
@@ -55,7 +55,7 @@ void Session::Stop()
 void Session::Init()
 {
     spdlog::info("session{}: Init", uuids::to_string(_id));
-    _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
+    asio::post(_strand, [weakSelf = GetWeak<Session>()]() {
         if(auto self = weakSelf.lock())
         {
             self->_state = SessionState::Initializing;
@@ -328,8 +328,10 @@ void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
         return;
     }
 
-    std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
-    _sendTcpQueue.push(sendData);
+    {
+        std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
+        _sendTcpQueue.push(sendData);
+    }
 
     if(_isWriting)
         return;
@@ -342,10 +344,12 @@ void Session::DoSendAsyncTcpLoop()
 {
     // Dequeue from send queue
     std::shared_ptr<Raw> dataBody;
+    std::size_t queueSize = 0;
     {
         std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
         dataBody = _sendTcpQueue.front();
         _sendTcpQueue.pop();
+        queueSize = _sendTcpQueue.size();
     }
 
     // calculate size for payload
@@ -358,7 +362,9 @@ void Session::DoSendAsyncTcpLoop()
     std::memcpy(payload->data(), &netSize, sizeof(netSize));
     std::memcpy(payload->data() + sizeof(netSize), dataBody->data(), size);
 
-    asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), payload](const std::error_code& ec, std::size_t) {
+    spdlog::info("session {} calling async_write with totalSize: {}, remaining queue: {}", uuids::to_string(GetId()), totalSize, queueSize);
+
+    asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), payload, totalSize](const std::error_code& ec, std::size_t bytesTransferred) {
         if(auto self = weakSelf.lock())
         {
             if(ec)
@@ -383,39 +389,12 @@ void Session::DoSendAsyncTcpLoop()
 
 void Session::SendSessionInfo()
 {
-    std::string sendData;
-    Packet sendPacket;
+    auto sendPacket = std::make_shared<Packet>();
+    sendPacket->set_type(PacketType::PortHandshake);
+    sendPacket->set_data(std::format("{},{}", std::to_string(_serverUdpPort), uuids::to_string(GetId())));
 
-    sendPacket.set_type(PacketType::PortHandshake);
-    sendPacket.set_data(std::format("{},{}", std::to_string(_serverUdpPort), uuids::to_string(GetId())));
-    sendPacket.SerializeToString(&sendData);
-
-    // reusable
-    std::uint16_t size = static_cast<std::uint16_t>(sendData.size());
-    std::uint16_t netSize = htons(size);
-
-    std::vector<unsigned char> receiveData;
-    Packet receivePacket;
-
-    std::error_code ec;
-
-    // 1. send port data size
-    asio::write(*_socketPtr, asio::buffer(&netSize, sizeof(netSize)), ec);
-
-    // 2. send port real data
-    if(!ec)
-    {
-        spdlog::info("session {} send size complete", uuids::to_string(_id));
-        asio::write(*_socketPtr, asio::buffer(sendData), ec);
-    }
-
-    // if error occured once, move here
-    if(ec)
-    {
-        spdlog::error("session {} send error occured: {}", uuids::to_string(_id), ec.message());
-        Stop();
-        return;
-    }
+    spdlog::info("session {} sending handshake info asynchronously", uuids::to_string(GetId()));
+    EnqueueTcpSendPacket(std::move(sendPacket));
 
     StartTcpRead();
 }

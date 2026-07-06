@@ -9,7 +9,7 @@
 
 Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
 : _ioManager(ioManager), _strand(ioManager->GetIoContext()), _sessionManager(sessionManager), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
-  _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0))
+  _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0)), _isSending(false)
 {
     _udpEndpoint = _udpSocket.local_endpoint();
     spdlog::info("listener object created: tcp port {}, udp port {}", _tcpEndpoint.port(), _udpEndpoint.port());
@@ -120,18 +120,28 @@ void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr
         _payloadQueue.push({ ep, payload });
     }
 
-    if(_isSending)
+    if(_isSending.exchange(true))
         return;
 
-    _isSending = true;
     SendAsyncByUdp();
 }
 
 void Listener::SendAsyncByUdp()
 {
-    std::lock_guard<std::mutex> payloadQueueLock(_payloadQueueMutex);
-    auto [ep, payload] = _payloadQueue.front();
-    _payloadQueue.pop();
+    asio::ip::udp::endpoint ep;
+    std::shared_ptr<Raw> payload;
+    {
+        std::lock_guard<std::mutex> payloadQueueLock(_payloadQueueMutex);
+        if(_payloadQueue.empty())
+        {
+            _isSending = false;
+            return;
+        }
+        auto item = _payloadQueue.front();
+        ep = item.first;
+        payload = item.second;
+        _payloadQueue.pop();
+    }
 
     _udpSocket.async_send_to(
     asio::buffer(*payload), ep, asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), payload, ep](const std::error_code& ec, std::size_t) {
@@ -143,16 +153,23 @@ void Listener::SendAsyncByUdp()
 
         if(auto self = weakSelf.lock())
         {
-            spdlog::info("[test log] listener: udp send to ({}:{}) complete", ep.address().to_string(), ep.port());
-
-            std::lock_guard<std::mutex> payloadQueueLock(self->_payloadQueueMutex);
-            if(self->_payloadQueue.empty())
+            bool hasMore = false;
             {
-                self->_isSending = false;
-                return;
+                std::lock_guard<std::mutex> payloadQueueLock(self->_payloadQueueMutex);
+                if(self->_payloadQueue.empty())
+                {
+                    self->_isSending = false;
+                }
+                else
+                {
+                    hasMore = true;
+                }
             }
 
-            self->SendAsyncByUdp();
+            if(hasMore)
+            {
+                self->SendAsyncByUdp();
+            }
         }
     }));
 }

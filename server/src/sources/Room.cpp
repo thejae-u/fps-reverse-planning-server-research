@@ -90,7 +90,6 @@ void Room::Broadcast(std::shared_ptr<Packet> packet)
             if(!session->IsValid())
                 continue;
             session->EnqueueUdpSendPacket(packet);
-            spdlog::info("room: session {} send", uuids::to_string(session->GetId()));
         }
     }
 }

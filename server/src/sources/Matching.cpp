@@ -1,4 +1,4 @@
-﻿#include "Matching.hpp"
+#include "Matching.hpp"
 
 #include "SessionManager.hpp"
 #include "Listener.hpp"
@@ -117,6 +117,7 @@ void Matching::TryMatch()
             if(auto nextSession = weakNextSession.lock())
             {
                 nextSession->SetRoom(newRoom->GetId());
+                newRoom->AddSession(nextSessionId, weakNextSession);
                 nextSession->RemoveDisconnectCallback(_sessionCallbackHandles[nextSessionId]);
                 _sessionCallbackHandles.erase(nextSessionId);
             }

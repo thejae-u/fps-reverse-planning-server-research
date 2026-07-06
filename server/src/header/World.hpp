@@ -54,14 +54,16 @@ private:
     void UpdateState();
     
 public:
-    void PublicHit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
+    void Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
     
 private:
     void Move(uuids::uuid player, Vector3 direction, std::int32_t speed);
     void Jump(uuids::uuid player);
     void Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick);
-    void Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
+    void HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
     
+    std::unordered_map<uuids::uuid, Vector3> RewindPlayersNoLock(uuids::uuid shooterId, std::size_t targetTick);
+    void RestorePlayersNoLock(const std::unordered_map<uuids::uuid, Vector3>& backup);
 
 private:
     static constexpr std::int32_t MAX_SPEED = 20;
@@ -69,7 +71,7 @@ private:
 
     std::size_t _playerSize;
     std::unordered_map<uuids::uuid, std::unique_ptr<Player>> _players;
-    std::recursive_mutex _playerMutex;
+    std::mutex _playerMutex;
     
     std::atomic<std::size_t> _tickCount = 0;
 

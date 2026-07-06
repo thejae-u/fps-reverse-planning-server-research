@@ -76,16 +76,16 @@ void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTi
         return;
 
     // 1. Rewind Players
-    auto backup = RewindPlayers(shooterId, targetTick);
+    auto backup = RewindPlayersNoLock(shooterId, targetTick);
     Vector3 origin = _players[shooterId]->position;
 
     // 2. Perform distance-based hit detection
-    int hitCount = 0;
     constexpr float HIT_RADIUS = 3.0f;
     constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS;
     float len = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
     Vector3 dirNorm = (len > 0.0f) ? Vector3(direction.x / len, direction.y / len, direction.z / len) : Vector3(0, 0, 1);
 
+    std::unordered_set<uuids::uuid> hitTargetIds;
     for(auto& [targetId, targetPlayer] : _players)
     {
         if(targetId == shooterId || !targetPlayer)
@@ -111,16 +111,67 @@ void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTi
 
         if(distSq <= HIT_RADIUS_SQ)
         {
-            hitCount++;
-            Hit(targetId, 10, shooterId);
+            HitNoLock(targetId, 10, shooterId);
+            hitTargetIds.insert(targetId);
+        }
+    }
+
+    if(auto room = _weakRoom.lock())
+    {
+        Protocol::DebugLagCompPacket debugPacket;
+        debugPacket.set_shooterid(uuids::to_string(shooterId));
+        debugPacket.set_originx(origin.x);
+        debugPacket.set_originy(origin.y);
+        debugPacket.set_originz(origin.z);
+        debugPacket.set_dirx(dirNorm.x);
+        debugPacket.set_diry(dirNorm.y);
+        debugPacket.set_dirz(dirNorm.z);
+
+        for(const auto& [targetId, targetPlayer] : _players)
+        {
+            if(targetId == shooterId || !targetPlayer)
+                continue;
+            auto* targetMsg = debugPacket.add_targets();
+            targetMsg->set_targetid(uuids::to_string(targetId));
+
+            // 현재 위치 (백업에서 복원)
+            Vector3 presentPos = backup.at(targetId);
+            targetMsg->set_presentx(presentPos.x);
+            targetMsg->set_presenty(presentPos.y);
+            targetMsg->set_presentz(presentPos.z);
+            // 되감겼던 위치 (현재 복원 직전의 targetPlayer->position)
+            targetMsg->set_rewoundx(targetPlayer->position.x);
+            targetMsg->set_rewoundy(targetPlayer->position.y);
+            targetMsg->set_rewoundz(targetPlayer->position.z);
+
+            targetMsg->set_ishit(hitTargetIds.contains(targetId));
+        }
+
+        std::string serializedDebug;
+        if(debugPacket.SerializeToString(&serializedDebug))
+        {
+            auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
+            ingamePacket->set_sessionid(uuids::to_string(shooterId));
+            ingamePacket->set_roomid(uuids::to_string(_roomId));
+            ingamePacket->set_method(Protocol::IngameType::DebugLagComp);
+            ingamePacket->set_data(serializedDebug);
+
+            std::string serializedIngame;
+            if(ingamePacket->SerializeToString(&serializedIngame))
+            {
+                auto sendPacket = std::make_shared<Protocol::Packet>();
+                sendPacket->set_type(Protocol::PacketType::Ingame);
+                sendPacket->set_data(serializedIngame);
+                room->Broadcast(std::move(sendPacket));
+            }
         }
     }
 
     // 3. Restore Players
-    RestorePlayers(backup);
+    RestorePlayersNoLock(backup);
 }
 
-void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
+void World::HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 {
     if(!_players.contains(shooterId) || !_players[shooterId])
     {
@@ -179,7 +230,7 @@ void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 
             // 3. Serialize outer IngamePacket and broadcast
             std::string serializedIngame;
-            if (ingamePacket->SerializeToString(&serializedIngame))
+            if(ingamePacket->SerializeToString(&serializedIngame))
             {
                 auto sendPacket = std::make_shared<Protocol::Packet>();
                 sendPacket->set_type(Protocol::PacketType::Ingame);
@@ -190,10 +241,10 @@ void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
     }
 }
 
-void World::PublicHit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
+void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 {
     std::lock_guard lock(_playerMutex);
-    Hit(hitId, damage, shooterId);
+    HitNoLock(hitId, damage, shooterId);
 }
 
 void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microseconds interval)
@@ -203,6 +254,7 @@ void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microse
 
     _weakRoom = weakRoom;
     _tickInterval = interval;
+    _timer.expires_at(std::chrono::steady_clock::now());
     ScheduleNextTick();
 }
 
@@ -285,6 +337,7 @@ void World::Update()
             ingamePacket->set_sessionid(uuids::to_string(id));
             ingamePacket->set_roomid(uuids::to_string(_roomId));
             ingamePacket->set_method(Protocol::IngameType::Move);
+            ingamePacket->set_clienttick(_tickCount.load());
 
             // Serialize Vector3 position to bytes data
             std::string posData(sizeof(Vector3), '\0');
@@ -303,6 +356,11 @@ void World::Update()
     }
 
     ++_tickCount;
+
+    if(_tickCount % 60 == 0)
+    {
+        PrintScoreboard();
+    }
 }
 
 void World::ProcessQueue()
@@ -420,7 +478,7 @@ bool World::GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition)
     return true;
 }
 
-std::unordered_map<uuids::uuid, Vector3> World::RewindPlayers(uuids::uuid shooterId, std::size_t targetTick)
+std::unordered_map<uuids::uuid, Vector3> World::RewindPlayersNoLock(uuids::uuid shooterId, std::size_t targetTick)
 {
     std::unordered_map<uuids::uuid, Vector3> currentPositionsBackup;
     for(auto& [id, player] : _players)
@@ -451,7 +509,7 @@ std::unordered_map<uuids::uuid, Vector3> World::RewindPlayers(uuids::uuid shoote
     return currentPositionsBackup;
 }
 
-void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup)
+void World::RestorePlayersNoLock(const std::unordered_map<uuids::uuid, Vector3>& backup)
 {
     for(const auto& [id, originPosition] : backup)
     {
@@ -460,6 +518,18 @@ void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backu
             _players[id]->position = originPosition;
         }
     }
+}
+
+std::unordered_map<uuids::uuid, Vector3> World::RewindPlayers(uuids::uuid shooterId, std::size_t targetTick)
+{
+    std::lock_guard lock(_playerMutex);
+    return RewindPlayersNoLock(shooterId, targetTick);
+}
+
+void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup)
+{
+    std::lock_guard lock(_playerMutex);
+    RestorePlayersNoLock(backup);
 }
 
 void World::PrintScoreboard()
@@ -472,8 +542,9 @@ void World::PrintScoreboard()
     {
         if(player)
         {
-            spdlog::info("Player {}: Kills: {}, Deaths: {}, HP: {}",
-                         uuids::to_string(id).substr(0, 8), player->kill, player->death, player->hp);
+            spdlog::info("Player {}: Pos: ({:.2f}, {:.2f}, {:.2f}) | HP: {} | Kills: {} | Deaths: {}",
+                         uuids::to_string(id).substr(0, 8), player->position.x, player->position.y, player->position.z,
+                         player->hp, player->kill, player->death);
         }
     }
     spdlog::info("=========================================");

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <asio.hpp>
 #include <functional>
@@ -31,7 +31,7 @@ public:
     explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener, uuids::uuid sessionId, std::uint16_t udpPort)
         : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _strand(ioManager->GetIoContext()),
           _serverUdpPort(udpPort), _clientUdpPort(0), _weakListener(listener), _isValid(false), _state(SessionState::Initializing),
-          _id(sessionId), _readSize(0), _readNetSize(0), _callbackHandleCount(0)
+          _id(sessionId), _readSize(0), _readNetSize(0), _callbackHandleCount(0), _isWriting(false), _isProcessing(false)
     {
     }
 
@@ -103,11 +103,11 @@ private:
 
     std::queue<std::shared_ptr<Raw>> _sendTcpQueue;
     std::mutex _sendTcpQueueMutex;
-    std::atomic<bool> _isWriting;
+    std::atomic<bool> _isWriting{ false };
 
     std::queue<std::shared_ptr<Packet>> _processQueue;
     std::mutex _processQueueMutex;
-    std::atomic<bool> _isProcessing;
+    std::atomic<bool> _isProcessing{ false };
 
 public:
     void EnqueueUdpSendPacket(std::shared_ptr<Packet> data);
