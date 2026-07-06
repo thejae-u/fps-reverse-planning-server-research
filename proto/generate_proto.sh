@@ -55,6 +55,8 @@ for proto in "${PROTO_FILES[@]}"; do
   "$VCPKG_PROTOC" --proto_path="$PROTO_SRC" \
          --cpp_out="$SERVER_HEADER" \
          "$proto"
+
+  echo "${proto} created in ${SERVER_HEADER}..."
   
   # Move .pb.cc to sources
   # Note: Some protoc versions might generate .pb.cc in the same dir as .pb.h

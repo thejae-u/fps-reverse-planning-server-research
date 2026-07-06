@@ -26,6 +26,36 @@ namespace _pbi = ::google::protobuf::internal;
 namespace _fl = ::google::protobuf::internal::field_layout;
 namespace Protocol {
 
+inline constexpr Scoreboard::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        playerid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        kill_{0},
+        death_{0},
+        heal_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR Scoreboard::Scoreboard(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(Scoreboard_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct ScoreboardDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ScoreboardDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ScoreboardDefaultTypeInternal() {}
+  union {
+    Scoreboard _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ScoreboardDefaultTypeInternal _Scoreboard_default_instance_;
+
 inline constexpr Packet::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
@@ -222,6 +252,34 @@ struct AuthenticationPacketDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 AuthenticationPacketDefaultTypeInternal _AuthenticationPacket_default_instance_;
 
+inline constexpr ScoreboardPacket::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        scores_{},
+        roomid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
+template <typename>
+PROTOBUF_CONSTEXPR ScoreboardPacket::ScoreboardPacket(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(ScoreboardPacket_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct ScoreboardPacketDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ScoreboardPacketDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ScoreboardPacketDefaultTypeInternal() {}
+  union {
+    ScoreboardPacket _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ScoreboardPacketDefaultTypeInternal _ScoreboardPacket_default_instance_;
+
 inline constexpr DebugLagCompPacket::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
@@ -356,6 +414,24 @@ const ::uint32_t
         6,
         7,
         0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::Protocol::Scoreboard, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::Protocol::Scoreboard, _impl_.playerid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Scoreboard, _impl_.kill_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Scoreboard, _impl_.death_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::Scoreboard, _impl_.heal_),
+        0,
+        1,
+        2,
+        3,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::Protocol::ScoreboardPacket, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::Protocol::ScoreboardPacket, _impl_.roomid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::ScoreboardPacket, _impl_.scores_),
+        1,
+        0,
 };
 
 static const ::_pbi::MigrationSchema
@@ -367,6 +443,8 @@ static const ::_pbi::MigrationSchema
         {40, sizeof(::Protocol::HitPacket)},
         {55, sizeof(::Protocol::DebugLagCompTarget)},
         {74, sizeof(::Protocol::DebugLagCompPacket)},
+        {93, sizeof(::Protocol::Scoreboard)},
+        {104, sizeof(::Protocol::ScoreboardPacket)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::Protocol::_Packet_default_instance_._instance,
@@ -376,6 +454,8 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::Protocol::_HitPacket_default_instance_._instance,
     &::Protocol::_DebugLagCompTarget_default_instance_._instance,
     &::Protocol::_DebugLagCompPacket_default_instance_._instance,
+    &::Protocol::_Scoreboard_default_instance_._instance,
+    &::Protocol::_ScoreboardPacket_default_instance_._instance,
 };
 const char descriptor_table_protodef_Packet_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -401,13 +481,17 @@ const char descriptor_table_protodef_Packet_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     "\017\n\007originX\030\002 \001(\002\022\017\n\007originY\030\003 \001(\002\022\017\n\007ori"
     "ginZ\030\004 \001(\002\022\014\n\004dirX\030\005 \001(\002\022\014\n\004dirY\030\006 \001(\002\022\014"
     "\n\004dirZ\030\007 \001(\002\022-\n\007targets\030\010 \003(\0132\034.Protocol"
-    ".DebugLagCompTarget*\232\001\n\nPacketType\022\014\n\010Pa"
-    "cketOk\020\000\022\017\n\013InvalidData\020\001\022\020\n\014ErrorOccure"
-    "d\020\002\022\021\n\rPortHandshake\020d\022\021\n\rInfoHandshake\020"
-    "e\022\010\n\004Ping\020f\022\t\n\005Match\020g\022\013\n\006Ingame\020\310\001\022\023\n\016A"
-    "uthentication\020\311\001*T\n\nIngameType\022\014\n\010Ingame"
-    "Ok\020\000\022\010\n\004Move\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003H"
-    "it\020\004\022\020\n\014DebugLagComp\020\005*d\n\017MatchmakingTyp"
+    ".DebugLagCompTarget\"I\n\nScoreboard\022\020\n\010pla"
+    "yerId\030\001 \001(\014\022\014\n\004kill\030\002 \001(\005\022\r\n\005death\030\003 \001(\005"
+    "\022\014\n\004heal\030\004 \001(\005\"H\n\020ScoreboardPacket\022\016\n\006ro"
+    "omId\030\001 \001(\014\022$\n\006scores\030\002 \003(\0132\024.Protocol.Sc"
+    "oreboard*\232\001\n\nPacketType\022\014\n\010PacketOk\020\000\022\017\n"
+    "\013InvalidData\020\001\022\020\n\014ErrorOccured\020\002\022\021\n\rPort"
+    "Handshake\020d\022\021\n\rInfoHandshake\020e\022\010\n\004Ping\020f"
+    "\022\t\n\005Match\020g\022\013\n\006Ingame\020\310\001\022\023\n\016Authenticati"
+    "on\020\311\001*_\n\nIngameType\022\014\n\010IngameOk\020\000\022\010\n\004Mov"
+    "e\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003Hit\020\004\022\020\n\014Deb"
+    "ugLagComp\020\005\022\t\n\005Score\020\006*d\n\017MatchmakingTyp"
     "e\022\021\n\rMatchmakingOk\020\000\022\013\n\007Request\020\001\022\013\n\007Suc"
     "cess\020\002\022\n\n\006Failed\020\003\022\013\n\007Waiting\020\004\022\013\n\007Match"
     "ed\020\005*\?\n\022AuthenticationType\022\024\n\020Authentica"
@@ -417,13 +501,13 @@ static ::absl::once_flag descriptor_table_Packet_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_Packet_2eproto = {
     false,
     false,
-    1317,
+    1477,
     descriptor_table_protodef_Packet_2eproto,
     "Packet.proto",
     &descriptor_table_Packet_2eproto_once,
     nullptr,
     0,
-    7,
+    9,
     schemas,
     file_default_instances,
     TableStruct_Packet_2eproto::offsets,
@@ -442,7 +526,7 @@ const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL IngameType_descriptor
   return file_level_enum_descriptors_Packet_2eproto[1];
 }
 PROTOBUF_CONSTINIT const uint32_t IngameType_internal_data_[] = {
-    393216u, 0u, };
+    458752u, 0u, };
 const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL MatchmakingType_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_Packet_2eproto);
   return file_level_enum_descriptors_Packet_2eproto[2];
@@ -3332,6 +3416,711 @@ void DebugLagCompPacket::InternalSwap(DebugLagCompPacket* PROTOBUF_RESTRICT PROT
 }
 
 ::google::protobuf::Metadata DebugLagCompPacket::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class Scoreboard::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<Scoreboard>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_._has_bits_);
+};
+
+Scoreboard::Scoreboard(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, Scoreboard_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:Protocol.Scoreboard)
+}
+PROTOBUF_NDEBUG_INLINE Scoreboard::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::Protocol::Scoreboard& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        playerid_(arena, from.playerid_) {}
+
+Scoreboard::Scoreboard(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const Scoreboard& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, Scoreboard_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  Scoreboard* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, kill_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, kill_),
+           offsetof(Impl_, heal_) -
+               offsetof(Impl_, kill_) +
+               sizeof(Impl_::heal_));
+
+  // @@protoc_insertion_point(copy_constructor:Protocol.Scoreboard)
+}
+PROTOBUF_NDEBUG_INLINE Scoreboard::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        playerid_(arena) {}
+
+inline void Scoreboard::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, kill_),
+           0,
+           offsetof(Impl_, heal_) -
+               offsetof(Impl_, kill_) +
+               sizeof(Impl_::heal_));
+}
+Scoreboard::~Scoreboard() {
+  // @@protoc_insertion_point(destructor:Protocol.Scoreboard)
+  SharedDtor(*this);
+}
+inline void Scoreboard::SharedDtor(MessageLite& self) {
+  Scoreboard& this_ = static_cast<Scoreboard&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.playerid_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL Scoreboard::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) Scoreboard(arena);
+}
+constexpr auto Scoreboard::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(Scoreboard),
+                                            alignof(Scoreboard));
+}
+constexpr auto Scoreboard::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_Scoreboard_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // OnDemandRegisterArenaDtor
+          nullptr,  // IsInitialized
+          &Scoreboard::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<Scoreboard>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &Scoreboard::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<Scoreboard>(), &Scoreboard::ByteSizeLong,
+              &Scoreboard::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_._cached_size_),
+          false,
+      },
+      &Scoreboard::kDescriptorMethods,
+      &descriptor_table_Packet_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull Scoreboard_class_data_ =
+        Scoreboard::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+Scoreboard::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&Scoreboard_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(Scoreboard_class_data_.tc_table);
+  return Scoreboard_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 0, 2>
+Scoreboard::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    Scoreboard_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::Protocol::Scoreboard>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // int32 heal = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(Scoreboard, _impl_.heal_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.heal_)}},
+    // bytes playerId = 1;
+    {::_pbi::TcParser::FastBS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.playerid_)}},
+    // int32 kill = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(Scoreboard, _impl_.kill_), 1>(),
+     {16, 1, 0,
+      PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.kill_)}},
+    // int32 death = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(Scoreboard, _impl_.death_), 2>(),
+     {24, 2, 0,
+      PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.death_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bytes playerId = 1;
+    {PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.playerid_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
+    // int32 kill = 2;
+    {PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.kill_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // int32 death = 3;
+    {PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.death_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // int32 heal = 4;
+    {PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.heal_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+PROTOBUF_NOINLINE void Scoreboard::Clear() {
+// @@protoc_insertion_point(message_clear_start:Protocol.Scoreboard)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.playerid_.ClearNonDefaultToEmpty();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
+    ::memset(&_impl_.kill_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.heal_) -
+        reinterpret_cast<char*>(&_impl_.kill_)) + sizeof(_impl_.heal_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL Scoreboard::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const Scoreboard& this_ = static_cast<const Scoreboard&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL Scoreboard::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const Scoreboard& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:Protocol.Scoreboard)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bytes playerId = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_playerid().empty()) {
+      const ::std::string& _s = this_._internal_playerid();
+      target = stream->WriteBytesMaybeAliased(1, _s, target);
+    }
+  }
+
+  // int32 kill = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_kill() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
+              stream, this_._internal_kill(), target);
+    }
+  }
+
+  // int32 death = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_death() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
+              stream, this_._internal_death(), target);
+    }
+  }
+
+  // int32 heal = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_heal() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+              stream, this_._internal_heal(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:Protocol.Scoreboard)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t Scoreboard::ByteSizeLong(const MessageLite& base) {
+  const Scoreboard& this_ = static_cast<const Scoreboard&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t Scoreboard::ByteSizeLong() const {
+  const Scoreboard& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:Protocol.Scoreboard)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // bytes playerId = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_playerid().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                        this_._internal_playerid());
+      }
+    }
+    // int32 kill = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_kill() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_kill());
+      }
+    }
+    // int32 death = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_death() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_death());
+      }
+    }
+    // int32 heal = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_heal() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_heal());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void Scoreboard::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<Scoreboard*>(&to_msg);
+  auto& from = static_cast<const Scoreboard&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:Protocol.Scoreboard)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_playerid().empty()) {
+        _this->_internal_set_playerid(from._internal_playerid());
+      } else {
+        if (_this->_impl_.playerid_.IsDefault()) {
+          _this->_internal_set_playerid("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_kill() != 0) {
+        _this->_impl_.kill_ = from._impl_.kill_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_death() != 0) {
+        _this->_impl_.death_ = from._impl_.death_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_heal() != 0) {
+        _this->_impl_.heal_ = from._impl_.heal_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void Scoreboard::CopyFrom(const Scoreboard& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:Protocol.Scoreboard)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void Scoreboard::InternalSwap(Scoreboard* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.playerid_, &other->_impl_.playerid_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.heal_)
+      + sizeof(Scoreboard::_impl_.heal_)
+      - PROTOBUF_FIELD_OFFSET(Scoreboard, _impl_.kill_)>(
+          reinterpret_cast<char*>(&_impl_.kill_),
+          reinterpret_cast<char*>(&other->_impl_.kill_));
+}
+
+::google::protobuf::Metadata Scoreboard::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class ScoreboardPacket::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<ScoreboardPacket>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_._has_bits_);
+};
+
+ScoreboardPacket::ScoreboardPacket(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ScoreboardPacket_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:Protocol.ScoreboardPacket)
+}
+PROTOBUF_NDEBUG_INLINE ScoreboardPacket::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::Protocol::ScoreboardPacket& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        scores_{visibility, arena, from.scores_},
+        roomid_(arena, from.roomid_) {}
+
+ScoreboardPacket::ScoreboardPacket(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const ScoreboardPacket& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ScoreboardPacket_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  ScoreboardPacket* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+
+  // @@protoc_insertion_point(copy_constructor:Protocol.ScoreboardPacket)
+}
+PROTOBUF_NDEBUG_INLINE ScoreboardPacket::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        scores_{visibility, arena},
+        roomid_(arena) {}
+
+inline void ScoreboardPacket::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+ScoreboardPacket::~ScoreboardPacket() {
+  // @@protoc_insertion_point(destructor:Protocol.ScoreboardPacket)
+  SharedDtor(*this);
+}
+inline void ScoreboardPacket::SharedDtor(MessageLite& self) {
+  ScoreboardPacket& this_ = static_cast<ScoreboardPacket&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.roomid_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL ScoreboardPacket::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ScoreboardPacket(arena);
+}
+constexpr auto ScoreboardPacket::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_.scores_) +
+          decltype(ScoreboardPacket::_impl_.scores_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(ScoreboardPacket), alignof(ScoreboardPacket), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&ScoreboardPacket::PlacementNew_,
+                                 sizeof(ScoreboardPacket),
+                                 alignof(ScoreboardPacket));
+  }
+}
+constexpr auto ScoreboardPacket::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_ScoreboardPacket_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // OnDemandRegisterArenaDtor
+          nullptr,  // IsInitialized
+          &ScoreboardPacket::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ScoreboardPacket>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ScoreboardPacket::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ScoreboardPacket>(), &ScoreboardPacket::ByteSizeLong,
+              &ScoreboardPacket::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_._cached_size_),
+          false,
+      },
+      &ScoreboardPacket::kDescriptorMethods,
+      &descriptor_table_Packet_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull ScoreboardPacket_class_data_ =
+        ScoreboardPacket::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ScoreboardPacket::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ScoreboardPacket_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(ScoreboardPacket_class_data_.tc_table);
+  return ScoreboardPacket_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 1, 0, 2>
+ScoreboardPacket::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_._has_bits_),
+    0, // no _extensions_
+    2, 8,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
+    ScoreboardPacket_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::Protocol::ScoreboardPacket>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // repeated .Protocol.Scoreboard scores = 2;
+    {::_pbi::TcParser::FastMtR1,
+     {18, 0, 0,
+      PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_.scores_)}},
+    // bytes roomId = 1;
+    {::_pbi::TcParser::FastBS1,
+     {10, 1, 0,
+      PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_.roomid_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bytes roomId = 1;
+    {PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_.roomid_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
+    // repeated .Protocol.Scoreboard scores = 2;
+    {PROTOBUF_FIELD_OFFSET(ScoreboardPacket, _impl_.scores_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+  }},
+  {{
+      {::_pbi::TcParser::GetTable<::Protocol::Scoreboard>()},
+  }},
+  {{
+  }},
+};
+PROTOBUF_NOINLINE void ScoreboardPacket::Clear() {
+// @@protoc_insertion_point(message_clear_start:Protocol.ScoreboardPacket)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.scores_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.roomid_.ClearNonDefaultToEmpty();
+    }
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL ScoreboardPacket::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const ScoreboardPacket& this_ = static_cast<const ScoreboardPacket&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL ScoreboardPacket::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const ScoreboardPacket& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:Protocol.ScoreboardPacket)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bytes roomId = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_roomid().empty()) {
+      const ::std::string& _s = this_._internal_roomid();
+      target = stream->WriteBytesMaybeAliased(1, _s, target);
+    }
+  }
+
+  // repeated .Protocol.Scoreboard scores = 2;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+    for (unsigned i = 0, n = static_cast<unsigned>(
+                             this_._internal_scores_size());
+         i < n; i++) {
+      const auto& repfield = this_._internal_scores().Get(i);
+      target =
+          ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+              2, repfield, repfield.GetCachedSize(),
+              target, stream);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:Protocol.ScoreboardPacket)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t ScoreboardPacket::ByteSizeLong(const MessageLite& base) {
+  const ScoreboardPacket& this_ = static_cast<const ScoreboardPacket&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t ScoreboardPacket::ByteSizeLong() const {
+  const ScoreboardPacket& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:Protocol.ScoreboardPacket)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // repeated .Protocol.Scoreboard scores = 2;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      total_size += 1UL * this_._internal_scores_size();
+      for (const auto& msg : this_._internal_scores()) {
+        total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+      }
+    }
+    // bytes roomId = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_roomid().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                        this_._internal_roomid());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void ScoreboardPacket::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<ScoreboardPacket*>(&to_msg);
+  auto& from = static_cast<const ScoreboardPacket&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:Protocol.ScoreboardPacket)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _this->_internal_mutable_scores()->InternalMergeFromWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), arena,
+          from._internal_scores());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_roomid().empty()) {
+        _this->_internal_set_roomid(from._internal_roomid());
+      } else {
+        if (_this->_impl_.roomid_.IsDefault()) {
+          _this->_internal_set_roomid("");
+        }
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void ScoreboardPacket::CopyFrom(const ScoreboardPacket& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:Protocol.ScoreboardPacket)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void ScoreboardPacket::InternalSwap(ScoreboardPacket* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  _impl_.scores_.InternalSwap(&other->_impl_.scores_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.roomid_, &other->_impl_.roomid_, arena);
+}
+
+::google::protobuf::Metadata ScoreboardPacket::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

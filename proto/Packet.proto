@@ -26,6 +26,7 @@ enum IngameType {
     Shoot = 3;
     Hit = 4;
     DebugLagComp = 5;
+    Score = 6;
 }
 
 enum MatchmakingType {
@@ -98,4 +99,16 @@ message DebugLagCompPacket {
     float dirY = 6;
     float dirZ = 7;
     repeated DebugLagCompTarget targets = 8;
+}
+
+message Scoreboard {
+  bytes playerId = 1;
+  int32 kill = 2;
+  int32 death = 3;
+  int32 heal = 4;
+}
+
+message ScoreboardPacket {
+  bytes roomId = 1;
+  repeated Scoreboard scores = 2;
 }
