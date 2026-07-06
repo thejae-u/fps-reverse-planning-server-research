@@ -14,7 +14,8 @@
 
 class IOManager;
 
-class App {
+class App
+{
 public:
     App();
     ~App();
