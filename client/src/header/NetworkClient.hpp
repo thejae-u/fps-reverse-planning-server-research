@@ -31,10 +31,12 @@ public:
     const std::string& GetSessionId() const { return _sessionId; }
     bool IsMatching() const { return _isMatching; }
     void SetMatching(bool matching) { _isMatching = matching; }
+    bool IsIngame() const { return _isIngame; }
+    void SetIngame(bool ingame) { _isIngame = ingame; }
 
     void SendMatchRequest();
     void Send(const std::string& message);
-    void SendIngamePacket(IngameType type, const std::string& data);
+    void SendIngamePacket(IngameType type, const std::string& data, uint64_t clientTick = 0);
     void SendUdpCorrect(const std::string& message, const std::string& host, uint16_t port);
     void SendUdpMalformed(const std::string& message, const std::string& host, uint16_t port, int errorType);
     void SendUdpHolePunching();
@@ -73,6 +75,7 @@ private:
 
     bool _connected = false;
     bool _isMatching = false;
+    bool _isIngame = false;
     std::string _roomId;
     std::string _sessionId;
     std::string _serverHost;

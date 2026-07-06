@@ -1,5 +1,7 @@
 #include "App.hpp"
 #include "IOManager.hpp"
+#include <cstdlib>
+#include <ctime>
 
 App::App() {}
 
@@ -42,6 +44,7 @@ bool App::Init()
     ImGui_ImplOpenGL3_Init("#version 330");
 
     _ioManager = IOManager::Create("ClientIO", 4, 4);
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
     return true;
 }
 
@@ -89,15 +92,25 @@ void App::RenderUI()
         ImGui::SameLine();
         if (ImGui::Button("Send Jump##All")) SendIngamePacketsFromAll(IngameType::Jump);
         ImGui::SameLine();
-        if (ImGui::Button("Send Shoot##All")) SendIngamePacketsFromAll(IngameType::Shoot);
+        if (ImGui::Button("Send Shoot##All")) SendIngamePacketsFromAll(IngameType::Shoot, (uint64_t)_targetTick);
         ImGui::SameLine();
         if (ImGui::Button("Send Hit##All")) SendIngamePacketsFromAll(IngameType::Hit);
+
+        ImGui::InputInt("Target Tick (Lag Comp)", &_targetTick);
 
         ImGui::Separator();
         ImGui::Checkbox("Auto-send Move (Stress)", &_autoSendIngame);
         if (_autoSendIngame)
         {
+            _autoSendRandom = false;
             ImGui::SliderFloat("Interval (sec)", &_autoSendInterval, 0.01f, 5.0f);
+        }
+
+        ImGui::Checkbox("Auto-send Random Packets (Shoot, Move, Jump)", &_autoSendRandom);
+        if (_autoSendRandom)
+        {
+            _autoSendIngame = false;
+            ImGui::SliderFloat("Interval (sec)##Random", &_autoSendInterval, 0.01f, 5.0f);
         }
         
         ImGui::TreePop();
@@ -162,7 +175,8 @@ void App::RenderUI()
 
                 ImGui::TableSetColumnIndex(2);
                 if (_testClients[i]->IsConnected()) {
-                    if (!_testClients[i]->GetRoomId().empty()) ImGui::Text("Matched");
+                    if (_testClients[i]->IsIngame()) ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Ingame");
+                    else if (!_testClients[i]->GetRoomId().empty()) ImGui::Text("Matched");
                     else if (_testClients[i]->IsMatching()) ImGui::Text("Matching...");
                     else ImGui::Text("Wait...");
                 } else { ImGui::Text("-"); }
@@ -198,20 +212,25 @@ void App::StartMatchmakingTest(int count)
 {
     StopMatchmakingTest();
 
-    std::lock_guard<std::mutex> lock(_testClientsMutex);
-    for(int i = 0; i < count; ++i)
-    {
-        auto client = std::make_shared<NetworkClient>(_ioManager);
-        client->SetMessageCallback([this, i](const std::string& msg) {
-            OnMessage("Test Client [" + std::to_string(i) + "] TCP: " + msg);
-        });
-        
-        client->Connect(_host, (uint16_t)_port);
-        
-        _testClients.push_back(client);
-    }
-
-    spdlog::info("Started matchmaking test with {} clients", count);
+    std::thread([this, count]() {
+        for(int i = 0; i < count; ++i)
+        {
+            auto client = std::make_shared<NetworkClient>(_ioManager);
+            client->SetMessageCallback([this, i](const std::string& msg) {
+                OnMessage("Test Client [" + std::to_string(i) + "] TCP: " + msg);
+            });
+            
+            client->Connect(_host, (uint16_t)_port);
+            
+            {
+                std::lock_guard<std::mutex> lock(_testClientsMutex);
+                _testClients.push_back(client);
+            }
+            
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        spdlog::info("Started matchmaking test with {} clients", count);
+    }).detach();
 }
 
 void App::StopMatchmakingTest()
@@ -258,7 +277,7 @@ void App::Shutdown()
     glfwTerminate();
 }
 
-void App::SendIngamePacketsFromAll(IngameType type)
+void App::SendIngamePacketsFromAll(IngameType type, uint64_t clientTick)
 {
     std::lock_guard<std::mutex> lock(_testClientsMutex);
     for (auto& client : _testClients)
@@ -268,18 +287,29 @@ void App::SendIngamePacketsFromAll(IngameType type)
             if (type == IngameType::Move)
             {
                 struct MoveData {
-                    std::int32_t dx = 1;
-                    std::int32_t dy = 0;
-                    std::int32_t dz = 0;
+                    float dx = 1.0f;
+                    float dy = 0.0f;
+                    float dz = 0.0f;
                     std::int32_t speed = 10;
                 } data;
                 std::string sendData(sizeof(MoveData), '\0');
                 std::memcpy(&sendData[0], &data, sizeof(MoveData));
-                client->SendIngamePacket(type, sendData);
+                client->SendIngamePacket(type, sendData, clientTick);
+            }
+            else if (type == IngameType::Shoot)
+            {
+                struct ShootData {
+                    float x = 1.0f;
+                    float y = 0.0f;
+                    float z = 0.0f;
+                } data;
+                std::string sendData(sizeof(ShootData), '\0');
+                std::memcpy(&sendData[0], &data, sizeof(ShootData));
+                client->SendIngamePacket(type, sendData, clientTick);
             }
             else
             {
-                client->SendIngamePacket(type, "TestClientPacket");
+                client->SendIngamePacket(type, "TestClientPacket", clientTick);
             }
         }
     }
@@ -287,13 +317,61 @@ void App::SendIngamePacketsFromAll(IngameType type)
 
 void App::UpdateAutoSend()
 {
-    if (!_autoSendIngame)
+    if (!_autoSendIngame && !_autoSendRandom)
         return;
 
     double currentTime = glfwGetTime();
     if (currentTime - _lastAutoSendTime >= _autoSendInterval)
     {
-        SendIngamePacketsFromAll(IngameType::Move);
+        if (_autoSendIngame)
+        {
+            SendIngamePacketsFromAll(IngameType::Move);
+        }
+        else if (_autoSendRandom)
+        {
+            std::lock_guard<std::mutex> lock(_testClientsMutex);
+            for (auto& client : _testClients)
+            {
+                if (client->IsConnected() && client->IsIngame())
+                {
+                    int packetType = rand() % 3; // 0: Move, 1: Jump, 2: Shoot
+                    if (packetType == 0)
+                    {
+                        struct MoveData {
+                            float dx = 0.0f;
+                            float dy = 0.0f;
+                            float dz = 0.0f;
+                            std::int32_t speed = 10;
+                        } data;
+                        data.dx = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f;
+                        data.dz = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f;
+                        data.speed = rand() % 15 + 5; // 5 to 20
+
+                        std::string sendData(sizeof(MoveData), '\0');
+                        std::memcpy(&sendData[0], &data, sizeof(MoveData));
+                        client->SendIngamePacket(IngameType::Move, sendData);
+                    }
+                    else if (packetType == 1)
+                    {
+                        client->SendIngamePacket(IngameType::Jump, "");
+                    }
+                    else if (packetType == 2)
+                    {
+                        struct ShootData {
+                            float x = 0.0f;
+                            float y = 0.0f;
+                            float z = 1.0f;
+                        } data;
+                        data.x = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f;
+                        data.z = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f;
+
+                        std::string sendData(sizeof(ShootData), '\0');
+                        std::memcpy(&sendData[0], &data, sizeof(ShootData));
+                        client->SendIngamePacket(IngameType::Shoot, sendData, (uint64_t)_targetTick);
+                    }
+                }
+            }
+        }
         _lastAutoSendTime = currentTime;
     }
 }

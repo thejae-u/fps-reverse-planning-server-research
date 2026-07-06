@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -28,7 +28,7 @@ private:
     void OnMessage(const std::string& message);
     void StartMatchmakingTest(int count);
     void StopMatchmakingTest();
-    void SendIngamePacketsFromAll(IngameType type);
+    void SendIngamePacketsFromAll(IngameType type, uint64_t clientTick = 0);
     void UpdateAutoSend();
 
     GLFWwindow* _window = nullptr;
@@ -42,6 +42,7 @@ private:
     int _udpPort = 52801;
     int _testClientCount = 10;
     int _udpPacketSize = 64;
+    int _targetTick = 0;
 
     char _messageToSend[256] = "Test Message";
     char _udpMessageToSend[256] = "UDP Test Message";
@@ -49,6 +50,7 @@ private:
     std::mutex _messagesMutex;
     bool _useUdpForTest = false;
     bool _autoSendIngame = false;
+    bool _autoSendRandom = false;
     float _autoSendInterval = 1.0f;
     double _lastAutoSendTime = 0.0;
 };

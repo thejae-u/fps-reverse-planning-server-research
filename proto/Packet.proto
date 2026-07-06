@@ -25,6 +25,7 @@ enum IngameType {
     Jump = 2;
     Shoot = 3;
     Hit = 4;
+    DebugLagComp = 5;
 }
 
 enum MatchmakingType {
@@ -75,4 +76,26 @@ message HitPacket {
     int32 deaths = 4;
     bool isDead = 5;
     int32 damage = 6;
+}
+
+message DebugLagCompTarget {
+    bytes targetId = 1;
+    float presentX = 2;
+    float presentY = 3;
+    float presentZ = 4;
+    float rewoundX = 5;
+    float rewoundY = 6;
+    float rewoundZ = 7;
+    bool isHit = 8;
+}
+
+message DebugLagCompPacket {
+    bytes shooterId = 1;
+    float originX = 2;
+    float originY = 3;
+    float originZ = 4;
+    float dirX = 5;
+    float dirY = 6;
+    float dirZ = 7;
+    repeated DebugLagCompTarget targets = 8;
 }

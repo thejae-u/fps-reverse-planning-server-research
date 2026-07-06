@@ -1,4 +1,4 @@
-﻿#include "NetworkClient.hpp"
+#include "NetworkClient.hpp"
 #include "IOManager.hpp"
 
 NetworkClient::NetworkClient(std::shared_ptr<IOManager> ioManager)
@@ -82,6 +82,7 @@ void NetworkClient::Disconnect()
 {
     _connected = false;
     _isMatching = false;
+    _isIngame = false;
     _roomId.clear();
     _sessionId.clear();
     _serverUdpPort = 0;
@@ -95,6 +96,8 @@ void NetworkClient::Disconnect()
     std::error_code ec;
     if (_socket->is_open())
         _socket->close(ec);
+    if (_udpSocket.is_open())
+        _udpSocket.close(ec);
 
     // Re-initialize sockets using member functions
     _socket = std::make_shared<asio::ip::tcp::socket>(_ioManager->GetIoContext());
@@ -254,7 +257,7 @@ void NetworkClient::Send(const std::string& message)
     }
 }
 
-void NetworkClient::SendIngamePacket(IngameType type, const std::string& data)
+void NetworkClient::SendIngamePacket(IngameType type, const std::string& data, uint64_t clientTick)
 {
     if (!_connected || _roomId.empty() || _sessionId.empty())
     {
@@ -268,6 +271,7 @@ void NetworkClient::SendIngamePacket(IngameType type, const std::string& data)
         ingame.set_sessionid(_sessionId);
         ingame.set_method(type);
         ingame.set_data(data);
+        ingame.set_clienttick(clientTick);
 
         std::string ingameData;
         if (!ingame.SerializeToString(&ingameData)) return;
@@ -393,6 +397,7 @@ void NetworkClient::AsyncRead()
                                 {
                                     _roomId = match.roomid();
                                     _isMatching = false;
+                                    _isIngame = true;
                                     AddLog("Matchmaking Success! Room: " + _roomId);
                                 }
                                 else if (match.type() == MatchmakingType::Failed)
@@ -464,6 +469,7 @@ void NetworkClient::AsyncReadUdp()
                                 case IngameType::Jump: typeStr = "Jump"; break;
                                 case IngameType::Shoot: typeStr = "Shoot"; break;
                                 case IngameType::Hit: typeStr = "Hit"; break;
+                                case IngameType::DebugLagComp: typeStr = "DebugLagComp"; break;
                                 default: typeStr = "Unknown"; break;
                                 }
                                 
