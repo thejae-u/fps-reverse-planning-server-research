@@ -56,7 +56,7 @@ public:
 
     bool IsValid() const { return _isValid; }
 
-    void SetRoom(uuids::uuid roomId);
+    void SetRoom(const uuids::uuid& roomId);
 
     uuids::uuid GetId() const { return _id; }
     uuids::uuid GetRoomId() const { return _roomId; }
