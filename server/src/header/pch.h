@@ -23,3 +23,8 @@
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
 #include <uuid.h>
+
+// 3. Custom Headers
+#include "Packet.pb.h"
+#include "Internal.pb.h"
+#include "CustomUtility.hpp"
