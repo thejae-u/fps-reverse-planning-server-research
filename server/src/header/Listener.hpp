@@ -85,6 +85,7 @@ private:
     std::mutex _sessionsMutex;
 
     std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _payloadQueue;
+    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _noLockPayloadQueue;
     std::mutex _payloadQueueMutex;
     std::atomic<bool> _isSending{ false };
 };
