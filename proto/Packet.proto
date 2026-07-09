@@ -3,102 +3,112 @@ syntax = "proto3";
 package Protocol;
 
 enum PacketType {
-    // status response
-    PacketOk = 0;
-    InvalidData = 1;
-    ErrorOccured = 2;
+  // status response
+  PacketOk = 0;
+  InvalidData = 1;
+  ErrorOccured = 2;
 
-    // Tcp
-    PortHandshake = 100;
-    InfoHandshake = 101;
-    Ping = 102;
-    Match = 103;
+  // Tcp
+  PortHandshake = 100;
+  InfoHandshake = 101;
+  Ping = 102;
+  Match = 103;
 
-    // Udp
-    Ingame = 200;
-    Authentication = 201;
+  // Udp
+  Ingame = 200;
+  Authentication = 201;
 }
 
 enum IngameType {
-    IngameOk = 0;
-    Move = 1;
-    Jump = 2;
-    Shoot = 3;
-    Hit = 4;
-    DebugLagComp = 5;
-    Score = 6;
+  IngameOk = 0;
+  Move = 1;
+  Jump = 2;
+  Shoot = 3;
+  Hit = 4;
+  DebugLagComp = 5;
+  Score = 6;
 }
 
 enum MatchmakingType {
-    MatchmakingOk = 0;
-    Request = 1;
-    Success = 2;
-    Failed = 3;
+  MatchmakingOk = 0;
+  Request = 1;
+  Success = 2;
+  Failed = 3;
 
-    Waiting = 4;
-    Matched = 5; 
+  Waiting = 4;
+  Matched = 5;
 }
 
 enum AuthenticationType {
-    AuthenticationOk = 0;
-    UdpHolePunching = 1;
+  AuthenticationOk = 0;
+  UdpHolePunching = 1;
 }
 
 message Packet {
-    PacketType type = 1;
-    bytes data = 2;
+  PacketType type = 1;
+  bytes data = 2;
 }
 
 message Matchmaking {
-    MatchmakingType type = 1;
-    bytes sessionId = 2;
-    optional bytes roomId = 3;
+  MatchmakingType type = 1;
+  bytes sessionId = 2;
+  optional bytes roomId = 3;
 }
 
 message IngamePacket {
-   bytes sessionId = 1;
-   bytes roomId = 2; 
-   IngameType method = 3;
-   bytes data = 4;
-   uint64 clientTick = 5;
-} 
+  bytes sessionId = 1;
+  bytes roomId = 2;
+  IngameType method = 3;
+  bytes data = 4;
+  uint64 clientTick = 5;
+}
 
 message AuthenticationPacket {
-    bytes sessionId = 1;
-    bytes roomId = 2;
-    AuthenticationType method = 3;
-    bytes data = 4;
+  bytes sessionId = 1;
+  bytes roomId = 2;
+  AuthenticationType method = 3;
+  bytes data = 4;
 }
 
 message HitPacket {
-    bytes hitPlayerId = 1;
-    bytes shooterId = 2;
-    int32 currentHp = 3;
-    int32 deaths = 4;
-    bool isDead = 5;
-    int32 damage = 6;
+  bytes hitPlayerId = 1;
+  bytes shooterId = 2;
+  int32 currentHp = 3;
+  int32 deaths = 4;
+  bool isDead = 5;
+  int32 damage = 6;
 }
 
 message DebugLagCompTarget {
-    bytes targetId = 1;
-    float presentX = 2;
-    float presentY = 3;
-    float presentZ = 4;
-    float rewoundX = 5;
-    float rewoundY = 6;
-    float rewoundZ = 7;
-    bool isHit = 8;
+  bytes targetId = 1;
+  float presentX = 2;
+  float presentY = 3;
+  float presentZ = 4;
+  float rewoundX = 5;
+  float rewoundY = 6;
+  float rewoundZ = 7;
+  bool isHit = 8;
 }
 
 message DebugLagCompPacket {
-    bytes shooterId = 1;
-    float originX = 2;
-    float originY = 3;
-    float originZ = 4;
-    float dirX = 5;
-    float dirY = 6;
-    float dirZ = 7;
-    repeated DebugLagCompTarget targets = 8;
+  bytes shooterId = 1;
+  float originX = 2;
+  float originY = 3;
+  float originZ = 4;
+  float dirX = 5;
+  float dirY = 6;
+  float dirZ = 7;
+  repeated DebugLagCompTarget targets = 8;
+}
+
+message MovePacket {
+  bytes playerId = 1;
+  float originX = 2;
+  float originY = 3;
+  float originZ = 4;
+  float dirX = 5;
+  float dirY = 6;
+  float dirZ = 7;
 }
 
 message Scoreboard {

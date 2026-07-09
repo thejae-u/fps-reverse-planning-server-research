@@ -36,8 +36,11 @@ SERVER_SOURCE="../server/src/sources"
 CLIENT_HEADER="../client/src/header"
 CLIENT_SOURCE="../client/src/sources"
 
+# Unity Client path
+UNITY_CSHARP="../UnityFpsClient/Assets/Scripts/Protobuf"
+
 # Ensure directories exist
-mkdir -p "$SERVER_HEADER" "$SERVER_SOURCE" "$CLIENT_HEADER" "$CLIENT_SOURCE"
+mkdir -p "$SERVER_HEADER" "$SERVER_SOURCE" "$CLIENT_HEADER" "$CLIENT_SOURCE" "$UNITY_CSHARP"
 
 # Find proto files
 PROTO_FILES=(*.proto)
@@ -71,7 +74,12 @@ for proto in "${PROTO_FILES[@]}"; do
   # Move .pb.cc to sources
   find "$CLIENT_HEADER" -name "*.pb.cc" -exec mv {} "$CLIENT_SOURCE/" \;
   
-  echo "Generated headers and sources from $proto"
+  # Generate for Unity Client (C#)
+  "$VCPKG_PROTOC" --proto_path="$PROTO_SRC" \
+         --csharp_out="$UNITY_CSHARP" \
+         "$proto"
+  
+  echo "Generated headers, sources and C# files from $proto"
 done
 
 echo "All proto files generated!"
