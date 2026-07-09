@@ -7,7 +7,7 @@
 bool Matching::AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> weakSession, MatchingLastError& type)
 {
     std::lock_guard<std::mutex> queueLock(_waitingQueueMutex);
-    if(_weakSessions.find(waitSessionId) != _weakSessions.end())
+    if(_weakSessions.contains(waitSessionId))
     {
         spdlog::warn("matching: session {} already in waiting queue", uuids::to_string(waitSessionId));
         type = MatchingLastError::FailedByExsists;
@@ -19,17 +19,17 @@ bool Matching::AddWaitSession(uuids::uuid waitSessionId, std::weak_ptr<Session> 
 
     spdlog::info("matching: waiting queue is added {}", uuids::to_string(waitSessionId));
 
-    if(auto session = weakSession.lock())
+    if(const auto session = weakSession.lock())
     {
-        auto handle = session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::weak_ptr<Session>& weakRemoveSession) {
-            if(auto self = weakSelf.lock())
+        const auto handle = session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::weak_ptr<Session>& weakRemoveSession) {
+            if(const auto self = weakSelf.lock())
                 self->RemoveSession(weakRemoveSession);
         });
 
         _sessionCallbackHandles[waitSessionId] = handle;
 
         _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
-            if(auto self = weakSelf.lock())
+            if(const auto self = weakSelf.lock())
                 self->TryMatch();
         });
     }
@@ -53,7 +53,7 @@ void Matching::Stop()
     while(!_waitingQueue.empty())
     {
         auto [id, weakSession] = _waitingQueue.front();
-        if(auto session = weakSession.lock())
+        if(const auto session = weakSession.lock())
             session->Stop();
 
         _waitingQueue.pop_front();
@@ -90,7 +90,7 @@ void Matching::TryMatch()
         }
         auto newRoom = Room::Create(_ioManager, _sessionManager, roomId);
         newRoom->SetRemoveRoomCallback([weakSelf = weak_from_this()](const std::shared_ptr<Room>& removeRoom) {
-            if(auto self = weakSelf.lock())
+            if(const auto self = weakSelf.lock())
                 self->RemoveRoom(removeRoom);
         });
 
@@ -100,7 +100,7 @@ void Matching::TryMatch()
             auto nextSession = _waitingQueue.front();
             _waitingQueue.pop_front();
             matchedSessions.push(nextSession);
-            _weakSessions.erase(nextSession.first);
+            _weakSessions.erase(nextSession.first); // remove from waiting session info map
         }
 
         // Room Initialize
@@ -114,9 +114,9 @@ void Matching::TryMatch()
             auto [nextSessionId, weakNextSession] = matchedSessions.front();
             matchedSessions.pop();
 
-            if(auto nextSession = weakNextSession.lock())
+            if(const auto nextSession = weakNextSession.lock())
             {
-                nextSession->SetRoom(newRoom->GetId());
+                nextSession->SetRoom(newRoom->GetId()); // Matched Packet send
                 newRoom->AddSession(nextSessionId, weakNextSession);
                 nextSession->RemoveDisconnectCallback(_sessionCallbackHandles[nextSessionId]);
                 _sessionCallbackHandles.erase(nextSessionId);
@@ -141,21 +141,21 @@ void Matching::SetRemoveRoomCallback(RoomCallback handler)
 void Matching::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
 {
     std::lock_guard<std::mutex> waitingQueueLock(_waitingQueueMutex);
-    if(auto removeSession = weakRemoveSession.lock())
+    if(const auto removeSession = weakRemoveSession.lock())
     {
         auto removeId = removeSession->GetId();
-        if(_weakSessions.find(removeId) == _weakSessions.end())
+        if(!_weakSessions.contains(removeId))
         {
             spdlog::error("matching: invalid access session {}", uuids::to_string(removeId));
             return;
         }
 
-        auto it = std::find_if(_waitingQueue.begin(), _waitingQueue.end(), [removeId](const auto& p) { return p.first == removeId; });
+        const auto it = std::ranges::find_if(_waitingQueue, [removeId](const auto& p) { return p.first == removeId; });
         if(it == _waitingQueue.end())
             return;
 
-        _waitingQueue.erase(it);                 // remove from queue
-        _weakSessions.erase(removeId);           // remove from session map
+        _waitingQueue.erase(it); // remove from queue
+        _weakSessions.erase(removeId); // remove from session map
         _sessionCallbackHandles.erase(removeId); // remove from session callback handle
         spdlog::info("matching: removed session {} from waiting queue", uuids::to_string(removeId));
     }
@@ -165,7 +165,7 @@ void Matching::RemoveRoom(std::shared_ptr<Room> removeRoom)
 {
     std::lock_guard<std::mutex> activeRoomLock(_activeRoomsMutex);
     auto removeId = removeRoom->GetId();
-    auto it = std::find_if(_activeRooms.begin(), _activeRooms.end(), [removeId](const auto& p) { return p.first == removeId; });
+    const auto it = std::ranges::find_if(_activeRooms, [removeId](const auto& p) { return p.first == removeId; });
 
     if(it == _activeRooms.end())
     {

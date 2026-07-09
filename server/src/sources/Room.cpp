@@ -46,11 +46,11 @@ void Room::Stop()
 void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    if(auto session = weakSession.lock())
+    if(const auto session = weakSession.lock())
     {
         _sessions.insert({ sessionId, weakSession });
         session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::weak_ptr<Session>& removeSession) {
-            if(auto self = weakSelf.lock())
+            if(const auto self = weakSelf.lock())
                 self->RemoveSession(removeSession);
         });
     }
@@ -59,9 +59,8 @@ void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
 void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    if(auto removeSession = weakRemoveSession.lock())
+    if(const auto removeSession = weakRemoveSession.lock())
     {
-        // 수정 부분: 삭제된 세션이 없으면(이미 정리되었거나 존재하지 않는 세션이면) 조기 리턴
         if (_sessions.erase(removeSession->GetId()) == 0)
         {
             return;
@@ -73,7 +72,6 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
             return;
 
         spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
-        // MODIFIED: Added null check for safety when handler is not registered (e.g., during tests)
         if (_removeRoomFromMatchingHandler)
         {
             _removeRoomFromMatchingHandler(shared_from_this());
@@ -83,9 +81,9 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
 
 void Room::Broadcast(std::shared_ptr<Packet> packet)
 {
-    for(auto& [id, weakSession] : _sessions)
+    for(const auto& [id, weakSession] : _sessions)
     {
-        if(auto session = weakSession.lock())
+        if(const auto session = weakSession.lock())
         {
             if(!session->IsValid())
                 continue;
@@ -94,7 +92,7 @@ void Room::Broadcast(std::shared_ptr<Packet> packet)
     }
 }
 
-void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet)
+void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet) const
 {
     _world->EnqueuePacket(packet);
 }

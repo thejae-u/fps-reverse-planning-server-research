@@ -40,7 +40,7 @@ public:
     void AddSession(uuids::uuid sessionId, std::weak_ptr<Session> session);
     void RemoveSession(std::weak_ptr<Session> removeSession);
     void Broadcast(std::shared_ptr<Packet> packet);
-    void EnqueuePacket(std::shared_ptr<IngamePacket> packet);
+    void EnqueuePacket(std::shared_ptr<IngamePacket> packet) const;
 
     uuids::uuid GetId() const
     {

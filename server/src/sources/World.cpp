@@ -9,16 +9,16 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
     _playerSize = sessions.size();
 
     int index = 0;
-    for(const auto [id, session] : sessions)
+    for(const auto& [id, session] : sessions)
     {
         auto newPlayer = std::make_unique<Player>();
-        newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f);
+        newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f); // 임시 위치 지정
         _players.insert({ id, std::move(newPlayer) });
         _sessions.insert({ id, session });
         index++;
-    }
 
-    // some init logics: team division, role assignment
+        // some init logics: team division, role assignment
+    }
 
     spdlog::info("world(room id) {}: created", uuids::to_string(_roomId));
 }
@@ -340,10 +340,21 @@ void World::Update()
             ingamePacket->set_method(Protocol::IngameType::Move);
             ingamePacket->set_clienttick(_tickCount.load());
 
-            // Serialize Vector3 position to bytes data
-            std::string posData(sizeof(Vector3), '\0');
-            std::memcpy(&posData[0], &player->position, sizeof(Vector3));
-            ingamePacket->set_data(posData);
+            // Serialize MovePacket to bytes data
+            Protocol::MovePacket movePacket;
+            movePacket.set_playerid(uuids::to_string(id));
+            movePacket.set_originx(player->position.x);
+            movePacket.set_originy(player->position.y);
+            movePacket.set_originz(player->position.z);
+            movePacket.set_dirx(player->velocity.x);
+            movePacket.set_diry(player->velocity.y);
+            movePacket.set_dirz(player->velocity.z);
+
+            std::string serializedMove;
+            if(movePacket.SerializeToString(&serializedMove))
+            {
+                ingamePacket->set_data(serializedMove);
+            }
 
             std::string sendBuffer;
             if(ingamePacket->SerializeToString(&sendBuffer))
@@ -389,15 +400,65 @@ void World::ProcessQueue()
         switch(packet->method())
         {
         case Protocol::IngameType::Move: {
-            if(packet->data().size() >= sizeof(std::int32_t) * 4)
+            Protocol::MovePacket movePacket;
+            if(movePacket.ParseFromString(packet->data()))
             {
-                Vector3 direction;
-                std::int32_t speed;
-                std::memcpy(&direction.x, packet->data().data(), sizeof(std::int32_t));
-                std::memcpy(&direction.y, packet->data().data() + sizeof(std::int32_t), sizeof(std::int32_t));
-                std::memcpy(&direction.z, packet->data().data() + sizeof(std::int32_t) * 2, sizeof(std::int32_t));
-                std::memcpy(&speed, packet->data().data() + sizeof(std::int32_t) * 3, sizeof(std::int32_t));
-                Move(playerId, direction, speed);
+                Vector3 origin(movePacket.originx(), movePacket.originy(), movePacket.originz());
+                Vector3 direction(movePacket.dirx(), movePacket.diry(), movePacket.dirz());
+
+                // 서버 틱 기준 dt (16.6ms at 60fps)
+                constexpr float div = 1'000'000.0f;
+                const float dt = static_cast<float>(_tickInterval.count()) / div;
+                
+                bool isValid = true;
+                
+                {
+                    std::lock_guard playerLock(_playerMutex);
+                    if(_players.contains(playerId) && _players[playerId])
+                    {
+                        auto& player = _players[playerId];
+                        
+                        // 이론 최대 이동 거리 계산
+                        float maxSpeed = BASE_MOVE_SPEED;
+                        float theoreticalDist = maxSpeed * dt;
+                        
+                        float tolerance = 2.0f; // 레이턴시 극복용 완충 거리
+                        float maxAllowedDist = theoreticalDist + tolerance;
+                        
+                        // 서버 위치와 클라이언트 신규 위치 간 실제 거리 측정
+                        float dx = player->position.x - origin.x;
+                        float dy = player->position.y - origin.y;
+                        float dz = player->position.z - origin.z;
+                        float actualDist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                        
+                        // 차이가 허용된 수치를 넘음
+                        if(actualDist > maxAllowedDist)
+                        {
+                            isValid = false;
+                            spdlog::warn("world(room id){}: player {} teleport suspected. Dist: {}m, Allowed: {}m",
+                                uuids::to_string(playerId), actualDist, maxAllowedDist);
+                        }
+                        else
+                        {
+                            player->position = origin;
+                        }
+                    }
+                }
+                
+                if(isValid)
+                {
+                    float magnitude = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+                    Vector3 normDirection(0.0f, 0.0f, 0.0f);
+
+                    if(magnitude > 0.0001f)
+                    {
+                        normDirection.x = direction.x / magnitude;
+                        normDirection.y = direction.y / magnitude;
+                        normDirection.z = direction.z / magnitude;
+                    }
+
+                    Move(playerId, normDirection, static_cast<std::int32_t>(BASE_MOVE_SPEED));
+                }
             }
             break;
         }

@@ -115,17 +115,28 @@ int RunWorldUpdateTest()
                     ingamePacket->set_method(Protocol::IngameType::Move);
 
                     // Strafe back and forth along the Z axis
-                    struct MoveData {
-                        Vector3 direction;
-                        std::int32_t speed;
-                    } data;
+                    Vector3 shooterPos(0.0f, 0.0f, 0.0f);
+                    room->GetWorld()->GetPlayerPosition(sessionId, shooterPos);
+
                     float zDir = std::sin(static_cast<float>(loopCount) * 0.05f);
-                    data.direction = Vector3(0.0f, 0.0f, zDir);
-                    data.speed = 2;
-                    
-                    std::string moveData(sizeof(MoveData), '\0');
-                    std::memcpy(&moveData[0], &data, sizeof(MoveData));
-                    ingamePacket->set_data(moveData);
+                    Vector3 direction(0.0f, 0.0f, zDir);
+                    float speed = 2.0f;
+                    Vector3 velocity = direction * speed;
+
+                    Protocol::MovePacket movePacket;
+                    movePacket.set_playerid(uuids::to_string(sessionId));
+                    movePacket.set_originx(shooterPos.x);
+                    movePacket.set_originy(shooterPos.y);
+                    movePacket.set_originz(shooterPos.z);
+                    movePacket.set_dirx(velocity.x);
+                    movePacket.set_diry(velocity.y);
+                    movePacket.set_dirz(velocity.z);
+
+                    std::string serializedMove;
+                    if(movePacket.SerializeToString(&serializedMove))
+                    {
+                        ingamePacket->set_data(serializedMove);
+                    }
                 }
 
                 // 수정 부분: 패킷 직렬화 및 역직렬화 전 과정 테스트 시뮬레이션

@@ -19,6 +19,7 @@ class Room;
 constexpr float GRAVITY = 9.8f;
 constexpr float DELTA_TIME = 0.05f;
 constexpr float JUMP_SPEED = 5.0f;
+constexpr float BASE_MOVE_SPEED = 10.0f;
 
 class World
 {
