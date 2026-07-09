@@ -435,8 +435,8 @@ void World::ProcessQueue()
                         if(actualDist > maxAllowedDist)
                         {
                             isValid = false;
-                            spdlog::warn("world(room id){}: player {} teleport suspected. Dist: {}m, Allowed: {}m",
-                                uuids::to_string(playerId), actualDist, maxAllowedDist);
+                            spdlog::warn("world(room id) {}: player {} teleport suspected. Dist: {}m, Allowed: {}m",
+                                uuids::to_string(_roomId), uuids::to_string(playerId), actualDist, maxAllowedDist);
                         }
                         else
                         {

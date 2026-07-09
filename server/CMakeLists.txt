@@ -22,6 +22,7 @@ target_precompile_headers(main PRIVATE
 target_include_directories(main
     PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/header  # 루트 기준 절대경로
+        ${CMAKE_CURRENT_BINARY_DIR}            # 동적 생성 헤더 경로
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/sources  # 소스 내부 헤더용
 )
@@ -36,6 +37,15 @@ find_package(protobuf CONFIG REQUIRED)
 find_package(asio CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(stduuid CONFIG REQUIRED)
+
+# Protobuf 동적 소스코드 생성 설정
+protobuf_generate(
+    TARGET main
+    LANGUAGE cpp
+    IMPORT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../proto"
+    PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/../proto/Packet.proto"
+           "${CMAKE_CURRENT_SOURCE_DIR}/../proto/Internal.proto"
+)
 
 add_definitions(-DUUID_SYSTEM_GENERATOR)
 
