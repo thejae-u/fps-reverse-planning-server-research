@@ -1,8 +1,18 @@
-﻿#include "Room.hpp"
+#include "Room.hpp"
 
 #include "IOManager.hpp"
 #include "SessionManager.hpp"
 #include "Session.hpp"
+
+Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
+: _ioManager(ioManager), _sessionManager(sessionManager), _roomId(roomId), _world(std::make_unique<World>(ioManager->GetIoContext(), roomId))
+{
+}
+
+Room::~Room()
+{
+    spdlog::info("room {} destroyed", uuids::to_string(_roomId));
+}
 
 void Room::WorldInit()
 {
@@ -15,10 +25,7 @@ void Room::WorldInit()
     _world->Init(_sessions);
     spdlog::info("room {}: world create complete", uuids::to_string(_roomId));
 
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
-        if(auto self = weakSelf.lock())
-            self->DequeuePacketAsync();
-    });
+    _world->StartUpdate(weak_from_this());
 }
 
 void Room::Stop()
@@ -27,6 +34,8 @@ void Room::Stop()
         _removeRoomFromMatchingHandler(shared_from_this());
 
     _removeRoomFromMatchingHandler = nullptr;
+
+    _world->StopUpdate();
 
     if(!_sessions.empty())
     {
@@ -37,11 +46,11 @@ void Room::Stop()
 void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    if(auto session = weakSession.lock())
+    if(const auto session = weakSession.lock())
     {
         _sessions.insert({ sessionId, weakSession });
         session->AddDisconnectCallback([weakSelf = weak_from_this()](const std::weak_ptr<Session>& removeSession) {
-            if(auto self = weakSelf.lock())
+            if(const auto self = weakSelf.lock())
                 self->RemoveSession(removeSession);
         });
     }
@@ -50,75 +59,42 @@ void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
 void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
 {
     std::lock_guard<std::mutex> lock(_sessionsMutex);
-    if(auto removeSession = weakRemoveSession.lock())
+    if(const auto removeSession = weakRemoveSession.lock())
     {
-        spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
-        _sessions.erase(removeSession->GetId());
+        if (_sessions.erase(removeSession->GetId()) == 0)
+        {
+            return;
+        }
+
+        spdlog::info("room {}: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
 
         if(!_sessions.empty())
             return;
 
         spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
-        _removeRoomFromMatchingHandler(shared_from_this());
+        if (_removeRoomFromMatchingHandler)
+        {
+            _removeRoomFromMatchingHandler(shared_from_this());
+        }
     }
 }
 
 void Room::Broadcast(std::shared_ptr<Packet> packet)
 {
-    for(auto& [id, weakSession] : _sessions)
+    for(const auto& [id, weakSession] : _sessions)
     {
-        if(auto session = weakSession.lock())
+        if(const auto session = weakSession.lock())
         {
             if(!session->IsValid())
                 continue;
             session->EnqueueUdpSendPacket(packet);
-            spdlog::info("room: session {} send", uuids::to_string(session->GetId()));
         }
     }
 }
 
-void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet)
+void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet) const
 {
-    std::lock_guard<std::mutex> packetQueueLock(_packetQueueMutex);
-    _sendPacketQueue.push(packet);
-
-    _packetQueueCv.notify_one();
-}
-
-void Room::DequeuePacketAsync()
-{
-    std::unique_lock<std::mutex> packetQueueLock(_packetQueueMutex);
-    _packetQueueCv.wait(packetQueueLock, [&] {
-        return !_sendPacketQueue.empty();
-    });
-
-    if(!_isRunning)
-        return;
-
-
-    auto packet = _sendPacketQueue.front();
-    _sendPacketQueue.pop();
-
-    // valid packet logic (todo)
-
-    std::size_t packetSize = packet->ByteSizeLong();
-    std::string sendBuffer;
-    if(packet->SerializeToString(&sendBuffer))
-    {
-        auto sendPacket = std::make_shared<Packet>();
-        sendPacket->set_type(PacketType::Ingame);
-        sendPacket->set_data(sendBuffer);
-        Broadcast(std::move(sendPacket));
-    }
-    else
-    {
-        spdlog::error("room {}: serialize error", uuids::to_string(_roomId));
-    }
-
-    _ioManager->PostOnBlockingPool([weakSelf = weak_from_this()]() {
-        if(auto self = weakSelf.lock())
-            self->DequeuePacketAsync();
-    });
+    _world->EnqueuePacket(packet);
 }
 
 void Room::SetRemoveRoomCallback(RemoveRoomCallback handler)

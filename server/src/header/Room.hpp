@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <queue>
 #include <functional>
@@ -25,12 +25,8 @@ private:
     struct SecretKey {};
 
 public:
-    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
-    : _ioManager(ioManager), _sessionManager(sessionManager), _roomId(roomId), _world(std::make_unique<World>(roomId)) {}
-    ~Room()
-    {
-        spdlog::info("room {} destroyed", uuids::to_string(_roomId));
-    }
+    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId);
+    ~Room();
 
     static auto Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
     {
@@ -44,8 +40,7 @@ public:
     void AddSession(uuids::uuid sessionId, std::weak_ptr<Session> session);
     void RemoveSession(std::weak_ptr<Session> removeSession);
     void Broadcast(std::shared_ptr<Packet> packet);
-    void EnqueuePacket(std::shared_ptr<IngamePacket> packet);
-    void DequeuePacketAsync();
+    void EnqueuePacket(std::shared_ptr<IngamePacket> packet) const;
 
     uuids::uuid GetId() const
     {
@@ -55,11 +50,12 @@ public:
     using RemoveRoomCallback = std::function<void(const std::shared_ptr<Room>&)>;
     void SetRemoveRoomCallback(RemoveRoomCallback handler);
 
+    World* GetWorld() const { return _world.get(); }
+
 private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<SessionManager> _sessionManager;
     uuids::uuid _roomId;
-    std::atomic<bool> _isRunning;
 
     std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
     std::mutex _sessionsMutex;
@@ -68,9 +64,4 @@ private:
 
     // World information
     std::unique_ptr<World> _world;
-
-private:
-    std::queue<std::shared_ptr<IngamePacket>> _sendPacketQueue;
-    std::mutex _packetQueueMutex;
-    std::condition_variable _packetQueueCv;
 };

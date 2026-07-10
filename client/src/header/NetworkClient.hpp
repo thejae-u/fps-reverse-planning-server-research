@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include <asio.hpp>
 #include <deque>
+#include <queue>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -11,6 +12,9 @@
 
 #include "Packet.pb.h"
 
+#include <unordered_map>
+#include <chrono>
+
 class IOManager;
 
 using namespace Protocol;
@@ -18,6 +22,26 @@ using namespace Protocol;
 class NetworkClient : public std::enable_shared_from_this<NetworkClient>
 {
 public:
+    struct PlayerState
+    {
+        std::string id;
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+        int hp = 100;
+        int kills = 0;
+        int deaths = 0;
+        std::chrono::steady_clock::time_point lastUpdate;
+
+        bool isShooting = false;
+        std::chrono::steady_clock::time_point shootTime;
+        float shootOrigin[3] = { 0.0f, 0.0f, 0.0f };
+        float shootDir[3] = { 0.0f, 0.0f, 1.0f };
+
+        bool isHit = false;
+        std::chrono::steady_clock::time_point hitTime;
+    };
+
     NetworkClient(std::shared_ptr<IOManager> ioManager);
     ~NetworkClient();
 
@@ -30,15 +54,22 @@ public:
     const std::string& GetSessionId() const { return _sessionId; }
     bool IsMatching() const { return _isMatching; }
     void SetMatching(bool matching) { _isMatching = matching; }
+    bool IsIngame() const { return _isIngame; }
+    void SetIngame(bool ingame) { _isIngame = ingame; }
+    uint64_t GetLastServerTick() const { return _lastServerTick; }
 
     void SendMatchRequest();
     void Send(const std::string& message);
-    void SendIngamePacket(IngameType type, const std::string& data);
+    void SendIngamePacket(IngameType type, const std::string& data, uint64_t clientTick = 0);
     void SendUdpCorrect(const std::string& message, const std::string& host, uint16_t port);
     void SendUdpMalformed(const std::string& message, const std::string& host, uint16_t port, int errorType);
     void SendUdpHolePunching();
 
-    struct LogMessage {
+    std::vector<PlayerState> GetRoomPlayers() const;
+    void ClearRoomPlayers();
+
+    struct LogMessage
+    {
         std::string text;
         spdlog::level::level_enum level;
     };
@@ -52,6 +83,8 @@ public:
     using MessageCallback = std::function<void(const std::string&)>;
     void SetMessageCallback(MessageCallback callback);
     void SetUdpMessageCallback(MessageCallback callback);
+    
+    std::unordered_map<std::string, Scoreboard> GetScores();
 
 private:
     void AddLog(const std::string& msg, spdlog::level::level_enum level = spdlog::level::info);
@@ -72,6 +105,8 @@ private:
 
     bool _connected = false;
     bool _isMatching = false;
+    bool _isIngame = false;
+    uint64_t _lastServerTick = 0;
     std::string _roomId;
     std::string _sessionId;
     std::string _serverHost;
@@ -79,6 +114,12 @@ private:
 
     std::deque<LogMessage> _logs;
     mutable std::mutex _logMutex;
+
+    std::unordered_map<std::string, PlayerState> _roomPlayers;
+    mutable std::mutex _roomPlayersMutex;
+    
+    std::mutex _scoresMutex;
+    std::unordered_map<std::string, Scoreboard> _scores;
 
     // Read-related members
     uint16_t _readNetSize;
@@ -91,7 +132,7 @@ private:
     // Write-related members
     std::queue<std::shared_ptr<std::vector<char>>> _sendTcpQueue;
     std::mutex _sendTcpQueueMutex;
-    std::atomic<bool> _isWriting{false};
+    std::atomic<bool> _isWriting{ false };
 
     void DoSendAsyncTcpLoop();
 };

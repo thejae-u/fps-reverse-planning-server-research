@@ -1,4 +1,4 @@
-﻿# client/CMakeLists.txt
+# client/CMakeLists.txt
 cmake_minimum_required (VERSION 3.21)
 project(client)
 
@@ -37,8 +37,18 @@ file(GLOB IMGUI_SOURCES
 add_executable(client_main ${CLIENT_SOURCES} ${CLIENT_HEADERS} ${IMGUI_SOURCES})
 set_target_properties(client_main PROPERTIES OUTPUT_NAME "client")
 
+# Protobuf 동적 소스코드 생성 설정
+protobuf_generate(
+    TARGET client_main
+    LANGUAGE cpp
+    IMPORT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../proto"
+    PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/../proto/Packet.proto"
+           "${CMAKE_CURRENT_SOURCE_DIR}/../proto/Internal.proto"
+)
+
 target_include_directories(client_main PRIVATE
     src/header
+    ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/imgui
     ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/imgui/backends
 )

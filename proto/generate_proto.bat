@@ -33,12 +33,14 @@ set "SERVER_HEADER=..\server\src\header"
 set "SERVER_SOURCE=..\server\src\sources"
 set "CLIENT_HEADER=..\client\src\header"
 set "CLIENT_SOURCE=..\client\src\sources"
+set "UNITY_CSHARP=..\UnityFpsClient\Assets\Scripts\Protobuf"
 
 :: Ensure directories exist
 if not exist "%SERVER_HEADER%" mkdir "%SERVER_HEADER%"
 if not exist "%SERVER_SOURCE%" mkdir "%SERVER_SOURCE%"
 if not exist "%CLIENT_HEADER%" mkdir "%CLIENT_HEADER%"
 if not exist "%CLIENT_SOURCE%" mkdir "%CLIENT_SOURCE%"
+if not exist "%UNITY_CSHARP%" mkdir "%UNITY_CSHARP%"
 
 :: Compile each proto file
 for %%f in (*.proto) do (
@@ -50,7 +52,10 @@ for %%f in (*.proto) do (
     :: Client
     "%VCPKG_PROTOC%" --proto_path="%PROTO_SRC%" --cpp_out="%CLIENT_HEADER%" "%%f"
 
-    echo Generated headers and sources from %%f
+    :: Unity Client (C#)
+    "%VCPKG_PROTOC%" --proto_path="%PROTO_SRC%" --csharp_out="%UNITY_CSHARP%" "%%f"
+
+    echo Generated headers, sources and C# files from %%f
 )
 
 :: Move .pb.cc files

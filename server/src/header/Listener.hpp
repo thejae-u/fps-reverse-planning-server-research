@@ -1,10 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <asio.hpp>
 #include <memory>
 #include <spdlog/spdlog.h>
 #include <unordered_map>
-#include <unordered_set>
 #include <uuid.h>
 #include <vector>
 #include <queue>
@@ -31,7 +30,7 @@ private:
 
 public:
     explicit Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port);
-    ~Listener() { spdlog::info("server successfully destroyed"); }
+    ~Listener() override { spdlog::info("server successfully destroyed"); }
 
     static std::shared_ptr<Listener> Create(std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
     {
@@ -86,6 +85,7 @@ private:
     std::mutex _sessionsMutex;
 
     std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _payloadQueue;
+    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _noLockPayloadQueue;
     std::mutex _payloadQueueMutex;
-    std::atomic<bool> _isSending;
+    std::atomic<bool> _isSending{ false };
 };

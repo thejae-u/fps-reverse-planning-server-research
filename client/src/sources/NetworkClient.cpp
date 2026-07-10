@@ -1,10 +1,10 @@
-﻿#include "NetworkClient.hpp"
+#include "NetworkClient.hpp"
 #include "IOManager.hpp"
 
 NetworkClient::NetworkClient(std::shared_ptr<IOManager> ioManager)
-    : _ioManager(ioManager), 
+    : _ioManager(ioManager),
       _strand(asio::make_strand(ioManager->GetIoContext())),
-      _socket(std::make_shared<asio::ip::tcp::socket>(_strand)), 
+      _socket(std::make_shared<asio::ip::tcp::socket>(_strand)),
       _udpSocket(_strand)
 {
     InitUdpSocket();
@@ -13,18 +13,25 @@ NetworkClient::NetworkClient(std::shared_ptr<IOManager> ioManager)
 void NetworkClient::InitUdpSocket()
 {
     std::error_code ec;
-    if (_udpSocket.is_open()) {
+    if(_udpSocket.is_open())
+    {
         _udpSocket.close(ec);
     }
     _udpSocket.open(asio::ip::udp::v4(), ec);
-    if (ec) {
+    if(ec)
+    {
         spdlog::error("Failed to open UDP socket: {}", ec.message());
-    } else {
+    }
+    else
+    {
         _udpSocket.set_option(asio::socket_base::reuse_address(true));
         _udpSocket.bind(asio::ip::udp::endpoint(asio::ip::udp::v4(), 0), ec);
-        if (ec) {
+        if(ec)
+        {
             spdlog::error("Failed to bind UDP socket: {}", ec.message());
-        } else {
+        }
+        else
+        {
             _clientUdpPort = _udpSocket.local_endpoint().port();
             spdlog::info("Client UDP socket initialized on port {}", _clientUdpPort);
         }
@@ -57,7 +64,8 @@ void NetworkClient::Connect(const std::string& host, uint16_t port)
                 // Get the actual address from the socket's remote endpoint
                 std::error_code rec;
                 auto endpoint = _socket->remote_endpoint(rec);
-                if (!rec) {
+                if(!rec)
+                {
                     _serverAddress = endpoint.address();
                     AddLog("Connected to " + endpoint.address().to_string() + ":" + std::to_string(endpoint.port()));
                 }
@@ -82,19 +90,26 @@ void NetworkClient::Disconnect()
 {
     _connected = false;
     _isMatching = false;
+    _isIngame = false;
     _roomId.clear();
     _sessionId.clear();
     _serverUdpPort = 0;
+    _lastServerTick = 0;
+
+    ClearRoomPlayers();
 
     {
         std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
-        while (!_sendTcpQueue.empty()) _sendTcpQueue.pop();
+        while(!_sendTcpQueue.empty())
+            _sendTcpQueue.pop();
         _isWriting = false;
     }
 
     std::error_code ec;
-    if (_socket->is_open())
+    if(_socket->is_open())
         _socket->close(ec);
+    if(_udpSocket.is_open())
+        _udpSocket.close(ec);
 
     // Re-initialize sockets using member functions
     _socket = std::make_shared<asio::ip::tcp::socket>(_ioManager->GetIoContext());
@@ -108,13 +123,13 @@ void NetworkClient::SendMatchRequest()
     if(!_connected || _sessionId.empty())
         return;
 
-    if (!_roomId.empty())
+    if(!_roomId.empty())
     {
         AddLog("Matchmaking request ignored: already matched.");
         return;
     }
 
-    if (_isMatching)
+    if(_isMatching)
     {
         AddLog("Matchmaking request ignored: already in queue.");
         return;
@@ -127,14 +142,16 @@ void NetworkClient::SendMatchRequest()
         match.set_sessionid(_sessionId);
 
         std::string matchData;
-        if (!match.SerializeToString(&matchData)) return;
+        if(!match.SerializeToString(&matchData))
+            return;
 
         auto packet = std::make_shared<Packet>();
         packet->set_type(PacketType::Match);
         packet->set_data(matchData);
 
         std::string packetData;
-        if (!packet->SerializeToString(&packetData)) return;
+        if(!packet->SerializeToString(&packetData))
+            return;
 
         uint16_t size = static_cast<uint16_t>(packetData.size());
         uint16_t netSize = htons(size);
@@ -147,16 +164,16 @@ void NetworkClient::SendMatchRequest()
             _sendTcpQueue.push(buffer);
         }
 
-        if (!_isWriting)
+        if(!_isWriting)
         {
             _isWriting = true;
             DoSendAsyncTcpLoop();
         }
-        
+
         _isMatching = true;
         AddLog("Matchmaking request queued.");
     }
-    catch (const std::exception& e)
+    catch(const std::exception& e)
     {
         AddLog(std::format("SendMatchRequest exception: {}", e.what()), spdlog::level::err);
     }
@@ -206,7 +223,7 @@ void NetworkClient::AsyncHandshake()
 
             std::string data = receivePacket.data();
             size_t commaPos = data.find(',');
-            if (commaPos != std::string::npos)
+            if(commaPos != std::string::npos)
             {
                 _serverUdpPort = static_cast<uint16_t>(std::stoi(data.substr(0, commaPos)));
                 _sessionId = data.substr(commaPos + 1);
@@ -225,7 +242,7 @@ void NetworkClient::AsyncHandshake()
 
             // Automate matching request immediately after handshake
             SendMatchRequest();
-            
+
             AsyncRead();
         }));
     }));
@@ -247,16 +264,16 @@ void NetworkClient::Send(const std::string& message)
         _sendTcpQueue.push(buffer);
     }
 
-    if (!_isWriting)
+    if(!_isWriting)
     {
         _isWriting = true;
         DoSendAsyncTcpLoop();
     }
 }
 
-void NetworkClient::SendIngamePacket(IngameType type, const std::string& data)
+void NetworkClient::SendIngamePacket(IngameType type, const std::string& data, uint64_t clientTick)
 {
-    if (!_connected || _roomId.empty() || _sessionId.empty())
+    if(!_connected || _roomId.empty() || _sessionId.empty())
     {
         return;
     }
@@ -268,32 +285,35 @@ void NetworkClient::SendIngamePacket(IngameType type, const std::string& data)
         ingame.set_sessionid(_sessionId);
         ingame.set_method(type);
         ingame.set_data(data);
+        ingame.set_clienttick(clientTick);
 
         std::string ingameData;
-        if (!ingame.SerializeToString(&ingameData)) return;
+        if(!ingame.SerializeToString(&ingameData))
+            return;
 
         Packet packet;
         packet.set_type(PacketType::Ingame);
         packet.set_data(ingameData);
 
         std::string packetData;
-        if (!packet.SerializeToString(&packetData)) return;
+        if(!packet.SerializeToString(&packetData))
+            return;
 
         asio::ip::udp::endpoint destination(_serverAddress, _serverUdpPort);
-        
+
         std::uint16_t size = htons(static_cast<std::uint16_t>(packetData.size()));
         std::vector<char> buffer(sizeof(size) + packetData.size());
         std::memcpy(buffer.data(), &size, sizeof(size));
         std::memcpy(buffer.data() + sizeof(size), packetData.data(), packetData.size());
 
         _udpSocket.async_send_to(asio::buffer(buffer), destination, [this, buffer](std::error_code ec, std::size_t) {
-            if (ec && ec != asio::error::operation_aborted)
+            if(ec && ec != asio::error::operation_aborted)
             {
                 AddLog("UDP Send error: " + ec.message(), spdlog::level::err);
             }
         });
     }
-    catch (const std::exception& e)
+    catch(const std::exception& e)
     {
         AddLog(std::format("SendIngamePacket exception: {}", e.what()), spdlog::level::err);
     }
@@ -339,12 +359,14 @@ void NetworkClient::SendUdpMalformed(const std::string& message, const std::stri
 
         std::vector<char> buffer;
         if(errorType == 1)
-        { // Size < 2 bytes
+        {
+            // Size < 2 bytes
             buffer.push_back('X');
             AddLog("Sending malformed UDP: Size < 2 bytes", spdlog::level::warn);
         }
         else if(errorType == 2)
-        {                                                                                     // Mismatched header
+        {
+            // Mismatched header
             std::uint16_t wrongSize = htons(static_cast<std::uint16_t>(message.size() + 10)); // Say it's 10 bytes longer
             buffer.resize(sizeof(wrongSize) + message.size());
             std::memcpy(buffer.data(), &wrongSize, sizeof(wrongSize));
@@ -373,47 +395,82 @@ void NetworkClient::AsyncRead()
         if(!ec)
         {
             _readSize = ntohs(_readNetSize);
-            
+
             // 2. Read Body
             auto bodyBuffer = std::make_shared<std::vector<char>>(_readSize);
             asio::async_read(*_socket, asio::buffer(*bodyBuffer), asio::bind_executor(_strand, [this, self, bodyBuffer](std::error_code body_ec, std::size_t body_length) {
-                if (!body_ec) {
+                if(!body_ec)
+                {
                     Packet packet;
-                    if (packet.ParseFromArray(bodyBuffer->data(), static_cast<int>(bodyBuffer->size()))) {
-                        if (packet.type() == PacketType::Match)
+                    if(packet.ParseFromArray(bodyBuffer->data(), static_cast<int>(bodyBuffer->size())))
+                    {
+                        if(packet.type() == PacketType::Match)
                         {
                             Matchmaking match;
-                            if (match.ParseFromString(packet.data()))
+                            if(match.ParseFromString(packet.data()))
                             {
-                                if (match.type() == MatchmakingType::Waiting)
+                                if(match.type() == MatchmakingType::Waiting)
                                 {
                                     AddLog("Matchmaking: In queue, waiting for other players...");
                                 }
-                                else if (match.type() == MatchmakingType::Matched)
+                                else if(match.type() == MatchmakingType::Matched)
                                 {
                                     _roomId = match.roomid();
                                     _isMatching = false;
+                                    _isIngame = true;
                                     AddLog("Matchmaking Success! Room: " + _roomId);
                                 }
-                                else if (match.type() == MatchmakingType::Failed)
+                                else if(match.type() == MatchmakingType::Failed)
                                 {
                                     _isMatching = false;
                                     AddLog("Matchmaking Failed.", spdlog::level::err);
                                 }
                             }
                         }
-                        else if (packet.type() == PacketType::Ingame)
+                        else if(packet.type() == PacketType::Ingame)
                         {
-                            AddLog("Warning: Received Ingame packet via TCP. Ingame packets should be UDP only.", spdlog::level::warn);
+                            IngamePacket ingamePacket;
+                            if(!ingamePacket.ParseFromString(packet.data()))
+                            {
+                                AddLog("Parsing Ingame packet Error.", spdlog::level::err);
+                                AsyncRead();
+                                return;
+                            }
+                            
+                            if(ingamePacket.method() != IngameType::Score)
+                            {
+                                AddLog("Invalid Packet Income.", spdlog::level::warn) ;
+                                AsyncRead();
+                                return;
+                            }
+                            
+                            ScoreboardPacket scoreboardPacket;
+                            if(!scoreboardPacket.ParseFromString(ingamePacket.data()))
+                            {
+                                AddLog("Parsing Scoreboard packet Error.", spdlog::level::err);
+                                AsyncRead();
+                                return;
+                            }
+                            
+                            auto scores = scoreboardPacket.scores();
+                            if(scores.empty())
+                                AddLog("scores empty");
+                            for(const auto score : scores)
+                            {
+                                std::lock_guard<std::mutex> lock(_scoresMutex);
+                                _scores[score.playerid()] = score;
+                            }
                         }
-                        else if (_messageCallback)
+                        else if(_messageCallback)
                         {
                             _messageCallback(packet.data());
                         }
                     }
                     AsyncRead(); // Read next
-                } else {
-                    if (body_ec == asio::error::eof)
+                }
+                else
+                {
+                    if(body_ec == asio::error::eof)
                         AddLog("Server closed connection (EOF during body)", spdlog::level::warn);
                     else
                         AddLog("Read error (body): " + body_ec.message(), spdlog::level::err);
@@ -423,9 +480,9 @@ void NetworkClient::AsyncRead()
         }
         else if(_connected)
         {
-            if (ec == asio::error::eof)
+            if(ec == asio::error::eof)
                 AddLog("Server closed connection (EOF during header)", spdlog::level::warn);
-            else if (ec != asio::error::operation_aborted)
+            else if(ec != asio::error::operation_aborted)
                 AddLog("Read error (header): " + ec.message(), spdlog::level::err);
             Disconnect();
         }
@@ -439,44 +496,131 @@ void NetworkClient::AsyncReadUdp()
         if(!ec)
         {
             // 서버의 UDP 패킷 포맷: [2바이트 크기(BigEndian)] + [Protobuf 데이터]
-            if (length >= 2)
+            if(length >= 2)
             {
                 uint16_t size;
                 std::memcpy(&size, _udpReceiveBuffer.data(), sizeof(size));
                 size = ntohs(size);
 
                 // 실제 수신된 데이터 길이가 헤더에 명시된 크기와 일치하는지 검증
-                if (length >= static_cast<size_t>(2 + size))
+                if(length >= static_cast<size_t>(2 + size))
                 {
                     Packet packet;
-                    if (packet.ParseFromArray(_udpReceiveBuffer.data() + 2, size))
+                    if(packet.ParseFromArray(_udpReceiveBuffer.data() + 2, size))
                     {
-                        if (packet.type() == PacketType::Ingame)
+                        if(packet.type() == PacketType::Ingame)
                         {
                             IngamePacket ingame;
-                            if (ingame.ParseFromString(packet.data()))
+                            if(ingame.ParseFromString(packet.data()))
                             {
-                                std::string typeStr;
-                                switch (ingame.method())
+                                if(ingame.clienttick() > 0)
                                 {
-                                case IngameType::IngameOk: typeStr = "IngameOk"; break;
-                                case IngameType::Move: typeStr = "Move"; break;
-                                case IngameType::Jump: typeStr = "Jump"; break;
-                                case IngameType::Shoot: typeStr = "Shoot"; break;
-                                case IngameType::Hit: typeStr = "Hit"; break;
-                                default: typeStr = "Unknown"; break;
+                                    _lastServerTick = ingame.clienttick();
                                 }
-                                
-                                AddLog(std::format("[UDP Ingame] Room: {}, Session: {}, Type: {}", 
-                                    ingame.roomid().substr(0, 8), ingame.sessionid().substr(0, 8), typeStr));
-                                
-                                if (_udpMessageCallback)
+
+                                std::string typeStr;
+                                switch(ingame.method())
+                                {
+                                case IngameType::IngameOk: typeStr = "IngameOk";
+                                    break;
+                                case IngameType::Move: typeStr = "Move";
+                                    break;
+                                case IngameType::Jump: typeStr = "Jump";
+                                    break;
+                                case IngameType::Shoot: typeStr = "Shoot";
+                                    break;
+                                case IngameType::Hit: typeStr = "Hit";
+                                    break;
+                                case IngameType::DebugLagComp: typeStr = "DebugLagComp";
+                                    break;
+                                default: typeStr = "Unknown";
+                                    break;
+                                }
+
+                                {
+                                    std::lock_guard<std::mutex> roomPlayersLock(_roomPlayersMutex);
+                                    std::string targetSessionId = ingame.sessionid();
+                                    auto& targetPlayer = _roomPlayers[targetSessionId];
+                                    targetPlayer.id = targetSessionId;
+
+                                    if(ingame.method() == IngameType::Move && ingame.data().size() >= 12)
+                                    {
+                                        float coords[3];
+                                        std::memcpy(coords, ingame.data().data(), 12);
+                                        targetPlayer.x = coords[0];
+                                        targetPlayer.y = coords[1];
+                                        targetPlayer.z = coords[2];
+                                        targetPlayer.lastUpdate = std::chrono::steady_clock::now();
+                                    }
+                                    else if(ingame.method() == IngameType::Hit)
+                                    {
+                                        HitPacket hitPacket;
+                                        if(hitPacket.ParseFromString(ingame.data()))
+                                        {
+                                            auto& hitPlayer = _roomPlayers[hitPacket.hitplayerid()];
+                                            hitPlayer.id = hitPacket.hitplayerid();
+                                            hitPlayer.hp = hitPacket.currenthp();
+                                            hitPlayer.deaths = hitPacket.deaths();
+                                            hitPlayer.isHit = true;
+                                            hitPlayer.hitTime = std::chrono::steady_clock::now();
+                                            hitPlayer.lastUpdate = std::chrono::steady_clock::now();
+
+                                            _messageCallback(std::format("{}: hit packet received", hitPlayer.id.substr(0, 8)));
+                                        }
+                                    }
+                                    else if(ingame.method() == IngameType::DebugLagComp)
+                                    {
+                                        DebugLagCompPacket debugPacket;
+                                        if(debugPacket.ParseFromString(ingame.data()))
+                                        {
+                                            auto& shooterPlayer = _roomPlayers[debugPacket.shooterid()];
+                                            shooterPlayer.id = debugPacket.shooterid();
+                                            shooterPlayer.isShooting = true;
+                                            shooterPlayer.shootTime = std::chrono::steady_clock::now();
+                                            shooterPlayer.shootOrigin[0] = debugPacket.originx();
+                                            shooterPlayer.shootOrigin[1] = debugPacket.originy();
+                                            shooterPlayer.shootOrigin[2] = debugPacket.originz();
+                                            shooterPlayer.shootDir[0] = debugPacket.dirx();
+                                            shooterPlayer.shootDir[1] = debugPacket.diry();
+                                            shooterPlayer.shootDir[2] = debugPacket.dirz();
+                                            shooterPlayer.lastUpdate = std::chrono::steady_clock::now();
+
+                                            _messageCallback(std::format("{}: shoot(comp) packet received", shooterPlayer.id.substr(0, 8)));
+
+                                            for(int i = 0; i < debugPacket.targets_size(); ++i)
+                                            {
+                                                const auto& targetMsg = debugPacket.targets(i);
+                                                auto& tgtPlayer = _roomPlayers[targetMsg.targetid()];
+                                                tgtPlayer.id = targetMsg.targetid();
+                                                tgtPlayer.x = targetMsg.presentx();
+                                                tgtPlayer.y = targetMsg.presenty();
+                                                tgtPlayer.z = targetMsg.presentz();
+                                                tgtPlayer.lastUpdate = std::chrono::steady_clock::now();
+                                                tgtPlayer.hp = targetMsg.ishit() ? (tgtPlayer.hp - 10) : tgtPlayer.hp;
+                                                if(targetMsg.ishit())
+                                                {
+                                                    tgtPlayer.isHit = true;
+                                                    tgtPlayer.hitTime = std::chrono::steady_clock::now();
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else if(ingame.method() == IngameType::Jump)
+                                    {
+                                        targetPlayer.y = 5.0f; // Temporary jump height representation
+                                        targetPlayer.lastUpdate = std::chrono::steady_clock::now();
+                                        
+                                        _messageCallback(std::format("{}: shoot(comp) packet received", targetPlayer.id.substr(0, 8)));
+                                    }
+                                }
+
+                                if(_udpMessageCallback)
                                     _udpMessageCallback(std::format("UDP_INGAME: {} from {}", typeStr, ingame.sessionid().substr(0, 8)));
                             }
                         }
                         else
                         {
-                            if (_udpMessageCallback)
+                            if(_udpMessageCallback)
                                 _udpMessageCallback("UDP Control: " + std::to_string(static_cast<int>(packet.type())));
                         }
                     }
@@ -490,7 +634,7 @@ void NetworkClient::AsyncReadUdp()
                     AddLog(std::format("UDP Size Mismatch: Expected {}, Received {}", size + 2, length), spdlog::level::warn);
                 }
             }
-            else if (length > 0)
+            else if(length > 0)
             {
                 AddLog("UDP Packet too small (under 2 bytes)", spdlog::level::warn);
             }
@@ -530,9 +674,15 @@ void NetworkClient::SetUdpMessageCallback(MessageCallback callback)
     _udpMessageCallback = std::move(callback);
 }
 
+std::unordered_map<std::string, Scoreboard> NetworkClient::GetScores() 
+{
+    std::lock_guard<std::mutex> lock(_scoresMutex);
+    return _scores;
+}
+
 void NetworkClient::SendUdpHolePunching()
 {
-    if (!_connected || _sessionId.empty())
+    if(!_connected || _sessionId.empty())
     {
         return;
     }
@@ -546,37 +696,39 @@ void NetworkClient::SendUdpHolePunching()
         auth.set_method(AuthenticationType::UdpHolePunching);
 
         std::string authData;
-        if (!auth.SerializeToString(&authData)) return;
+        if(!auth.SerializeToString(&authData))
+            return;
 
         Packet packet;
         packet.set_type(PacketType::Authentication);
         packet.set_data(authData);
 
         std::string packetData;
-        if (!packet.SerializeToString(&packetData)) return;
+        if(!packet.SerializeToString(&packetData))
+            return;
 
         asio::ip::udp::endpoint destination(_serverAddress, _serverUdpPort);
-        
+
         std::uint16_t size = htons(static_cast<std::uint16_t>(packetData.size()));
         std::vector<char> buffer(sizeof(size) + packetData.size());
         std::memcpy(buffer.data(), &size, sizeof(size));
         std::memcpy(buffer.data() + sizeof(size), packetData.data(), packetData.size());
 
         // Send a few times to increase chance of success
-        for (int i = 0; i < 5; ++i)
+        for(int i = 0; i < 5; ++i)
         {
             auto buffer_ptr = std::make_shared<std::vector<char>>(buffer);
             _udpSocket.async_send_to(asio::buffer(*buffer_ptr), destination, [this, buffer_ptr](std::error_code ec, std::size_t) {
-                if (ec && ec != asio::error::operation_aborted)
+                if(ec && ec != asio::error::operation_aborted)
                 {
                     AddLog("UDP Hole Punching error: " + ec.message(), spdlog::level::err);
                 }
             });
         }
-        
+
         AddLog("Sent UDP Hole Punching packets to " + destination.address().to_string() + ":" + std::to_string(destination.port()));
     }
-    catch (const std::exception& e)
+    catch(const std::exception& e)
     {
         AddLog(std::format("SendUdpHolePunching exception: {}", e.what()), spdlog::level::err);
     }
@@ -593,9 +745,9 @@ void NetworkClient::DoSendAsyncTcpLoop()
 
     auto self = shared_from_this();
     asio::async_write(*_socket, asio::buffer(*buffer), asio::bind_executor(_strand, [this, self, buffer](std::error_code ec, std::size_t) {
-        if (ec)
+        if(ec)
         {
-            if (ec != asio::error::operation_aborted)
+            if(ec != asio::error::operation_aborted)
             {
                 AddLog("TCP Write error: " + ec.message(), spdlog::level::err);
             }
@@ -604,7 +756,7 @@ void NetworkClient::DoSendAsyncTcpLoop()
         }
 
         std::lock_guard<std::mutex> lock(_sendTcpQueueMutex);
-        if (_sendTcpQueue.empty())
+        if(_sendTcpQueue.empty())
         {
             _isWriting = false;
             return;
@@ -612,4 +764,21 @@ void NetworkClient::DoSendAsyncTcpLoop()
 
         DoSendAsyncTcpLoop();
     }));
+}
+
+std::vector<NetworkClient::PlayerState> NetworkClient::GetRoomPlayers() const
+{
+    std::lock_guard<std::mutex> lock(_roomPlayersMutex);
+    std::vector<PlayerState> result;
+    for(const auto& [id, state] : _roomPlayers)
+    {
+        result.push_back(state);
+    }
+    return result;
+}
+
+void NetworkClient::ClearRoomPlayers()
+{
+    std::lock_guard<std::mutex> lock(_roomPlayersMutex);
+    _roomPlayers.clear();
 }

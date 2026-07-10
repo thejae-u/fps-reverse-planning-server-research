@@ -6,14 +6,14 @@ cd "$SCRIPT_DIR"
 
 # Protoc discovery
 VCPKG_PROTOC=""
-if [[ -f "../server/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../server/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
-elif [[ -f "../server/build/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../server/build/vcpkg_installed/x64-osx/tools/protobuf/protoc"
-elif [[ -f "../client/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../client/build/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
-elif [[ -f "../client/build/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
-  VCPKG_PROTOC="../client/build/vcpkg_installed/x64-osx/tools/protobuf/protoc"
+if [[ -f "../server/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../server/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
+elif [[ -f "../server/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../server/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc"
+elif [[ -f "../client/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../client/build/macos-debug/vcpkg_installed/arm64-osx/tools/protobuf/protoc"
+elif [[ -f "../client/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc" ]]; then
+  VCPKG_PROTOC="../client/build/macos-debug/vcpkg_installed/x64-osx/tools/protobuf/protoc"
 else
   VCPKG_PROTOC=$(which protoc)
 fi
@@ -36,8 +36,11 @@ SERVER_SOURCE="../server/src/sources"
 CLIENT_HEADER="../client/src/header"
 CLIENT_SOURCE="../client/src/sources"
 
+# Unity Client path
+UNITY_CSHARP="../UnityFpsClient/Assets/Scripts/Protobuf"
+
 # Ensure directories exist
-mkdir -p "$SERVER_HEADER" "$SERVER_SOURCE" "$CLIENT_HEADER" "$CLIENT_SOURCE"
+mkdir -p "$SERVER_HEADER" "$SERVER_SOURCE" "$CLIENT_HEADER" "$CLIENT_SOURCE" "$UNITY_CSHARP"
 
 # Find proto files
 PROTO_FILES=(*.proto)
@@ -55,6 +58,8 @@ for proto in "${PROTO_FILES[@]}"; do
   "$VCPKG_PROTOC" --proto_path="$PROTO_SRC" \
          --cpp_out="$SERVER_HEADER" \
          "$proto"
+
+  echo "${proto} created in ${SERVER_HEADER}..."
   
   # Move .pb.cc to sources
   # Note: Some protoc versions might generate .pb.cc in the same dir as .pb.h
@@ -69,7 +74,12 @@ for proto in "${PROTO_FILES[@]}"; do
   # Move .pb.cc to sources
   find "$CLIENT_HEADER" -name "*.pb.cc" -exec mv {} "$CLIENT_SOURCE/" \;
   
-  echo "Generated headers and sources from $proto"
+  # Generate for Unity Client (C#)
+  "$VCPKG_PROTOC" --proto_path="$PROTO_SRC" \
+         --csharp_out="$UNITY_CSHARP" \
+         "$proto"
+  
+  echo "Generated headers, sources and C# files from $proto"
 done
 
 echo "All proto files generated!"
