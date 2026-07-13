@@ -531,7 +531,7 @@ void World::UpdateState()
 bool World::GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition)
 {
     std::lock_guard playerLock(_playerMutex);
-    auto it = _players.find(playerId);
+    const auto it = _players.find(playerId);
     if(it == _players.end() || !it->second)
     {
         return false;

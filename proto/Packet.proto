@@ -49,6 +49,11 @@ message Packet {
   bytes data = 2;
 }
 
+message PortHandshakePacket {
+  uint32 serverPort = 1;
+  bytes sessionId = 2;
+}
+
 message Matchmaking {
   MatchmakingType type = 1;
   bytes sessionId = 2;

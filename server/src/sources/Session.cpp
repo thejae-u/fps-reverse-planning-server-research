@@ -394,9 +394,16 @@ void Session::DoSendAsyncTcpLoop()
 
 void Session::SendSessionInfo()
 {
+    PortHandshakePacket sendPortPacket;
+    sendPortPacket.set_serverport(_serverUdpPort);
+    sendPortPacket.set_sessionid(uuids::to_string(GetId()));
+        
+    std::string serializedPortPacket;
+    sendPortPacket.SerializeToString(&serializedPortPacket);
+    
     auto sendPacket = std::make_shared<Packet>();
     sendPacket->set_type(PacketType::PortHandshake);
-    sendPacket->set_data(std::format("{},{}", std::to_string(_serverUdpPort), uuids::to_string(GetId())));
+    sendPacket->set_data(serializedPortPacket);
 
     spdlog::info("session {} sending handshake info asynchronously", uuids::to_string(GetId()));
     EnqueueTcpSendPacket(std::move(sendPacket));
