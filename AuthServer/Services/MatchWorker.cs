@@ -10,14 +10,16 @@ namespace AuthServer.Services;
 public class MatchWorker : BackgroundService
 {
     private readonly MatchService _matchService;
-    private readonly LogicServerConnectionPool _tcpPool;
+    //private readonly LogicServerConnectionPool _tcpPool;
+    private readonly DedicatedServerSpawner _spawner;
     private readonly IHubContext<MatchHub> _hubContext;
     private readonly ILogger<MatchWorker> _logger;
 
-    public MatchWorker(MatchService matchService, LogicServerConnectionPool tcpPool, IHubContext<MatchHub> hubContext, ILogger<MatchWorker> logger)
+    public MatchWorker(MatchService matchService, DedicatedServerSpawner spawner, IHubContext<MatchHub> hubContext, ILogger<MatchWorker> logger)
     {
         _matchService = matchService;
-        _tcpPool = tcpPool;
+        //_tcpPool = tcpPool;
+        _spawner =  spawner;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -53,55 +55,31 @@ public class MatchWorker : BackgroundService
 
     private async Task HandleMatchCreation(MatchResult result, CancellationToken ct)
     {
-        // Craete GUID per User
+        // Create GUID per User
         var userTokenMap = result.UserIds.ToDictionary(uid => uid, _ => Guid.NewGuid().ToString("N"));
-
-        var client = await _tcpPool.RentAsync();
-        try
+        
+        var serverInfo = await _spawner.SpawnServerAsync(result.MatchId, userTokenMap.Values.ToList());
+        if (serverInfo == null)
         {
-            var request = new GamePacket
-            {
-                MatchCreateReq = new MatchCreateRequest
-                {
-                    MatchId = result.MatchId,
-                    GameType = "Normal"
-                }
-            };
-
-            // Include User Id and Token
-            foreach (var kvp in userTokenMap)
-            {
-                request.MatchCreateReq.Users.Add(new UserSessionInfo
-                {
-                    UserId = kvp.Key,
-                    SessionToken = kvp.Value
-                });
-            }
-
-            // Send to Logic Server
-            var responsePacket = await client.SendRequestAsync(request, ct);
-            if (responsePacket.PayloadCase == GamePacket.PayloadOneofCase.MatchCreateRes)
-            {
-                var res = responsePacket.MatchCreateRes;
-                foreach (var kvp in userTokenMap)
-                {
-                    var userId = kvp.Key;
-                    var token = kvp.Value;
-
-                    // SignalR send per user with token
-                    await _hubContext.Clients.Group(MatchHub.GetUserGroup(userId)).SendAsync("Matched", new
-                    {
-                        matchId = result.MatchId,
-                        serverAddress = $"{res.ServerIp}:{res.Port}",
-                        sessionToken = token,
-                        matchedAtUtc = DateTime.UtcNow
-                    }, ct);
-                }
-            }
+            _logger.LogError($"Failed to spawn dedicated server for match {result.MatchId}");
+            return;
         }
-        finally
+
+        string serverIp = "127.0.0.1"; // for-test
+        foreach (var kvp in userTokenMap)
         {
-            _tcpPool.Return(client);
+            var userId = kvp.Key;
+            var token = kvp.Value;
+
+            await _hubContext.Clients.Group(MatchHub.GetUserGroup(userId)).SendAsync("Matched", new
+            {
+                matchId = result.MatchId,
+                tcpPort = serverInfo.TcpPort,
+                udpPort = serverInfo.UdpPort,
+                serverAddreess = $"{serverIp}:{serverInfo.TcpPort}",
+                sessionToken = token,
+                matchedAtUtc = DateTime.UtcNow
+            }, ct);
         }
     }
 }

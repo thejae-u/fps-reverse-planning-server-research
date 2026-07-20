@@ -1,0 +1,124 @@
+﻿using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using Microsoft.AspNetCore.Identity;
+
+namespace AuthServer.Services;
+
+public class DedicatedServerInfo
+{
+    public string MatchId { get; set; } = string.Empty;
+    public int TcpPort { get; set; }
+    public int UdpPort { get; set; }
+    public Process Process { get; set; } = null!;
+}
+
+public interface IDedicatedServerSpawner
+{
+    Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> playerTokens);
+}
+
+public class DedicatedServerSpawner : IDedicatedServerSpawner
+{
+    private readonly IConfiguration _config;
+    private readonly ILogger<DedicatedServerSpawner> _logger;
+    private readonly MatchService _matchService;
+
+    public DedicatedServerSpawner(IConfiguration config, ILogger<DedicatedServerSpawner> logger, MatchService matchService)
+    {
+        _config = config;
+        _logger = logger;
+        _matchService = matchService;
+    }
+    
+    public Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> playerTokens)
+    {
+        try
+        {
+            int tcpPort = GetFreePort();
+            int udpPort = GetFreePort();
+
+            // OS에 따라 맞는 경로 설정
+            string executablePath = ResolveExecutablePath();
+            string tokenCsv = string.Join(",", playerTokens);
+
+            // CLI 인자 구성
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executablePath,
+                Arguments = $"--match-id {matchId} --tcp-port {tcpPort} --udp-port {udpPort} --players {tokenCsv}",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            var process = new Process
+            {
+                StartInfo = startInfo,
+                EnableRaisingEvents = true
+            };
+
+            process.Exited += async (sender, args) =>
+            {
+                _logger.LogInformation(
+                    $"[DedicatedServer] Match {matchId} process exited with code {process.ExitCode}");
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogError($"[DedicatedServer] Match {matchId} CRASHED! Recovering match state...");
+                    await _matchService.FinishMatchAsync(matchId, winnerId: null);
+                }
+            };
+
+            bool started = process.Start();
+            if (!started)
+            {
+                _logger.LogError($"Failed to start process: {executablePath}");
+                return Task.FromResult<DedicatedServerInfo?>(null);
+            }
+
+            _logger.LogInformation(
+                $"[DedicatedServer] Spawned process (PID: {process.Id}) for Match {matchId} on TCP: {tcpPort}, UDP: {udpPort}");
+
+            return Task.FromResult<DedicatedServerInfo?>(new DedicatedServerInfo
+            {
+                MatchId = matchId,
+                TcpPort = tcpPort,
+                UdpPort = udpPort,
+                Process = process
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Exception occurred while spawning dedicated server for match {matchId}");
+            return Task.FromResult<DedicatedServerInfo?>(null);
+        }
+    }
+
+    private string ResolveExecutablePath()
+    {
+        string osKey = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Windows" :
+            RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "OSX" : "Linux";
+
+        string? configuredPath = _config[$"LogicServer:ExecutablePaths:{osKey}"];
+        if (!string.IsNullOrEmpty(configuredPath))
+            return Path.GetFullPath(configuredPath);
+        
+        bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        string binaryName = isWindows ? "main.exe" : "main";
+
+        string basePath = AppContext.BaseDirectory;
+
+        string defaultPath = isWindows
+            ? Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "Debug", binaryName)
+            : Path.Combine(basePath, "..", "..", "..", "..", "server", "build", binaryName);
+
+        return defaultPath;
+    }
+
+    private int GetFreePort()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)socket.LocalEndPoint!).Port;
+    }
+}

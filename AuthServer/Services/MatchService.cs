@@ -261,7 +261,7 @@ public class MatchService
         _logger.LogInformation("{userId} remove from userConnections success", userId);
     }
 
-    public async Task<bool> FinishMatchAsync(string matchId, string winnerId)
+    public async Task<bool> FinishMatchAsync(string matchId, string? winnerId)
     {
         using var scope = _scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
