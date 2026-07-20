@@ -59,7 +59,8 @@ builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("Match
 builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicServer"));
 
 // Service DI
-builder.Services.AddSingleton<LogicServerConnectionPool>();
+//builder.Services.AddSingleton<LogicServerConnectionPool>();
+builder.Services.AddSingleton<IDedicatedServerSpawner, DedicatedServerSpawner>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
