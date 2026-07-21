@@ -3,18 +3,10 @@
 #include "asio.hpp"
 #include "Listener.hpp"
 #include "CustomUtility.hpp"
+#include "Room.hpp"
 
 void Session::StartTcpRead()
 {
-    {
-        std::lock_guard<std::mutex> lock(_disconnectCallbacksMutex);
-        if(_disconnectCallbacks.empty())
-        {
-            spdlog::error("session {}: disconnect callback not set", uuids::to_string(_id));
-            return;
-        }
-    }
-
     // Tcp read open
     ReadSizeAsync();
 }
@@ -33,23 +25,7 @@ void Session::Stop()
     _isValid = false;
     _socketPtr->close();
 
-    // 콜백들을 로컬로 복사하고 원본 맵을 비움 (순회 중 수정 방지)
-    std::unordered_map<CallbackHandle, NotifyDisconnectCallback> callbacks;
-    {
-        std::lock_guard<std::mutex> lock(_disconnectCallbacksMutex);
-        callbacks = std::move(_disconnectCallbacks);
-        _disconnectCallbacks.clear();
-    }
-
-    // 락 외부에서 콜백 실행 (데드락 방지 및 안전한 순회)
-    for(const auto& [handle, disconnectCallback] : callbacks)
-    {
-        if(disconnectCallback)
-        {
-            disconnectCallback(GetShared<Session>());
-            spdlog::info("session {} disconnect handle {} called", uuids::to_string(_id), handle);
-        }
-    }
+    _disconnectCallback(GetShared<Session>());
 }
 
 void Session::Init()
@@ -77,6 +53,14 @@ void Session::PunchUdpHole(const asio::ip::udp::endpoint& ep)
                     self->_clientUdpEp = ep;
                     self->_state = SessionState::InitializeComplete;
                     self->_isValid = true; // allow broadcast
+
+                    if(const auto listener = self->_weakListener.lock())
+                    {
+                        if(const auto room = listener->GetDedicatedRoom())
+                        {
+                            room->AddSession(self->_id, self->GetWeak<Session>());
+                        }
+                    }
 
                     spdlog::info("session {}: udp hole punched successfully. ip: {}, port: {}",
                                  uuids::to_string(self->_id), ep.address().to_string(), ep.port());
@@ -123,17 +107,14 @@ void Session::SetRoom(const uuids::uuid& roomId)
     EnqueueTcpSendPacket(std::move(sendPacket));
 }
 
-CallbackHandle Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
+void Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
 {
-    std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
-    _disconnectCallbacks[_callbackHandleCount] = callback;
-    return _callbackHandleCount++;
+    _disconnectCallback = std::move(callback);
 }
 
 void Session::RemoveDisconnectCallback(CallbackHandle handle)
 {
-    std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
-    _disconnectCallbacks.erase(handle);
+    _disconnectCallback = nullptr;
 }
 
 void Session::SetSendToHandler(SendToHandler handler)
@@ -226,77 +207,6 @@ void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::
 
 void Session::ProcessPacketAsync()
 {
-    std::lock_guard<std::mutex> processQueueLock(_processQueueMutex);
-    while(!_processQueue.empty())
-    {
-        auto packet = _processQueue.front();
-        _processQueue.pop();
-
-        // matching sequence
-        if(packet->type() == PacketType::Match)
-        {
-            const auto dataSize = packet->data().size();
-            const auto matchmakingPacket = std::make_shared<Matchmaking>();
-            if(!matchmakingPacket->ParseFromArray(packet->data().data(), dataSize))
-            {
-                spdlog::error("session {}: parsing match making packet error", uuids::to_string(_id));
-                return;
-            }
-
-            if(uuids::uuid::from_string(matchmakingPacket->sessionid()) != _id)
-            {
-                spdlog::error("session {}: session id is not same ({})", uuids::to_string(_id), matchmakingPacket->sessionid());
-                return;
-            }
-
-            _state = SessionState::WaitMatching; // Update State
-            _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
-                if(const auto self = weakSelf.lock())
-                {
-                    if(const auto listener = self->_weakListener.lock())
-                    {
-                        spdlog::info("session {}: request waiting for match", uuids::to_string(self->GetId()));
-
-                        Matchmaking sendMatchmakingPacket;
-                        if(MatchingLastError e; !listener->AddToMatchmakingQueue(self->GetId(), e))
-                        {
-                            if(e == MatchingLastError::FailedByExsists)
-                            {
-                                return;
-                            }
-
-                            // failed packet send
-                            sendMatchmakingPacket.set_type(MatchmakingType::Failed);
-                            sendMatchmakingPacket.set_sessionid(uuids::to_string(self->GetId()));
-                        }
-                        else
-                        {
-                            // send ok packet
-                            sendMatchmakingPacket.set_type(MatchmakingType::Waiting);
-                            sendMatchmakingPacket.set_sessionid(uuids::to_string(self->GetId()));
-                        }
-
-                        std::string serializedData;
-                        if(!sendMatchmakingPacket.SerializeToString(&serializedData))
-                        {
-                            spdlog::error("session {}: serialize match making packet error", uuids::to_string(self->GetId()));
-                            return;
-                        }
-
-                        auto sendPacket = std::make_shared<Packet>();
-                        sendPacket->set_type(PacketType::Match);
-                        sendPacket->set_data(serializedData);
-                        self->EnqueueTcpSendPacket(std::move(sendPacket)); // send matching complete to client
-                    }
-                }
-            });
-        }
-        else
-        {
-            spdlog::warn("session {}: income not implemented packet type", uuids::to_string(GetId()));
-            return;
-        }
-    }
 }
 
 void Session::EnqueueUdpSendPacket(const std::shared_ptr<Packet> data)

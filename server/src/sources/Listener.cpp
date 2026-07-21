@@ -1,15 +1,13 @@
 #include "Listener.hpp"
 
 #include "IOManager.hpp"
-#include "SessionManager.hpp"
-#include "Matching.hpp"
 #include "Room.hpp"
 #include "Session.hpp"
 #include "IngamePacketPool.hpp"
 
-Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, std::shared_ptr<Matching> matching, std::uint16_t port)
-    : _ioManager(ioManager), _strand(ioManager->GetIoContext()), _sessionManager(sessionManager), _matching(matching), _tcpEndpoint(asio::ip::tcp::v4(), port),
-      _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), 0))
+Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort)
+    : _ioManager(ioManager), _strand(ioManager->GetIoContext()), _tcpEndpoint(asio::ip::tcp::v4(), tcpPort),
+      _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), udpPort))
 {
     _udpEndpoint = _udpSocket.local_endpoint();
     spdlog::info("listener object created: tcp port {}, udp port {}", _tcpEndpoint.port(), _udpEndpoint.port());
@@ -19,26 +17,18 @@ void Listener::Start()
 {
     spdlog::info("listener started...");
 
-    _matching->SetRegisterRoomCallback([weakSelf = GetWeak<Listener>()](const std::shared_ptr<Room>& room) {
-        if(const auto self = weakSelf.lock())
-            self->AddRoom(room);
-    });
-
-    _matching->SetRemoveRoomCallback([weakSelf = GetWeak<Listener>()](const std::shared_ptr<Room>& room) {
-        if(const auto self = weakSelf.lock())
-            self->RemoveRoom(room);
-    });
-
     AcceptAsync();
     ReceiveAsyncByUdp();
-
-    _matching->Start();
 }
 
 void Listener::Stop()
 {
-    _matching->Stop();
-    _rooms.clear();
+    if(_dedicatedRoom)
+    {
+        _dedicatedRoom->Stop();
+        _dedicatedRoom = nullptr;
+    }
+
     _acceptor.close();
     _udpSocket.close();
     spdlog::info("listener stopped...\n");
@@ -49,24 +39,25 @@ void Listener::AcceptAsync()
     uuids::uuid sessionId;
     {
         std::lock_guard<std::mutex> lock(_uuidMutex);
-        sessionId = _uuidGen();
+        sessionId = _uuidGen(); // TODO : 인증 서버로부터 받은 player uuid를 사용할것인지 고민 -> 데이터 저장을 위한 조치 혹은 플레이어 아이디의 관리
     }
+
     auto newSession = Session::Create(_ioManager, GetWeak<Listener>(), sessionId, _udpEndpoint.port());
-
-    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
-    if(_sessions.contains(sessionId))
     {
-        spdlog::error("listener: create duplicate session, create again");
-        AcceptAsync();
-        return;
+        std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+        if(_sessions.contains(sessionId))
+        {
+            spdlog::error("listener: create duplicate session, create again");
+            AcceptAsync();
+            return;
+        }
     }
 
-    const auto handle = newSession->AddDisconnectCallback([weakSelf = GetWeak<Listener>(), sessionId](const std::shared_ptr<Session>& session) {
+    newSession->AddDisconnectCallback([weakSelf = GetWeak<Listener>(), sessionId](const std::shared_ptr<Session>& session) {
         if(const auto self = weakSelf.lock())
         {
             std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
             self->_sessions.erase(sessionId);
-            self->_sessionCallbackHandles.erase(sessionId);
             spdlog::info("listener: session {} removed from listener", uuids::to_string(sessionId));
         }
     });
@@ -77,40 +68,31 @@ void Listener::AcceptAsync()
             self->EnqueueSendData(ep, std::move(data));
     });
 
-    auto weakSession = _sessionManager->Insert(newSession->GetId(), std::move(newSession));
-
-    _sessions[sessionId] = weakSession;
-    _sessionCallbackHandles[sessionId] = handle;
+    _sessions[sessionId] = newSession;
 
     // async accept new client
-    if(const auto session = weakSession.lock())
-    {
-        _acceptor.async_accept(*session->GetSocket(), [weakSelf = GetWeak<Listener>(), weakSession, sessionId](const std::error_code& ec) {
-            if(ec)
+    _acceptor.async_accept(*newSession->GetSocket(), [weakSelf = GetWeak<Listener>(), newSession, sessionId](const std::error_code& ec) {
+        if(ec)
+        {
+            if(ec == asio::error::connection_aborted ||
+               ec == asio::error::operation_aborted)
             {
-                if(ec == asio::error::connection_aborted ||
-                   ec == asio::error::operation_aborted)
-                {
-                    spdlog::info("listener: acceptor aborted");
-                    return;
-                }
-
-                spdlog::error("listener: accept error occured({})", ec.message());
+                spdlog::info("listener: acceptor aborted");
                 return;
             }
 
-            if(auto self = weakSelf.lock())
-            {
-                if(auto session = weakSession.lock())
-                {
-                    session->Init();
+            spdlog::error("listener: accept error occured({})", ec.message());
+            return;
+        }
 
-                    // new session create for accept other client
-                    self->AcceptAsync();
-                }
-            }
-        });
-    }
+        if(auto self = weakSelf.lock())
+        {
+            newSession->Init();
+
+            // new session create for accept other client
+            self->AcceptAsync();
+        }
+    });
 }
 
 void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr<Raw> payload)
@@ -146,17 +128,17 @@ void Listener::SendAsyncByUdp()
 
     // 실행 후 바로 return -> thread 점유 최소화
     _udpSocket.async_send_to(
-    asio::buffer(*payload), ep,
-    asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), payload, ep](const std::error_code& ec, std::size_t) {
-        if(const auto self = weakSelf.lock())
-        {
-            // TODO : error code에 따라 작동 여부 결정
-            if(ec)
-                spdlog::error("listener: udp send error occured({})", ec.message());
-            
-            self->SendAsyncByUdp(); // 다시 실행하여 나머지 전송
-        }
-    }));
+        asio::buffer(*payload), ep,
+        asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), payload, ep](const std::error_code& ec, std::size_t) {
+            if(const auto self = weakSelf.lock())
+            {
+                // TODO : error code에 따라 작동 여부 결정
+                if(ec)
+                    spdlog::error("listener: udp send error occured({})", ec.message());
+
+                self->SendAsyncByUdp(); // 다시 실행하여 나머지 전송
+            }
+        }));
 }
 
 void Listener::ReceiveAsyncByUdp()
@@ -164,64 +146,64 @@ void Listener::ReceiveAsyncByUdp()
     auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
     auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
     _udpSocket.async_receive_from(
-    asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), receiveBuffer, senderEndpoint](const std::error_code& ec, const std::size_t bytesRead) {
-        if(ec)
-        {
-            if(ec == asio::error::operation_aborted)
+        asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), receiveBuffer, senderEndpoint](const std::error_code& ec, const std::size_t bytesRead) {
+            if(ec)
             {
-                spdlog::info("listener: udp socket close complete");
-                return;
+                if(ec == asio::error::operation_aborted)
+                {
+                    spdlog::info("listener: udp socket close complete");
+                    return;
+                }
+
+                spdlog::warn("listener: udp error occurred({})", ec.message());
+                if(auto self = weakSelf.lock())
+                {
+                    self->ReceiveAsyncByUdp();
+                    return;
+                }
             }
 
-            spdlog::warn("listener: udp error occurred({})", ec.message());
-            if(auto self = weakSelf.lock())
+            if(bytesRead < sizeof(std::uint16_t))
             {
-                self->ReceiveAsyncByUdp();
-                return;
-            }
-        }
-
-        if(bytesRead < sizeof(std::uint16_t))
-        {
-            spdlog::error("listener: bad size received (size {})", bytesRead);
-            if(const auto self = weakSelf.lock())
-                self->ReceiveAsyncByUdp();
-
-            return;
-        }
-
-        // first 2 bytes are data length header
-        std::uint16_t expectedSize;
-        std::memcpy(&expectedSize, receiveBuffer->data(), sizeof(expectedSize));
-        expectedSize = ntohs(expectedSize);
-
-        std::size_t payloadSize = bytesRead - sizeof(std::uint16_t);
-
-        if(expectedSize != payloadSize)
-        {
-            spdlog::error("listener: bad data received (expected {}, real {})", expectedSize, payloadSize);
-            if(const auto self = weakSelf.lock())
-                self->ReceiveAsyncByUdp();
-
-            return;
-        }
-
-        // raw pointer to data payload, no onwership
-        const unsigned char* payload = receiveBuffer->data() + 2;
-
-        // send to room
-        // client must have own room id and session id
-        if(const auto self = weakSelf.lock())
-        {
-            self->_ioManager->PostOnBlockingPool([weakSelf, senderEndpoint, receiveBuffer, payload, payloadSize]() {
+                spdlog::error("listener: bad size received (size {})", bytesRead);
                 if(const auto self = weakSelf.lock())
-                    self->ProcessPacket(std::move(senderEndpoint), payloadSize, payload);
-            });
-        }
+                    self->ReceiveAsyncByUdp();
 
-        if(const auto self = weakSelf.lock())
-            self->ReceiveAsyncByUdp();
-    }));
+                return;
+            }
+
+            // first 2 bytes are data length header
+            std::uint16_t expectedSize;
+            std::memcpy(&expectedSize, receiveBuffer->data(), sizeof(expectedSize));
+            expectedSize = ntohs(expectedSize);
+
+            std::size_t payloadSize = bytesRead - sizeof(std::uint16_t);
+
+            if(expectedSize != payloadSize)
+            {
+                spdlog::error("listener: bad data received (expected {}, real {})", expectedSize, payloadSize);
+                if(const auto self = weakSelf.lock())
+                    self->ReceiveAsyncByUdp();
+
+                return;
+            }
+
+            // raw pointer to data payload, no onwership
+            const unsigned char* payload = receiveBuffer->data() + 2;
+
+            // send to room
+            // client must have own room id and session id
+            if(const auto self = weakSelf.lock())
+            {
+                self->_ioManager->PostOnBlockingPool([weakSelf, senderEndpoint, receiveBuffer, payload, payloadSize]() {
+                    if(const auto self = weakSelf.lock())
+                        self->ProcessPacket(std::move(senderEndpoint), payloadSize, payload);
+                });
+            }
+
+            if(const auto self = weakSelf.lock())
+                self->ReceiveAsyncByUdp();
+        }));
 }
 
 void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std::uint16_t size, const unsigned char* data)
@@ -242,15 +224,13 @@ void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, st
             return;
         }
 
-        const auto roomId = uuids::uuid::from_string(ingamePacket->roomid());
-        const auto room = GetRoom(roomId.value());
-        if(room == nullptr)
+        if(!_dedicatedRoom)
         {
-            spdlog::error("listener: invalid room id ({})", ingamePacket->roomid());
+            spdlog::warn("listener: ingame packet arrived but dedicated room is null");
             return;
         }
 
-        room->EnqueuePacket(std::move(ingamePacket));
+        _dedicatedRoom->EnqueuePacket(std::move(ingamePacket));
         return;
     }
 
@@ -279,41 +259,8 @@ void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, st
                 spdlog::error("listener: no session in listener");
                 return;
             }
-            
-            if(const auto session = _sessions[sessionId.value()].lock())
-            {
-                session->PunchUdpHole(*sender);
-            }
+
+            _sessions[sessionId.value()]->PunchUdpHole(*sender);
         }
     }
-}
-
-void Listener::AddRoom(std::shared_ptr<Room> room)
-{
-    std::lock_guard<std::mutex> roomsLock(_roomsMutex);
-    const auto roomId = room->GetId();
-    _rooms[roomId] = room;
-
-    spdlog::info("listener: add room {} to listener", uuids::to_string(roomId));
-}
-
-void Listener::RemoveRoom(std::shared_ptr<Room> room)
-{
-    std::lock_guard<std::mutex> roomsLock(_roomsMutex);
-    const auto removeId = room->GetId();
-    if(_rooms.contains(removeId))
-        _rooms.erase(removeId);
-
-    spdlog::info("listener: remove room {} from listener", uuids::to_string(removeId));
-}
-
-bool Listener::AddToMatchmakingQueue(uuids::uuid sessionId, MatchingLastError& type)
-{
-    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
-    if(!_sessions.contains(sessionId))
-    {
-        return false;
-    }
-    
-    return _matching->AddWaitSession(sessionId, _sessions[sessionId], type);
 }
