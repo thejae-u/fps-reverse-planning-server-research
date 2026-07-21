@@ -36,8 +36,8 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
     {
         try
         {
-            int tcpPort = GetFreePort();
-            int udpPort = GetFreePort();
+            int tcpPort = GetFreeBothTcpAndUdpPort();
+            int udpPort = GetFreeBothTcpAndUdpPort();
 
             // OS에 따라 맞는 경로 설정
             string executablePath = ResolveExecutablePath();
@@ -115,10 +115,30 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
         return defaultPath;
     }
 
-    private int GetFreePort()
+    private int GetFreeBothTcpAndUdpPort()
     {
-        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return ((IPEndPoint)socket.LocalEndPoint!).Port;
+        const int maxTries = 10;
+
+        for (int i = 0; i < maxTries; ++i)
+        {
+            using var tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            tcpSocket.Bind(new IPEndPoint(IPAddress.Any, 0));
+            int allocatedPort = ((IPEndPoint)tcpSocket.LocalEndPoint!).Port;
+
+            try
+            {
+                using var udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                udpSocket.Bind(new IPEndPoint(IPAddress.Any, allocatedPort));
+
+                return allocatedPort;
+            }
+            catch (SocketException) 
+            { 
+                // 같은 포트 배정 실패 시 
+                continue;
+            }
+        }
+
+        throw new Exception("Failed to allocate port");
     }
 }

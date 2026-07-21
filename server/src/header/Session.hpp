@@ -25,13 +25,16 @@ class Session : public IBase
 {
 private:
     using Raw = std::vector<unsigned char>;
-    struct SecretKey {};
+
+    struct SecretKey
+    {
+    };
 
 public:
     explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener, uuids::uuid sessionId, std::uint16_t udpPort)
         : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _strand(ioManager->GetIoContext()),
           _serverUdpPort(udpPort), _clientUdpPort(0), _weakListener(listener), _isValid(false), _state(SessionState::Initializing),
-          _id(sessionId), _readSize(0), _readNetSize(0), _callbackHandleCount(0), _isWriting(false), _isProcessing(false)
+          _id(sessionId), _readSize(0), _readNetSize(0), _isWriting(false), _isProcessing(false)
     {
     }
 
@@ -62,7 +65,7 @@ public:
     uuids::uuid GetRoomId() const { return _roomId; }
 
     using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
-    CallbackHandle AddDisconnectCallback(NotifyDisconnectCallback callback);
+    void AddDisconnectCallback(NotifyDisconnectCallback callback);
     void RemoveDisconnectCallback(CallbackHandle handle);
 
     using SendToHandler = std::function<void(asio::ip::udp::endpoint, std::shared_ptr<Raw>)>;
@@ -92,10 +95,6 @@ private:
     std::vector<unsigned char> _readBuffer;
 
     NotifyDisconnectCallback _disconnectCallback;
-    std::unordered_map<CallbackHandle, NotifyDisconnectCallback> _disconnectCallbacks;
-    CallbackHandle _callbackHandleCount;
-    std::mutex _disconnectCallbacksMutex;
-
     SendToHandler _sendTo;
 
     std::queue<std::shared_ptr<Raw>> _sendUdpQueue;

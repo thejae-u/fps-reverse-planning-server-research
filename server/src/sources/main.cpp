@@ -4,27 +4,43 @@
 
 #include "Base.hpp"
 #include "IOManager.hpp"
-#include "Matching.hpp"
 #include "Listener.hpp"
-#include "SessionManager.hpp"
-#include "ConnectionPool.hpp"
 #include "IngamePacketPool.hpp"
-#include "TestWorld.hpp"
+#include "Room.hpp"
 
-// Test Server Port
-constexpr std::uint16_t SERVER_PORT = 52800;
-
-int main(int argc, char* argv[])
+int main(int argc, char** argv)
 {
-    if (argc > 1 && std::string(argv[1]) == "--test")
+    // 실행인자 파싱 및 검증
+    if(argc == 1)
     {
-        return RunWorldUpdateTest();
+        spdlog::error("no options");
+        exit(0);
     }
 
+    const ServerConfig config = ServerConfig::Parse(argc, argv);
+    if(config.matchId.empty())
+    {
+        spdlog::error("invalid match id");
+        exit(0);
+    }
+    
+    if(config.tcpPort == 0 || config.udpPort == 0)
+    {
+        spdlog::error("invalid port");
+        exit(0);
+    }
+    
+    if(config.allowedPlayers.size() == 0)
+    {
+        spdlog::error("no players specified");
+        exit(0);
+    }
+    
+    // 서버 시작
     spdlog::info("type 'quit' to stop server");
     const auto threadCount = std::thread::hardware_concurrency();
-    const auto blockingThreadCount = 4;
-    const auto ioManager = IOManager::Create("first manager", threadCount, blockingThreadCount);
+    constexpr auto blockingThreadCount = 4;
+    const auto ioManager = IOManager::Create("I/O Manager", threadCount, blockingThreadCount);
     
     if(!ioManager)
         throw std::runtime_error("failed to create io manager");
@@ -32,18 +48,15 @@ int main(int argc, char* argv[])
     constexpr auto ingamePacketPoolSize = 100;
     IngamePacketPool::Init(ingamePacketPoolSize);
     
-    /*
-    constexpr auto internalPoolSize = 5;
-    const auto internalConnectionPool = ConnectionPool::Create(ioManager, internalPoolSize);
-    */
+    // broadcast용 room
+    auto roomId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
+    const auto dedicatedRoom = Room::Create(ioManager, roomId, config.allowedPlayers.size());
     
-    const auto sessionManager = SessionManager::Create();
-    const auto matching = Matching::Create(ioManager, sessionManager);
-    const auto listener = Listener::Create(ioManager, sessionManager, matching, SERVER_PORT);
+    const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort);
+    listener->SetDedicatedRoom(dedicatedRoom);
 
     // Start, Stop을 처리하기 위한 컨테이너
     std::vector<std::shared_ptr<IBase>> components;
-    //components.emplace_back(internalConnectionPool);
     components.emplace_back(listener);
 
     for(const auto& component : components)
@@ -59,7 +72,6 @@ int main(int argc, char* argv[])
     for(auto it = components.rbegin(); it != components.rend(); ++it)
         (*it)->Stop();
 
-    sessionManager->Clear();
     ioManager->Stop();
     
     IngamePacketPool::Release();

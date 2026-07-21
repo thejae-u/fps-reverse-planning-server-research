@@ -1,40 +1,43 @@
 #include "Room.hpp"
 
 #include "IOManager.hpp"
-#include "SessionManager.hpp"
 #include "Session.hpp"
 
-Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
-: _ioManager(ioManager), _sessionManager(sessionManager), _roomId(roomId), _world(std::make_unique<World>(ioManager->GetIoContext(), roomId))
+Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid roomId, std::size_t expectedPlayerCount)
+    : _ioManager(ioManager), _roomId(roomId), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), roomId))
 {
 }
 
 Room::~Room()
 {
-    spdlog::info("room {} destroyed", uuids::to_string(_roomId));
+    spdlog::info("room: destroyed", uuids::to_string(_roomId));
 }
 
-void Room::WorldInit()
+void Room::TryStartGameNoLock()
 {
-    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
-    if(_sessions.empty())
-    {
-        spdlog::info("room {} invalid situation: no session", uuids::to_string(_roomId));
-    }
+    if(_isWorldStarted)
+        return;
 
+    if(_sessions.size() >= _expectedPlayerCount)
+    {
+        if(!_isWorldStarted.exchange(true))
+        {
+            spdlog::info("room: all players connected! starting world...", uuids::to_string(_roomId));
+            WorldInitNoLock();
+        }
+    }
+}
+
+void Room::WorldInitNoLock()
+{
     _world->Init(_sessions);
-    spdlog::info("room {}: world create complete", uuids::to_string(_roomId));
+    spdlog::info("room: world create complete", uuids::to_string(_roomId));
 
     _world->StartUpdate(weak_from_this());
 }
 
 void Room::Stop()
 {
-    if(_removeRoomFromMatchingHandler != nullptr)
-        _removeRoomFromMatchingHandler(shared_from_this());
-
-    _removeRoomFromMatchingHandler = nullptr;
-
     _world->StopUpdate();
 
     if(!_sessions.empty())
@@ -54,6 +57,8 @@ void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
                 self->RemoveSession(removeSession);
         });
     }
+
+    TryStartGameNoLock();
 }
 
 void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
@@ -61,21 +66,18 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
     std::lock_guard<std::mutex> lock(_sessionsMutex);
     if(const auto removeSession = weakRemoveSession.lock())
     {
-        if (_sessions.erase(removeSession->GetId()) == 0)
+        if(_sessions.erase(removeSession->GetId()) == 0)
         {
             return;
         }
 
-        spdlog::info("room {}: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
+        spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
 
         if(!_sessions.empty())
             return;
 
-        spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
-        if (_removeRoomFromMatchingHandler)
-        {
-            _removeRoomFromMatchingHandler(shared_from_this());
-        }
+        spdlog::info("room: all session removed", uuids::to_string(_roomId));
+        _world->StopUpdate();
     }
 }
 
@@ -95,9 +97,4 @@ void Room::Broadcast(std::shared_ptr<Packet> packet)
 void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet) const
 {
     _world->EnqueuePacket(packet);
-}
-
-void Room::SetRemoveRoomCallback(RemoveRoomCallback handler)
-{
-    _removeRoomFromMatchingHandler = std::move(handler);
 }
