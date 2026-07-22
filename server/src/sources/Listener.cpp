@@ -5,9 +5,10 @@
 #include "Session.hpp"
 #include "IngamePacketPool.hpp"
 
-Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort)
+Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort, const std::vector<std::string> allowedPlayers)
     : _ioManager(ioManager), _strand(ioManager->GetIoContext()), _tcpEndpoint(asio::ip::tcp::v4(), tcpPort),
-      _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), udpPort))
+      _acceptor(ioManager->GetIoContext(), _tcpEndpoint), _udpSocket(ioManager->GetIoContext(), asio::ip::udp::endpoint(asio::ip::udp::v4(), udpPort)),
+      _allowedPlayers(allowedPlayers.begin(), allowedPlayers.end())
 {
     _udpEndpoint = _udpSocket.local_endpoint();
     spdlog::info("listener object created: tcp port {}, udp port {}", _tcpEndpoint.port(), _udpEndpoint.port());

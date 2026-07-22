@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     auto roomId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
     const auto dedicatedRoom = Room::Create(ioManager, roomId, config.allowedPlayers.size());
     
-    const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort);
+    const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort, config.allowedPlayers);
     listener->SetDedicatedRoom(dedicatedRoom);
 
     // Start, Stop을 처리하기 위한 컨테이너

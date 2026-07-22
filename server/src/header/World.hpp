@@ -44,6 +44,19 @@ public:
     void EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet);
 
     std::size_t GetTickCount() const { return _tickCount.load(); }
+    std::unique_ptr<std::vector<PlayerStat>> GetPlayerStats()
+    {
+        std::lock_guard lock(_playerMutex);
+        auto playerStats = std::make_unique<std::vector<PlayerStat>>();
+        playerStats->reserve(_players.size());
+        for (auto& [id, player] : _players)
+        {
+            PlayerStat playerStat(id, *player);
+            playerStats->push_back(playerStat);
+        }
+        
+        return playerStats;
+    }
     
     // TEST MONITORING
     void PrintScoreboard();

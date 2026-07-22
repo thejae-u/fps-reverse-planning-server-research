@@ -5,6 +5,7 @@
     "protobuf",
     "asio",
     "spdlog",
-    "stduuid"
+    "stduuid",
+    "nlohmann-json"
   ]
 }
