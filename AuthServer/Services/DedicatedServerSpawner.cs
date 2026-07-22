@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using AuthServer.Dtos;
 using Microsoft.AspNetCore.Identity;
 
 namespace AuthServer.Services;
@@ -16,7 +17,7 @@ public class DedicatedServerInfo
 
 public interface IDedicatedServerSpawner
 {
-    Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> playerTokens);
+    Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> userIds);
 }
 
 public class DedicatedServerSpawner : IDedicatedServerSpawner
@@ -32,7 +33,7 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
         _matchService = matchService;
     }
     
-    public Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> playerTokens)
+    public Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> userIds)
     {
         try
         {
@@ -41,13 +42,13 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
 
             // OS에 따라 맞는 경로 설정
             string executablePath = ResolveExecutablePath();
-            string tokenCsv = string.Join(",", playerTokens);
+            string idCsv = string.Join(",", userIds);
 
             // CLI 인자 구성
             var startInfo = new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = $"--match-id {matchId} --tcp-port {tcpPort} --udp-port {udpPort} --players {tokenCsv}",
+                Arguments = $"--match-id {matchId} --tcp-port {tcpPort} --udp-port {udpPort} --players {idCsv}",
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
@@ -65,7 +66,7 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
                 if (process.ExitCode != 0)
                 {
                     _logger.LogError($"[DedicatedServer] Match {matchId} CRASHED! Recovering match state...");
-                    await _matchService.FinishMatchAsync(matchId, winnerId: null);
+                    await _matchService.FinishMatchAsync(matchId, TeamSide.None, userIds);
                 }
             };
 

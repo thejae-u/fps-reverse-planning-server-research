@@ -50,21 +50,21 @@ builder.Services.AddOpenApi("v1", options =>
 // web socket
 builder.Services.AddSignalR();
 
-// background internal service
-builder.Services.AddHostedService<MatchWorker>();
-builder.Services.AddHostedService<LogicServerListenerService>();
 
 // global fields
 builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("MatchOptions"));
 builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicServer"));
 
 // Service DI
-//builder.Services.AddSingleton<LogicServerConnectionPool>();
 builder.Services.AddSingleton<IDedicatedServerSpawner, DedicatedServerSpawner>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
 builder.Services.AddLogging();
+builder.Services.AddTransient<DataSeeder>();
+
+// background internal service
+builder.Services.AddHostedService<MatchWorker>();
 
 // JWT Configuration
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
@@ -131,16 +131,16 @@ app.MapControllers();
 // Server Information Route
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-app.MapGet("/version", () => "AuthServer v0.4.0-develop");
+app.MapGet("/version", () => "AuthServer v0.11.0-develop");
 app.MapGet("/version/detail", () => new
 {
-    Version = "version 0.4.0",
+    Version = "version 0.11.0",
     Status = "feature",
-    Implement = "web server connect to logic server",
+    Implement = "dedicated server implement",
     FeatureBranch = new
     {
-        Name = "feat/7-imp-web-server",
-        Link = "https://thejaeu.com/fps-reverse-planning-server-research/tree/feat/7-impl-web-server"
+        Name = "feat/12-impl-dedicated-process",
+        Link = "https://thejaeu.com/fps-reverse-planning-server-research/tree/feat/12-impl-dedicated-process"
     }
 });
 app.MapGet("/info", () => new
@@ -152,15 +152,10 @@ app.MapGet("/info", () => new
 // SignalR Match Hub Route
 app.MapHub<MatchHub>("/hubs/match");
 
-// Application Connection verification check
-var connectionPool = app.Services.GetRequiredService<LogicServerConnectionPool>();
-app.Lifetime.ApplicationStarted.Register(() =>
+// 구동 직전 admin, internal 계정 생성
+using (var scope = app.Services.CreateScope())
 {
-    Task.Run(async () =>
-    {
-        await Task.Delay(2000); // C++ 서버 기동 시차 대기
-        await connectionPool.InternalTestAsync();
-    });
-});
-
+    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+    await seeder.SeedAsync();
+}
 app.Run();

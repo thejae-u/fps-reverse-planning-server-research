@@ -1,5 +1,6 @@
 #include "Room.hpp"
 
+#include "HttpResultReporter.hpp"
 #include "IOManager.hpp"
 #include "Session.hpp"
 
@@ -11,6 +12,52 @@ Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid roomId, 
 Room::~Room()
 {
     spdlog::info("room: destroyed", uuids::to_string(_roomId));
+}
+
+void Room::OnMatchFinished()
+{
+    spdlog::info("room: match finished. reporting results to auth server...");
+
+    auto winningTeam = 1; // TODO : 실제 이긴 팀을 계산하여 반환하는 World::GetWinner 함수 구현 필요
+    auto playerStats = _world->GetPlayerStats();
+
+    json j;
+    j["apiKey"] = "default_secret_key"; // TODO : 검증용 api key 전달 로직 구현 필요
+    j["matchId"] = uuids::to_string(_roomId);
+    j["winningTeam"] = winningTeam;
+    j["TeamAScore"] = 0; // TODO : 팀 별 스코어 계산 로직 필요
+    j["TeamBScore"] = 0; // TODO : 팀 별 스코어 계산 로직 필요
+
+    // ISO8601 UTC Time
+    j["endTimeUtc"] = std::format("{:%FT%TZ}", std::chrono::system_clock::now());
+
+    j["winnerUserIds"] = json::array();
+    j["playerStats"] = json::array();
+    for(const auto& stat : *playerStats)
+    {
+        if(static_cast<int>(stat.team) == winningTeam)
+            j["winnerUserIds"].push_back(uuids::to_string(stat.id));
+
+        j["playerStats"].push_back({
+            { "userId", uuids::to_string(stat.id) },
+            { "kills", stat.kill },
+            { "deaths", stat.death },
+            { "assists", stat.assist },
+            { "damage", stat.damage },
+            { "heals", stat.damage },
+            { "guards", stat.guard }
+        });
+    }
+    
+    std::string jsonPayload = j.dump();
+
+    if(HttpResultReporter::SendMatchResult("127.0.0.1", 9000, jsonPayload))
+        spdlog::info("room: match result successfully reported to auth server.");
+    else
+        spdlog::error("room: failed to report match result");
+    
+    // 프로세스 종료
+    std::exit(0);
 }
 
 void Room::TryStartGameNoLock()

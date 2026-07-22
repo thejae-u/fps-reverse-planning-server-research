@@ -31,12 +31,12 @@ private:
     };
 
 public:
-    explicit Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort);
+    explicit Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort, const std::vector<std::string> allowedPlayers);
     ~Listener() override { spdlog::info("server successfully destroyed"); }
 
-    static std::shared_ptr<Listener> Create(std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort)
+    static std::shared_ptr<Listener> Create(std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort, const std::vector<std::string> allowedPlayers)
     {
-        auto newServer = std::make_shared<Listener>(SecretKey{}, ioManager, tcpPort, udpPort);
+        auto newServer = std::make_shared<Listener>(SecretKey{}, ioManager, tcpPort, udpPort, allowedPlayers);
         return newServer;
     }
 
@@ -57,6 +57,10 @@ private:
     void SendAsyncByUdp();
     void ReceiveAsyncByUdp();
     void ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std::uint16_t size, const unsigned char* data);
+    bool IsPlayerAllowed(const std::string& userId) const
+    {
+        return _allowedPlayers.contains(userId);
+    }
 
 private:
     std::shared_ptr<IOManager> _ioManager;
@@ -73,6 +77,7 @@ private:
 
     // 단일 룸 정보
     std::shared_ptr<Room> _dedicatedRoom;
+    std::unordered_set<std::string> _allowedPlayers;
 
     // 룸에 연결 된 세션 정보
     std::unordered_map<uuids::uuid, std::shared_ptr<Session>> _sessions;

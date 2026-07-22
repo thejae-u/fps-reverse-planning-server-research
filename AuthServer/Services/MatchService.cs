@@ -261,7 +261,7 @@ public class MatchService
         _logger.LogInformation("{userId} remove from userConnections success", userId);
     }
 
-    public async Task<bool> FinishMatchAsync(string matchId, string? winnerId)
+    public async Task<bool> FinishMatchAsync(string matchId, TeamSide winningTeam, List<string> winnerUserIds)
     {
         using var scope = _scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -270,9 +270,11 @@ public class MatchService
         if (matchResult is null || matchResult is { IsFinished: true }) return false;
 
         matchResult.IsFinished = true;
-        matchResult.WinnerId = winnerId;
+        matchResult.WinningTeam = winningTeam.ToString();
+        matchResult.WinnerUserIds = winnerUserIds;
         matchResult.FinishedAtUtc = DateTime.UtcNow;
 
+        // Redis 처리 트랙잭션
         var tran = _redisDB.CreateTransaction();
         _ = tran.HashDeleteAsync(REDIS_RESULT_PREFIX, matchId);
 
@@ -282,14 +284,16 @@ public class MatchService
         }
 
         await dbContext.SaveChangesAsync();
-        bool redisSuccess = await tran.ExecuteAsync();
+        await tran.ExecuteAsync();
+        
+        _logger.LogInformation("{matchId} finished successfully: {winningTeam}, {dateTime}", matchId, winningTeam, matchResult.FinishedAtUtc.ToString());
 
-        _logger.LogInformation("Match {matchId} finished, winner: {winnerId}", matchId, winnerId);
-
+        // SignalR로 매치 종료 알림
         await _hubContext.Clients.Group(MatchHub.GetMatchGroup(matchId)).SendAsync("GameFinished", new
         {
-            winnerId,
-            matchId
+            matchId,
+            winningTeam = winningTeam.ToString(),
+            winnerUserIds
         });
 
         return true;

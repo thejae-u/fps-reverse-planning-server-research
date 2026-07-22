@@ -4,10 +4,12 @@
 #include <mutex>
 #include <unordered_map>
 #include <uuid.h>
+#include <nlohmann/json.hpp>
 
 #include "Packet.pb.h"
 #include "World.hpp"
 using namespace Protocol;
+using json = nlohmann::json;
 
 class IOManager;
 class SessionManager;
@@ -29,6 +31,9 @@ public:
         auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, roomId, expectedPlayerCount);
         return newRoom;
     }
+    
+private:
+    void OnMatchFinished();
 
 public:
     void TryStartGameNoLock();

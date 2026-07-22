@@ -140,19 +140,4 @@ public class MatchController : ControllerBase
             ServerAddress = matchResult?.ServerAddress
         });
     }
-
-    [AllowAnonymous]
-    [HttpPost("report-result")]
-    public async Task<IActionResult> ReportResult([FromBody] GameResultReportDto report)
-    {
-        var serverKey = Environment.GetEnvironmentVariable("LOGIC_SERVER_API_KEY") ?? "default_secret_key";
-        if(report.ApiKey != serverKey)
-            return Unauthorized("Invalid API Key");
-
-        var result = await _matchService.FinishMatchAsync(report.MatchId, report.WinnderId);
-        if (!result)
-            return NotFound(new { message = "Match not found or already finished" });
-
-        return Ok(new { message = "Result processed successfully" });
-    }
 }

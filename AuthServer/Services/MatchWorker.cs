@@ -56,9 +56,7 @@ public class MatchWorker : BackgroundService
     private async Task HandleMatchCreation(MatchResult result, CancellationToken ct)
     {
         // Create GUID per User
-        var userTokenMap = result.UserIds.ToDictionary(uid => uid, _ => Guid.NewGuid().ToString("N"));
-        
-        var serverInfo = await _spawner.SpawnServerAsync(result.MatchId, userTokenMap.Values.ToList());
+        var serverInfo = await _spawner.SpawnServerAsync(result.MatchId, result.UserIds);
         if (serverInfo == null)
         {
             _logger.LogError($"Failed to spawn dedicated server for match {result.MatchId}");
@@ -66,18 +64,14 @@ public class MatchWorker : BackgroundService
         }
 
         string serverIp = "127.0.0.1"; // for-test
-        foreach (var kvp in userTokenMap)
+        foreach (var userId in result.UserIds)
         {
-            var userId = kvp.Key;
-            var token = kvp.Value;
-
             await _hubContext.Clients.Group(MatchHub.GetUserGroup(userId)).SendAsync("Matched", new
             {
                 matchId = result.MatchId,
                 tcpPort = serverInfo.TcpPort,
                 udpPort = serverInfo.UdpPort,
                 serverAddreess = $"{serverIp}:{serverInfo.TcpPort}",
-                sessionToken = token,
                 matchedAtUtc = DateTime.UtcNow
             }, ct);
         }

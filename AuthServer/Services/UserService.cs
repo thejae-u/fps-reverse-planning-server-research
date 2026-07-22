@@ -30,6 +30,12 @@ public class UserService
         return Result<User>.Success(user);
     }
 
+    public void AddUserDirectly(User user)
+    {
+        _users.Add(user);
+        _logger.LogWarning("{Role} User {Username} Directly Added", user.Role, user.Username);
+    }
+
     public Result<User> Login(LoginRequest request)
     {
         var user = _users.FirstOrDefault(u =>
@@ -45,5 +51,10 @@ public class UserService
     public User? GetById(string userId)
     {
         return _users.FirstOrDefault(u => u.Id == userId);
+    }
+
+    public User? GetByUsername(string username)
+    {
+        return _users.FirstOrDefault(u => u.Username == username);
     }
 }
