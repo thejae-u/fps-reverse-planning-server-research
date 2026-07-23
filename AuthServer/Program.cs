@@ -12,7 +12,7 @@ using Scalar.AspNetCore;
 using StackExchange.Redis;
 using Serilog;
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console().CreateLogger();
+Log.Logger = new LoggerConfiguration().MinimumLevel.Information().WriteTo.Console().CreateLogger();
 
 Log.Information("Server Starting...");
 var builder = WebApplication.CreateBuilder(args);
@@ -35,7 +35,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("DevCors", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5500")
+            .SetIsOriginAllowed(_ => true)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -56,7 +56,8 @@ builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("Match
 builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicServer"));
 
 // Service DI
-builder.Services.AddSingleton<IDedicatedServerSpawner, DedicatedServerSpawner>();
+builder.Services.AddSingleton<DedicatedServerSpawner>();
+builder.Services.AddSingleton<IDedicatedServerSpawner>(sp => sp.GetRequiredService<DedicatedServerSpawner>());
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();

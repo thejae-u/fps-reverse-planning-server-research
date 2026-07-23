@@ -1,4 +1,4 @@
-﻿using AuthServer.Hubs;
+using AuthServer.Hubs;
 using AuthServer.Models;
 using AuthServer.Protos;
 using AuthServer.Services.Tcp;
@@ -10,15 +10,13 @@ namespace AuthServer.Services;
 public class MatchWorker : BackgroundService
 {
     private readonly MatchService _matchService;
-    //private readonly LogicServerConnectionPool _tcpPool;
-    private readonly DedicatedServerSpawner _spawner;
+    private readonly IDedicatedServerSpawner _spawner;
     private readonly IHubContext<MatchHub> _hubContext;
     private readonly ILogger<MatchWorker> _logger;
 
-    public MatchWorker(MatchService matchService, DedicatedServerSpawner spawner, IHubContext<MatchHub> hubContext, ILogger<MatchWorker> logger)
+    public MatchWorker(MatchService matchService, IDedicatedServerSpawner spawner, IHubContext<MatchHub> hubContext, ILogger<MatchWorker> logger)
     {
         _matchService = matchService;
-        //_tcpPool = tcpPool;
         _spawner =  spawner;
         _hubContext = hubContext;
         _logger = logger;
@@ -64,6 +62,9 @@ public class MatchWorker : BackgroundService
         }
 
         string serverIp = "127.0.0.1"; // for-test
+        string fullAddress = $"{serverIp}:{serverInfo.TcpPort}";
+        await _matchService.UpdateMatchServerAddressAsync(result.MatchId, fullAddress);
+
         foreach (var userId in result.UserIds)
         {
             await _hubContext.Clients.Group(MatchHub.GetUserGroup(userId)).SendAsync("Matched", new
