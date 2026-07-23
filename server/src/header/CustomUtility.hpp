@@ -6,6 +6,7 @@
 struct ServerConfig
 {
     std::string matchId = "";
+    std::string apiKey = "";
     std::uint16_t tcpPort = 0; // default tcp port
     std::uint16_t udpPort = 0; // default udp port
     std::vector<std::string> allowedPlayers;
@@ -30,6 +31,10 @@ struct ServerConfig
             {
                 config.matchId = argv[++i];
             }
+            else if((arg == "--api-key" || arg == "-ak") && i + 1 < argc)
+            {
+                config.apiKey = argv[++i];
+            }
             else if((arg == "--players" || arg == "-p") && i + 1 < argc)
             {
                 std::string playersCsv = argv[++i];
@@ -46,6 +51,7 @@ struct ServerConfig
             {
                 std::cout << "Usage: LogicServer [Options]\n"
                 << "    --match-id <id>         Match UUID\n"
+                << "    --api-key <key>         ApiKey for validate"
                 << "    --tcp-port <port>       TCP Listen Port\n"
                 << "    --udp-port <port>       UDP Listen Port\n"
                 << "    --players <p1, p2>      Allowed Players tokens (CSV)\n";

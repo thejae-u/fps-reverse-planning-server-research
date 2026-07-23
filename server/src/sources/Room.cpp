@@ -4,14 +4,14 @@
 #include "IOManager.hpp"
 #include "Session.hpp"
 
-Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid roomId, std::size_t expectedPlayerCount)
-    : _ioManager(ioManager), _roomId(roomId), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), roomId))
+Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
+    : _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
 {
 }
 
 Room::~Room()
 {
-    spdlog::info("room: destroyed", uuids::to_string(_roomId));
+    spdlog::info("room: destroyed", uuids::to_string(_matchId));
 }
 
 void Room::OnMatchFinished()
@@ -22,8 +22,8 @@ void Room::OnMatchFinished()
     auto playerStats = _world->GetPlayerStats();
 
     json j;
-    j["apiKey"] = "default_secret_key"; // TODO : 검증용 api key 전달 로직 구현 필요
-    j["matchId"] = uuids::to_string(_roomId);
+    j["apiKey"] = _apiKey;
+    j["matchId"] = uuids::to_string(_matchId);
     j["winningTeam"] = winningTeam;
     j["TeamAScore"] = 0; // TODO : 팀 별 스코어 계산 로직 필요
     j["TeamBScore"] = 0; // TODO : 팀 별 스코어 계산 로직 필요
@@ -51,7 +51,7 @@ void Room::OnMatchFinished()
     
     std::string jsonPayload = j.dump();
 
-    if(HttpResultReporter::SendMatchResult("127.0.0.1", 9000, jsonPayload))
+    if(HttpResultReporter::SendMatchResult(_serverHost, _serverPort, jsonPayload))
         spdlog::info("room: match result successfully reported to auth server.");
     else
         spdlog::error("room: failed to report match result");
@@ -69,7 +69,7 @@ void Room::TryStartGameNoLock()
     {
         if(!_isWorldStarted.exchange(true))
         {
-            spdlog::info("room: all players connected! starting world...", uuids::to_string(_roomId));
+            spdlog::info("room: all players connected! starting world...", uuids::to_string(_matchId));
             WorldInitNoLock();
         }
     }
@@ -78,7 +78,7 @@ void Room::TryStartGameNoLock()
 void Room::WorldInitNoLock()
 {
     _world->Init(_sessions);
-    spdlog::info("room: world create complete", uuids::to_string(_roomId));
+    spdlog::info("room: world create complete", uuids::to_string(_matchId));
 
     _world->StartUpdate(weak_from_this());
 }
@@ -118,12 +118,12 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
             return;
         }
 
-        spdlog::info("room: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
+        spdlog::info("room: remove session {}", uuids::to_string(_matchId), uuids::to_string(removeSession->GetId()));
 
         if(!_sessions.empty())
             return;
 
-        spdlog::info("room: all session removed", uuids::to_string(_roomId));
+        spdlog::info("room: all session removed", uuids::to_string(_matchId));
         _world->StopUpdate();
     }
 }

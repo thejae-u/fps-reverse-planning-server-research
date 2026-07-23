@@ -23,12 +23,12 @@ private:
     };
 
 public:
-    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid roomId, std::size_t expectedPlayerCount);
+    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount);
     ~Room();
 
-    static auto Create(std::shared_ptr<IOManager> ioManager, uuids::uuid roomId, std::size_t expectedPlayerCount)
+    static auto Create(std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
     {
-        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, roomId, expectedPlayerCount);
+        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, matchId, apiKey, expectedPlayerCount);
         return newRoom;
     }
     
@@ -46,7 +46,7 @@ public:
 
     uuids::uuid GetId() const
     {
-        return _roomId;
+        return _matchId;
     }
 
     World* GetWorld() const { return _world.get(); }
@@ -54,7 +54,10 @@ public:
 private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<SessionManager> _sessionManager;
-    uuids::uuid _roomId;
+    uuids::uuid _matchId;
+    std::string _apiKey;
+    const std::string _serverHost = "127.0.0.1"; // 인증 서버 호스트
+    const std::uint16_t _serverPort = 9000; // 인증 서버 포트
 
     std::size_t _expectedPlayerCount{ 0 }; // 방에 들어와야 할 총 유저 수
     std::atomic<bool> _isWorldStarted{ false }; // 중복 실행 방지 플래그
