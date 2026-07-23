@@ -44,13 +44,15 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
             string executablePath = ResolveExecutablePath();
             string idCsv = string.Join(",", userIds);
 
+            string apiKey = _config["LogicServer:ApiKey"] ?? "default_api_key";
+
             // CLI 인자 구성
             var startInfo = new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = $"--match-id {matchId} --tcp-port {tcpPort} --udp-port {udpPort} --players {idCsv}",
-                UseShellExecute = false,
-                CreateNoWindow = true
+                Arguments = $"--match-id {matchId} --api-key {apiKey} --tcp-port {tcpPort} --udp-port {udpPort} --players {idCsv}",
+                UseShellExecute = true,
+                CreateNoWindow = false 
             };
 
             var process = new Process

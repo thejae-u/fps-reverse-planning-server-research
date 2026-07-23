@@ -222,6 +222,18 @@ public class MatchService
         return result;
     }
 
+    public async Task UpdateMatchServerAddressAsync(string matchId, string serverAddress)
+    {
+        var resultJson = await _redisDB.HashGetAsync(REDIS_RESULT_PREFIX, matchId);
+        if (!resultJson.HasValue) return;
+
+        var result = JsonSerializer.Deserialize<MatchResult>(resultJson.ToString());
+        if (result is null) return;
+
+        result.ServerAddress = serverAddress;
+        await _redisDB.HashSetAsync(REDIS_RESULT_PREFIX, matchId, JsonSerializer.Serialize(result));
+    }
+
     public async Task RemoveEntryAsync(string userId)
     {
         var entry = await GetStatus(userId);
