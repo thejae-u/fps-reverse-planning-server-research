@@ -24,6 +24,12 @@ int main(int argc, char** argv)
         exit(0);
     }
     
+    if(config.apiKey.empty())
+    {
+        spdlog::error("invalid api key");
+        exit(0);
+    }
+    
     if(config.tcpPort == 0 || config.udpPort == 0)
     {
         spdlog::error("invalid port");
@@ -49,9 +55,8 @@ int main(int argc, char** argv)
     IngamePacketPool::Init(ingamePacketPoolSize);
     
     // broadcast용 room
-    auto roomId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
-    const auto dedicatedRoom = Room::Create(ioManager, roomId, config.allowedPlayers.size());
-    
+    auto matchId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
+    const auto dedicatedRoom = Room::Create(ioManager, matchId, config.apiKey, config.allowedPlayers.size());
     const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort, config.allowedPlayers);
     listener->SetDedicatedRoom(dedicatedRoom);
 
