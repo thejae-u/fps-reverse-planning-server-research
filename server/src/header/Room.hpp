@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <memory>
 #include <mutex>
@@ -8,6 +8,7 @@
 
 #include "Packet.pb.h"
 #include "World.hpp"
+
 using namespace Protocol;
 using json = nlohmann::json;
 

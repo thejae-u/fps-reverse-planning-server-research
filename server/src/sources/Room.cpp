@@ -1,8 +1,9 @@
-#include "Room.hpp"
+﻿#include "Room.hpp"
 
 #include "HttpResultReporter.hpp"
 #include "IOManager.hpp"
 #include "Session.hpp"
+#include "GameResult.hpp"
 
 Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
 : _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
@@ -18,24 +19,27 @@ void Room::OnMatchFinished()
 {
     spdlog::info("room: match finished. reporting results to auth server...");
 
-    auto winningTeam = 1; // TODO : 실제 이긴 팀을 계산하여 반환하는 World::GetWinner 함수 구현 필요
-    auto playerStats = _world->GetPlayerStats();
+    const auto playerStats = _world->GetPlayerStats();
+    const auto gameResult = _world->GetResult();
+    auto winningTeam = static_cast<int>(gameResult->winningTeam);
 
     json j;
     j["apiKey"] = _apiKey;
     j["matchId"] = uuids::to_string(_matchId);
     j["winningTeam"] = winningTeam;
-    j["TeamAScore"] = 0; // TODO : 팀 별 스코어 계산 로직 필요
-    j["TeamBScore"] = 0; // TODO : 팀 별 스코어 계산 로직 필요
+    j["TeamAScore"] = gameResult->teamAInfo.kills;
+    j["TeamBScore"] = gameResult->teamBInfo.kills;
 
     // ISO8601 UTC Time
     j["endTimeUtc"] = std::format("{:%FT%TZ}", std::chrono::system_clock::now());
 
     j["winnerUserIds"] = json::array();
     j["playerStats"] = json::array();
+
+    // 팀 별 플레이어 스탯 저장
     for(const auto& stat : *playerStats)
     {
-        if(static_cast<int>(stat.team) == winningTeam)
+        if(static_cast<int>(stat.teamType) == winningTeam)
             j["winnerUserIds"].push_back(uuids::to_string(stat.id));
 
         j["playerStats"].push_back({
@@ -54,7 +58,7 @@ void Room::OnMatchFinished()
     if(HttpResultReporter::SendMatchResult(_serverHost, _serverPort, jsonPayload))
         spdlog::info("room: match result successfully reported to auth server.");
     else
-        spdlog::error("room: failed to report match result");
+        spdlog::error("room: failed to report match result"); // TODO : Fail 시 재시도 및 예외 처리 로직 필요
     
     // 프로세스 종료
     std::exit(0);

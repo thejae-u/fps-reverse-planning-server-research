@@ -9,9 +9,11 @@
 #include <queue>
 #include <atomic>
 #include <chrono>
+
 #include "Packet.pb.h"
 #include "Vector3.hpp"
 #include "Player.hpp"
+#include "GameResult.hpp"
 
 class Session;
 class Room;
@@ -24,10 +26,13 @@ constexpr float BASE_MOVE_SPEED = 10.0f;
 class World
 {
 public:
-    explicit World(asio::io_context& ioContext, uuids::uuid roomId)
+    explicit World(asio::io_context& ioContext, const uuids::uuid roomId)
     : _roomId(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false), _gen(_rd()),
-      _dis(static_cast<int>(Team::TeamA), static_cast<int>(Team::TeamB)), _teamACount(0), _teamBCount(0)
+      _dis(static_cast<int>(TeamType::TeamA), static_cast<int>(TeamType::TeamB)), _teamACount(0), _teamBCount(0)
     {
+        _teamInfos.reserve(2);
+        _teamInfos.emplace_back(TeamInfo(TeamType::TeamA));
+        _teamInfos.emplace_back(TeamInfo(TeamType::TeamB));
     }
 
     ~World()
@@ -71,6 +76,7 @@ private:
     
 public:
     void Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
+    std::unique_ptr<GameResult> GetResult();
     
 private:
     void Move(uuids::uuid player, Vector3 direction, std::int32_t speed);
@@ -114,6 +120,8 @@ private:
     std::random_device _rd;
     std::mt19937_64 _gen;
     std::uniform_int_distribution<> _dis;
+
+    std::vector<TeamInfo> _teamInfos;
     std::uint16_t _teamACount;
     std::uint16_t _teamBCount;
 };

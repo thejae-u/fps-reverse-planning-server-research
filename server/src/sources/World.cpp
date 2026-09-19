@@ -1,4 +1,4 @@
-#include "World.hpp"
+﻿#include "World.hpp"
 #include "Session.hpp"
 #include "Room.hpp"
 #include "PacketPool.hpp"
@@ -28,11 +28,10 @@ void World::DivideTeam()
     // sample team divide (TODO: include role, rating ...)
     for(const auto& [id, player] : _players)
     {
-        auto team = static_cast<Team>(_dis(_gen));
-        if(team == Team::TeamA && _teamACount < 5)
-            player->team = Team::TeamA;
+        if(const auto team = static_cast<TeamType>(_dis(_gen)); team == TeamType::TeamA && _teamACount < 5)
+            player->teamType = TeamType::TeamA;
         else
-            player->team = Team::TeamB;
+            player->teamType = TeamType::TeamB;
     }
 }
 
@@ -206,17 +205,29 @@ void World::HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shoote
         return;
     }
 
-    auto& targetPlayer = _players[hitId];
-    targetPlayer->hp -= damage;
+    auto& shooter = _players[shooterId];
+    auto shooterTeam = static_cast<int>(shooter->teamType);
 
-    bool isDead = false;
+    auto& targetPlayer = _players[hitId];
+    auto targetPlayerTeam = static_cast<int>(targetPlayer->teamType);
+
+    // damage 처리 (hit : 체력 감소, shoot : 준 대미지 증가 (팀 포함))
+    targetPlayer->hp -= damage;
+    shooter->damage += damage;
+    _teamInfos[shooterTeam].damages += damage;
+
+    // 플레이어 사망 시
+    bool isDead = false; // 패킷 전송을 위한 사망 플래그 (hit)
     if(targetPlayer->hp <= 0)
     {
         isDead = true;
         targetPlayer->death++;
+        _teamInfos[targetPlayerTeam].deaths++;
+
         targetPlayer->hp = 100; // reset
 
-        _players[shooterId]->kill++;
+        shooter->kill++;
+        _teamInfos[shooterTeam].kills++;
 
         spdlog::info("world {}: player {} killed player {}",
                      uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(hitId));
@@ -260,6 +271,11 @@ void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 {
     std::lock_guard lock(_playerMutex);
     HitNoLock(hitId, damage, shooterId);
+}
+
+std::unique_ptr<GameResult> World::GetResult()
+{
+    return std::make_unique<GameResult>(_teamInfos);
 }
 
 void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microseconds interval)
@@ -339,8 +355,7 @@ void World::Update()
     UpdateState();
 
     // 3. Broadcast updated player states to all clients in the room
-    auto room = _weakRoom.lock();
-    if(room)
+    if(const auto room = _weakRoom.lock())
     {
         std::lock_guard playerLock(_playerMutex);
         for(const auto& [id, player] : _players)
@@ -383,10 +398,10 @@ void World::Update()
 
     ++_tickCount;
 
-    if(_tickCount % 60 == 0)
+    /*if(_tickCount % 60 == 0)
     {
         PrintScoreboard();
-    }
+    }*/
 }
 
 void World::ProcessQueue()

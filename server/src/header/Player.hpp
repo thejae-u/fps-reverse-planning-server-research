@@ -9,7 +9,7 @@ struct PlayerSnapshot
     Vector3 position; // tick 당시 위치
 };
 
-enum class Team
+enum class TeamType
 {
     None,
     TeamA,
@@ -18,7 +18,7 @@ enum class Team
 
 struct Player
 {
-    Team team;
+    TeamType teamType;
     Vector3 position;
     Vector3 velocity;
     bool isGrounded;
@@ -37,7 +37,7 @@ struct Player
     std::deque<PlayerSnapshot> positionHistory;
 
     Player()
-        : team(Team::None), position(), velocity(), isGrounded(true),
+        : teamType(TeamType::None), position(), velocity(), isGrounded(true),
           hp(100), ammo(30), kill(0), death(0), assist(0), damage(0), heal(0), guard(0)
     {
     }
@@ -45,7 +45,7 @@ struct Player
 
 struct PlayerStat
 {
-    Team team;
+    TeamType teamType;
     uuids::uuid id;
     std::int16_t kill;
     std::int16_t death;
@@ -56,7 +56,7 @@ struct PlayerStat
     std::int32_t guard;
 
     PlayerStat(const uuids::uuid id, const Player& player)
-        : team(player.team), id(id), kill(player.kill), death(player.death), assist(player.assist),
+        : teamType(player.teamType), id(id), kill(player.kill), death(player.death), assist(player.assist),
           damage(player.damage), heal(player.heal), guard(player.guard)
     {
     }
