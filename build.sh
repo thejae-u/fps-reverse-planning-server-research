@@ -22,10 +22,5 @@ echo "Building client..."
 cmake --preset ${PRESET} -S client
 cmake --build client/build/${PRESET}
 
-# WebClient 빌드
-echo "Building WebClient..."
-cmake --preset ${PRESET} -S WebClient
-cmake --build WebClient/build/${PRESET}
-
 echo "Build finished!"
 
