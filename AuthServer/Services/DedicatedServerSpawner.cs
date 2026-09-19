@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
@@ -102,20 +102,37 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
         string osKey = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Windows" :
             RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "OSX" : "Linux";
 
-        string? configuredPath = _config[$"LogicServer:ExecutablePaths:{osKey}"];
-        if (!string.IsNullOrEmpty(configuredPath))
-            return Path.GetFullPath(configuredPath);
-        
         bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
         string binaryName = isWindows ? "main.exe" : "main";
+        string? configuredPath = _config[$"LogicServer:ExecutablePaths:{osKey}"];
+
+        var candidates = new List<string>();
+
+        if (!string.IsNullOrEmpty(configuredPath))
+        {
+            candidates.Add(Path.GetFullPath(configuredPath));
+            candidates.Add(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath)));
+            candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), configuredPath)));
+            candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "AuthServer", configuredPath)));
+        }
 
         string basePath = AppContext.BaseDirectory;
+        candidates.Add(Path.GetFullPath(Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "x64-debug", binaryName)));
+        candidates.Add(Path.GetFullPath(Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "Debug", binaryName)));
+        candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "server", "build", "x64-debug", binaryName)));
 
-        string defaultPath = isWindows
-            ? Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "Debug", binaryName)
-            : Path.Combine(basePath, "..", "..", "..", "..", "server", "build", binaryName);
+        foreach (var path in candidates)
+        {
+            if (File.Exists(path))
+            {
+                _logger.LogInformation($"[DedicatedServerSpawner] Found server executable: {path}");
+                return path;
+            }
+        }
 
-        return defaultPath;
+        string fallback = candidates.FirstOrDefault() ?? binaryName;
+        _logger.LogWarning($"[DedicatedServerSpawner] Executable not found. Falling back to: {fallback}");
+        return fallback;
     }
 
     private int GetFreeBothTcpAndUdpPort()

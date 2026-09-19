@@ -13,7 +13,6 @@ namespace AuthServer.Controllers;
 public class MatchController : ControllerBase
 {
     private readonly MatchService _matchService;
-    private readonly ApplicationDbContext _dbContext;
 
     public MatchController(MatchService matchService)
     {
