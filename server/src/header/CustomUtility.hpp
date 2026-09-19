@@ -170,17 +170,22 @@ inline std::string ConvertTypeToString(Protocol::PacketType type)
     }
 }
 
-inline std::shared_ptr<std::string> InternalPacketSerializer(const Internal::GamePacket& packet)
+inline std::unique_ptr<std::string> InternalPacketSerializer(const Internal::GamePacket& packet)
 {
+    /* 
+        payload 
+        header(2byte) + body(8byte)
+
+        header : body size (uint16_t)
+        body : Protobuf Internal::GamePacket
+    */
+
     const std::uint16_t bodySize = static_cast<std::uint16_t>(packet.ByteSizeLong());
     const std::uint16_t networkSize = htons(bodySize);
-    auto payload = std::make_shared<std::string>(2 + bodySize, '\0');
+    auto payload = std::make_unique<std::string>(sizeof(std::uint16_t) + bodySize, '\0'); // header 2byte + body packet size + '\0'
 
-    // first 2bytes Length
-    memcpy(&(*payload)[0], &networkSize, 2);
-
-    // 2bytes after Packet
-    if(!packet.SerializeToArray(&(*payload)[2], bodySize))
+    std::memcpy(&(*payload)[0], &networkSize, 2); // header
+    if(!packet.SerializeToArray(&(*payload)[2], bodySize)) // body serialize after header
     {
         return nullptr;
     }
@@ -188,9 +193,9 @@ inline std::shared_ptr<std::string> InternalPacketSerializer(const Internal::Gam
     return payload;
 }
 
-inline std::shared_ptr<Internal::GamePacket> InternalPacketDeserializer(const char* data, std::size_t size)
+inline std::unique_ptr<Internal::GamePacket> InternalPacketDeserializer(const char* data, std::size_t size)
 {
-    auto packet = std::make_shared<Internal::GamePacket>();
+    auto packet = std::make_unique<Internal::GamePacket>();
     if(!packet->ParseFromArray(data, static_cast<int>(size)))
     {
         return nullptr;

@@ -1,0 +1,14 @@
+{
+  "name": "webclient",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "cpr",
+    "nlohmann-json",
+    "glfw3",
+    "glad",
+    "spdlog",
+    "asio",
+    "protobuf",
+    "stduuid"
+  ]
+}

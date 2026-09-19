@@ -104,13 +104,13 @@ private:
     std::mutex _sendTcpQueueMutex;
     std::atomic<bool> _isWriting{ false };
 
-    std::queue<std::shared_ptr<Packet>> _processQueue;
+    std::queue<std::shared_ptr<NetworkPacket>> _processQueue;
     std::mutex _processQueueMutex;
     std::atomic<bool> _isProcessing{ false };
 
 public:
-    void EnqueueUdpSendPacket(std::shared_ptr<Packet> data);
-    void EnqueueTcpSendPacket(std::shared_ptr<Packet> data);
+    void EnqueueUdpSendPacket(std::shared_ptr<NetworkPacket> data);
+    void EnqueueTcpSendPacket(std::shared_ptr<NetworkPacket> data);
 
 private:
     // Tcp Async Send Data

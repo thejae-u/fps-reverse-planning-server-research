@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <unordered_map>
 #include <memory>
@@ -25,7 +25,8 @@ class World
 {
 public:
     explicit World(asio::io_context& ioContext, uuids::uuid roomId)
-        : _roomId(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false)
+    : _roomId(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false), _gen(_rd()),
+      _dis(static_cast<int>(Team::TeamA), static_cast<int>(Team::TeamB)), _teamACount(0), _teamBCount(0)
     {
     }
 
@@ -62,6 +63,7 @@ public:
     void PrintScoreboard();
 
 private:
+    void DivideTeam();
     void ScheduleNextTick();
     void Update();
     void ProcessQueue();
@@ -107,4 +109,11 @@ private:
     // Metrics storage
     std::vector<std::int64_t> _tickDurationsUs;
     std::mutex _metricsMutex;
+
+    // random device for team separate 
+    std::random_device _rd;
+    std::mt19937_64 _gen;
+    std::uniform_int_distribution<> _dis;
+    std::uint16_t _teamACount;
+    std::uint16_t _teamBCount;
 };

@@ -1,7 +1,7 @@
 #include "World.hpp"
 #include "Session.hpp"
 #include "Room.hpp"
-#include "IngamePacketPool.hpp"
+#include "PacketPool.hpp"
 
 void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions)
 {
@@ -17,10 +17,23 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
         _sessions.insert({ id, session });
         index++;
 
-        // some init logics: team division, role assignment
+        DivideTeam();
     }
 
     spdlog::info("world(room id) {}: created", uuids::to_string(_roomId));
+}
+
+void World::DivideTeam()
+{
+    // sample team divide (TODO: include role, rating ...)
+    for(const auto& [id, player] : _players)
+    {
+        auto team = static_cast<Team>(_dis(_gen));
+        if(team == Team::TeamA && _teamACount < 5)
+            player->team = Team::TeamA;
+        else
+            player->team = Team::TeamB;
+    }
 }
 
 void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
@@ -50,6 +63,7 @@ void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
         return;
     }
 
+    // 검증된 speed에 의한 velocity 연산 및 업데이트
     _players[playerId]->velocity = direction * speed;
 }
 
@@ -160,7 +174,7 @@ void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTi
             std::string serializedIngame;
             if(ingamePacket->SerializeToString(&serializedIngame))
             {
-                auto sendPacket = std::make_shared<Protocol::Packet>();
+                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
                 sendPacket->set_type(Protocol::PacketType::Ingame);
                 sendPacket->set_data(serializedIngame);
                 room->Broadcast(std::move(sendPacket));
@@ -233,7 +247,7 @@ void World::HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shoote
             std::string serializedIngame;
             if(ingamePacket->SerializeToString(&serializedIngame))
             {
-                auto sendPacket = std::make_shared<Protocol::Packet>();
+                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
                 sendPacket->set_type(Protocol::PacketType::Ingame);
                 sendPacket->set_data(serializedIngame);
                 room->Broadcast(std::move(sendPacket));
@@ -359,7 +373,7 @@ void World::Update()
             std::string sendBuffer;
             if(ingamePacket->SerializeToString(&sendBuffer))
             {
-                auto sendPacket = std::make_shared<Protocol::Packet>();
+                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
                 sendPacket->set_type(Protocol::PacketType::Ingame);
                 sendPacket->set_data(sendBuffer);
                 room->Broadcast(std::move(sendPacket));
@@ -641,11 +655,10 @@ void World::PrintScoreboard()
         return;
     }
 
-    Protocol::Packet packet;
-    packet.set_type(Protocol::PacketType::Ingame);
-    packet.set_data(serializedIngamePacket);
+    auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
+    sendPacket->set_type(Protocol::PacketType::Ingame);
+    sendPacket->set_data(serializedIngamePacket);
 
-    auto sendPacket = std::make_shared<Packet>(packet);
     for(const auto& [id, weakSession] : _sessions)
     {
         if(auto session = weakSession.lock())

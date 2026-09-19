@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Vector3.hpp"
 #include <deque>
 #include <cstdint>

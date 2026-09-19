@@ -53,7 +53,7 @@ public:
 
 private:
     using Raw = std::vector<unsigned char>;
-    void EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr<Raw> payload);
+    void EnqueueSendData(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> networkBuffer);
     void SendAsyncByUdp();
     void ReceiveAsyncByUdp();
     void ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std::uint16_t size, const unsigned char* data);
@@ -83,8 +83,8 @@ private:
     std::unordered_map<uuids::uuid, std::shared_ptr<Session>> _sessions;
     std::mutex _sessionsMutex;
 
-    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _payloadQueue;
-    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _noLockPayloadQueue;
-    std::mutex _payloadQueueMutex;
+    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _networkBufferQueue;
+    std::queue<std::pair<asio::ip::udp::endpoint, std::shared_ptr<Raw>>> _noLockNetworkBufferQueue;
+    std::mutex _networkBufferQueueMutex;
     std::atomic<bool> _isSending{ false };
 };

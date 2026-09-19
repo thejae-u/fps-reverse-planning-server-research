@@ -27,5 +27,13 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 cmake --build client/build/%PRESET%
 if %errorlevel% neq 0 exit /b %errorlevel%
 
+:: WebClient 빌드
+echo Building WebClient...
+cmake --preset %PRESET% -S WebClient
+if %errorlevel% neq 0 exit /b %errorlevel%
+cmake --build WebClient/build/%PRESET%
+if %errorlevel% neq 0 exit /b %errorlevel%
+
 echo Build finished successfully!
 pause
+

@@ -3,7 +3,7 @@
 #include "IOManager.hpp"
 #include "Room.hpp"
 #include "Session.hpp"
-#include "IngamePacketPool.hpp"
+#include "PacketPool.hpp"
 
 Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_t tcpPort, std::uint16_t udpPort, const std::vector<std::string> allowedPlayers)
     : _ioManager(ioManager), _strand(ioManager->GetIoContext()), _tcpEndpoint(asio::ip::tcp::v4(), tcpPort),
@@ -64,9 +64,9 @@ void Listener::AcceptAsync()
     });
 
     // Udp Send handler register
-    newSession->SetSendToHandler([weakSelf = GetWeak<Listener>()](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> data) {
+    newSession->SetSendToHandler([weakSelf = GetWeak<Listener>()](asio::ip::udp::endpoint ep, std::shared_ptr<Raw> networkBuffer) {
         if(const auto self = weakSelf.lock())
-            self->EnqueueSendData(ep, std::move(data));
+            self->EnqueueSendData(ep, std::move(networkBuffer));
     });
 
     _sessions[sessionId] = newSession;
@@ -96,11 +96,11 @@ void Listener::AcceptAsync()
     });
 }
 
-void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr<Raw> payload)
+void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> networkBuffer)
 {
     {
-        std::lock_guard<std::mutex> payloadQueueLock(_payloadQueueMutex);
-        _payloadQueue.push({ ep, payload });
+        std::lock_guard<std::mutex> networkBufferQueueLock(_networkBufferQueueMutex);
+        _networkBufferQueue.emplace(ep, std::move(networkBuffer));
     }
 
     if(_isSending.exchange(true))
@@ -112,25 +112,26 @@ void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, const std::shared_ptr
 void Listener::SendAsyncByUdp()
 {
     {
-        std::lock_guard<std::mutex> payloadQueueLock(_payloadQueueMutex);
-        if(_noLockPayloadQueue.empty())
-            std::swap(_payloadQueue, _noLockPayloadQueue);
+        std::lock_guard<std::mutex> networkBufferQueueLock(_networkBufferQueueMutex);
+        if(_noLockNetworkBufferQueue.empty())
+            std::swap(_networkBufferQueue, _noLockNetworkBufferQueue);
     }
 
-    if(_noLockPayloadQueue.empty()) // payloadQueue도 없음
+    if(_noLockNetworkBufferQueue.empty()) // networkBufferQueue도 없음
     {
         _isSending = false;
         return;
     }
 
-    auto [ep, payload] = std::move(_noLockPayloadQueue.front());
-    _noLockPayloadQueue.pop();
+    auto [ep, networkBuffer] = std::move(_noLockNetworkBufferQueue.front());
+    _noLockNetworkBufferQueue.pop();
     _isSending = true;
 
-    // 실행 후 바로 return -> thread 점유 최소화
+    const auto sendBuffer = asio::buffer(*networkBuffer);
+
     _udpSocket.async_send_to(
-        asio::buffer(*payload), ep,
-        asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), payload, ep](const std::error_code& ec, std::size_t) {
+        sendBuffer, ep,
+        asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), networkBuffer, ep](const std::error_code& ec, std::size_t) {
             if(const auto self = weakSelf.lock())
             {
                 // TODO : error code에 따라 작동 여부 결정
@@ -144,7 +145,10 @@ void Listener::SendAsyncByUdp()
 
 void Listener::ReceiveAsyncByUdp()
 {
-    auto receiveBuffer = std::make_shared<std::vector<unsigned char>>(BUF_SIZE);
+    auto receiveBuffer = ByteBufferPool::GetInstance()->Rent();
+    if(receiveBuffer->size() < BUF_SIZE)
+        receiveBuffer->resize(BUF_SIZE);
+
     auto senderEndpoint = std::make_shared<asio::ip::udp::endpoint>();
     _udpSocket.async_receive_from(
         asio::buffer(*receiveBuffer), *senderEndpoint, asio::bind_executor(_strand, [weakSelf = GetWeak<Listener>(), receiveBuffer, senderEndpoint](const std::error_code& ec, const std::size_t bytesRead) {
@@ -209,7 +213,7 @@ void Listener::ReceiveAsyncByUdp()
 
 void Listener::ProcessPacket(std::shared_ptr<asio::ip::udp::endpoint> sender, std::uint16_t size, const unsigned char* data)
 {
-    Packet packet;
+    NetworkPacket packet;
     if(!packet.ParseFromArray(data, size))
     {
         spdlog::error("listener: parsing udp real data error");

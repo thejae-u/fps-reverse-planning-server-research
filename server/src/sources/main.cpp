@@ -1,19 +1,42 @@
-#include <iostream>
+﻿#include <iostream>
 #include <thread>
 #include <vector>
 
 #include "Base.hpp"
 #include "IOManager.hpp"
 #include "Listener.hpp"
-#include "IngamePacketPool.hpp"
+#include "PacketPool.hpp"
 #include "Room.hpp"
+#include "TestMode.h"
 
-int main(int argc, char** argv)
+int main(const int argc, char** argv)
 {
     // 실행인자 파싱 및 검증
     if(argc == 1)
     {
         spdlog::error("no options");
+        exit(0);
+    }
+    
+    if(!std::strcmp(argv[1], "--test"))
+    {
+        std::uint16_t testClientCount = 10;
+        if(argc > 2)
+        {
+            try
+            {
+                testClientCount = std::stoi(argv[2]);
+            }
+            catch(const std::exception& e)
+            {
+                spdlog::error(e.what());
+                exit(0);
+            }
+        }
+            
+        spdlog::info("running test");
+        const auto testMode = std::make_unique<TestMode>(testClientCount);
+        testMode->RunTestMode();
         exit(0);
     }
 
@@ -52,7 +75,12 @@ int main(int argc, char** argv)
         throw std::runtime_error("failed to create io manager");
     
     constexpr auto ingamePacketPoolSize = 100;
+    constexpr auto networkPacketPoolSize = 100;
+    constexpr auto byteBufferPoolSize = 100;
+
     IngamePacketPool::Init(ingamePacketPoolSize);
+    NetworkPacketPool::Init(networkPacketPoolSize);
+    ByteBufferPool::Init(byteBufferPoolSize);
     
     // broadcast용 room
     auto matchId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
@@ -80,6 +108,8 @@ int main(int argc, char** argv)
     ioManager->Stop();
     
     IngamePacketPool::Release();
+    NetworkPacketPool::Release();
+    ByteBufferPool::Release();
 
     return 0;
 }

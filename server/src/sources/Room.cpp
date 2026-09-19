@@ -5,7 +5,7 @@
 #include "Session.hpp"
 
 Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
-    : _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
+: _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
 {
 }
 
@@ -77,10 +77,10 @@ void Room::TryStartGameNoLock()
 
 void Room::WorldInitNoLock()
 {
-    _world->Init(_sessions);
+    _world->Init(_sessions); // world 초기화 (위치, 캐릭터 상태 등)
     spdlog::info("room: world create complete", uuids::to_string(_matchId));
 
-    _world->StartUpdate(weak_from_this());
+    _world->StartUpdate(weak_from_this()); // 게임 시작
 }
 
 void Room::Stop()
@@ -128,7 +128,7 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
     }
 }
 
-void Room::Broadcast(std::shared_ptr<Packet> packet)
+void Room::Broadcast(std::shared_ptr<NetworkPacket> packet)
 {
     for(const auto& [id, weakSession] : _sessions)
     {
