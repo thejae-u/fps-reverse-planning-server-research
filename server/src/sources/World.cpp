@@ -78,6 +78,98 @@ std::unique_ptr<GameResult> World::GetResult()
     return std::make_unique<GameResult>(_teamInfos);
 }
 
+void World::InitMockPlayers(const std::vector<std::string>& allowedPlayers)
+{
+    std::lock_guard playerLock(_playerMutex);
+    _playerSize = allowedPlayers.size();
+
+    int index = 0;
+    for(const auto& token : allowedPlayers)
+    {
+        auto idOpt = uuids::uuid::from_string(token);
+        auto id = idOpt.value_or(uuids::uuid_system_generator{}());
+
+        auto newPlayer = std::make_unique<Player>();
+        newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f);
+        _players.insert({ id, std::move(newPlayer) });
+        index++;
+    }
+
+    DivideTeam();
+    spdlog::info("world(room id) {}: initialized {} mock players for test mode", uuids::to_string(_roomId), _players.size());
+}
+
+void World::SimulateKill(TeamType scoringTeam)
+{
+    std::lock_guard lock(_playerMutex);
+    TeamType victimTeam = (scoringTeam == TeamType::TeamA) ? TeamType::TeamB : TeamType::TeamA;
+
+    // 1. Scoring player 찾기
+    for(auto& [id, player] : _players)
+    {
+        if(player && player->teamType == scoringTeam)
+        {
+            player->kill++;
+            player->damage += 100;
+            break;
+        }
+    }
+
+    // 2. Victim player 찾기
+    for(auto& [id, player] : _players)
+    {
+        if(player && player->teamType == victimTeam)
+        {
+            player->death++;
+            break;
+        }
+    }
+
+    // 3. TeamInfo 갱신
+    std::int16_t currentKills = 0;
+    for(auto& info : _teamInfos)
+    {
+        if(info.teamType == scoringTeam)
+        {
+            info.kills++;
+            info.damages += 100;
+            currentKills = info.kills;
+        }
+        else if(info.teamType == victimTeam)
+        {
+            info.deaths++;
+        }
+    }
+
+    spdlog::info("[Simulation] Team {} scored! Total kills: {}",
+                 (scoringTeam == TeamType::TeamA ? "A" : "B"), currentKills);
+
+    // TARGET_KILLS 도달 시 자동 종료
+    constexpr std::int16_t TARGET_KILLS = 5;
+    if(currentKills >= TARGET_KILLS)
+    {
+        spdlog::info("[Simulation] Team {} reached target kills ({})! Finishing match...",
+                     (scoringTeam == TeamType::TeamA ? "A" : "B"), TARGET_KILLS);
+        if(const auto room = _weakRoom.lock())
+        {
+            room->OnMatchFinished();
+        }
+    }
+}
+
+void World::SetTestScores(int aKills, int bKills)
+{
+    std::lock_guard lock(_playerMutex);
+    for(auto& info : _teamInfos)
+    {
+        if(info.teamType == TeamType::TeamA)
+            info.kills = static_cast<std::int16_t>(aKills);
+        else if(info.teamType == TeamType::TeamB)
+            info.kills = static_cast<std::int16_t>(bKills);
+    }
+    spdlog::info("[Test] Test scores directly set: TeamA={}, TeamB={}", aKills, bKills);
+}
+
 void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microseconds interval)
 {
     if(_isUpdating.exchange(true))

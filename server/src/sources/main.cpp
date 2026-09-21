@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <thread>
 #include <vector>
 
@@ -18,7 +18,7 @@ int main(const int argc, char** argv)
         exit(0);
     }
     
-    if(!std::strcmp(argv[1], "--test"))
+    if(argc <= 3 && !std::strcmp(argv[1], "--test"))
     {
         std::uint16_t testClientCount = 10;
         if(argc > 2)
@@ -95,11 +95,53 @@ int main(const int argc, char** argv)
     for(const auto& component : components)
         component->Start();
 
+    if(config.isTestMode)
+    {
+        spdlog::info("[Main] Test mode active: initializing mock players and starting World loop");
+        dedicatedRoom->StartTestMode(config.allowedPlayers);
+    }
+
     std::string tmp;
     while(std::cin >> tmp)
     {
+        // Strip UTF-8 BOM if present
+        if (tmp.size() >= 3 && static_cast<unsigned char>(tmp[0]) == 0xEF && static_cast<unsigned char>(tmp[1]) == 0xBB && static_cast<unsigned char>(tmp[2]) == 0xBF)
+        {
+            tmp = tmp.substr(3);
+        }
+
+        spdlog::info("[Main] Received console input: '{}'", tmp);
         if(tmp == "quit")
             break;
+        if(tmp == "finish")
+        {
+            spdlog::info("received finish command. reporting results and exiting...");
+            dedicatedRoom->OnMatchFinished();
+            break;
+        }
+        if(tmp == "kill")
+        {
+            std::string teamStr;
+            if(std::cin >> teamStr)
+            {
+                if(teamStr == "A" || teamStr == "a" || teamStr == "1")
+                {
+                    dedicatedRoom->SimulateKill(TeamType::TeamA);
+                }
+                else if(teamStr == "B" || teamStr == "b" || teamStr == "2")
+                {
+                    dedicatedRoom->SimulateKill(TeamType::TeamB);
+                }
+            }
+        }
+        if(tmp == "score")
+        {
+            int a = 0, b = 0;
+            if(std::cin >> a >> b)
+            {
+                dedicatedRoom->SetTestScores(a, b);
+            }
+        }
     }
 
     for(auto it = components.rbegin(); it != components.rend(); ++it)

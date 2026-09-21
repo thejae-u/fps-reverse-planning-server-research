@@ -225,5 +225,16 @@ void CombatSystem::OnHit(
                 room->Broadcast(std::move(sendPacket));
             }
         }
+
+        // 4. Check target kills win condition
+        if(damageResult.isDead && shooterTeam >= 0 && shooterTeam < static_cast<int>(teamInfos.size()))
+        {
+            if(teamInfos[shooterTeam].kills >= TARGET_KILLS)
+            {
+                spdlog::info("world {}: team {} reached target kills ({})! finishing match...",
+                             uuids::to_string(_roomId), shooterTeam, TARGET_KILLS);
+                room->OnMatchFinished();
+            }
+        }
     }
 }

@@ -58,8 +58,11 @@ public:
         return playerStats;
     }
     
-    // TEST MONITORING
+    // TEST MONITORING & SIMULATION
     void PrintScoreboard();
+    void InitMockPlayers(const std::vector<std::string>& allowedPlayers);
+    void SimulateKill(TeamType scoringTeam);
+    void SetTestScores(int aKills, int bKills);
 
 private:
     void DivideTeam();

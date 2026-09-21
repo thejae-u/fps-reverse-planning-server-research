@@ -26,7 +26,7 @@ var dbConnectionString = builder.Configuration.GetConnectionString("DefaultConne
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(dbConnectionString));
 
 // Redis Configuration
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["Redis__ConnectionString"] ?? "redis:6379";
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["Redis__ConnectionString"] ?? "redis:16379";
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString));
 
 // Cors for dev

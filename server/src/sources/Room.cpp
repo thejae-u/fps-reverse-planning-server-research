@@ -1,4 +1,4 @@
-﻿#include "Room.hpp"
+#include "Room.hpp"
 
 #include "HttpResultReporter.hpp"
 #include "IOManager.hpp"
@@ -6,7 +6,7 @@
 #include "GameResult.hpp"
 
 Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
-: _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
+    : _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
 {
 }
 
@@ -43,23 +43,24 @@ void Room::OnMatchFinished()
             j["winnerUserIds"].push_back(uuids::to_string(stat.id));
 
         j["playerStats"].push_back({
+            { "team", static_cast<int>(stat.teamType) },
             { "userId", uuids::to_string(stat.id) },
             { "kills", stat.kill },
             { "deaths", stat.death },
             { "assists", stat.assist },
             { "damage", stat.damage },
-            { "heals", stat.damage },
+            { "heals", stat.heal },
             { "guards", stat.guard }
         });
     }
-    
+
     std::string jsonPayload = j.dump();
 
     if(HttpResultReporter::SendMatchResult(_serverHost, _serverPort, jsonPayload))
         spdlog::info("room: match result successfully reported to auth server.");
     else
         spdlog::error("room: failed to report match result"); // TODO : Fail 시 재시도 및 예외 처리 로직 필요
-    
+
     // 프로세스 종료
     std::exit(0);
 }
@@ -85,6 +86,26 @@ void Room::WorldInitNoLock()
     spdlog::info("room: world create complete", uuids::to_string(_matchId));
 
     _world->StartUpdate(weak_from_this()); // 게임 시작
+}
+
+void Room::StartTestMode(const std::vector<std::string>& allowedPlayers)
+{
+    spdlog::info("room: starting in TEST MODE with {} mock players", allowedPlayers.size());
+    _world->InitMockPlayers(allowedPlayers);
+    _world->StartUpdate(weak_from_this());
+    _isWorldStarted = true;
+}
+
+void Room::SimulateKill(TeamType scoringTeam)
+{
+    if(_world)
+        _world->SimulateKill(scoringTeam);
+}
+
+void Room::SetTestScores(int aKills, int bKills)
+{
+    if(_world)
+        _world->SetTestScores(aKills, bKills);
 }
 
 void Room::Stop()

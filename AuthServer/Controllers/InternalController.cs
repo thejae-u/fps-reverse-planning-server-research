@@ -1,4 +1,4 @@
-﻿using AuthServer.Dtos;
+using AuthServer.Dtos;
 using AuthServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,11 +12,13 @@ public class InternalController : ControllerBase
 {
     private readonly MatchService _matchService;
     private readonly IConfiguration _config;
+    private readonly ILogger<InternalController> _logger;
 
-    public InternalController(MatchService matchService, IConfiguration config)
+    public InternalController(MatchService matchService, IConfiguration config, ILogger<InternalController> logger)
     {
         _matchService = matchService;
         _config = config;
+        _logger = logger;
     }
     
     [HttpGet("all")]
@@ -31,21 +33,25 @@ public class InternalController : ControllerBase
         return NoContent();
     }
 
+    [AllowAnonymous]
     [HttpPost("finish")]
-    public async Task<ActionResult<GameResultReportDto>> FinishGame([FromBody] GameResultReportDto report)
+    public async Task<IActionResult> FinishGame([FromBody] GameResultReportDto report)
     {
         var serverKey = _config["LogicServer:ApiKey"] ?? "default_secret_key";
         if (report.ApiKey != serverKey)
+        {
+            _logger.LogWarning("[FinishGame] Unauthorized attempt with invalid ApiKey for MatchId: {MatchId}", report.MatchId);
             return Unauthorized("Invalid Internal ApiKey");
+        }
 
-        var result = await _matchService.FinishMatchAsync(
-            report.MatchId,
-            report.WinningTeam,
-            report.WinnerUserIds
-        );
+        var result = await _matchService.FinishMatchAsync(report);
 
         if (!result)
+        {
+            _logger.LogWarning("[FinishGame] Match not found or already finished: {MatchId}", report.MatchId);
             return NotFound(new { message = "Match not found or already finished" });
+        }
+
         return Ok(new { message = "Game result successfully processed" });
     }
 }

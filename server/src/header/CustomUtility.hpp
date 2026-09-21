@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Packet.pb.h"
 #include "Internal.pb.h"
@@ -10,6 +10,7 @@ struct ServerConfig
     std::uint16_t tcpPort = 0; // default tcp port
     std::uint16_t udpPort = 0; // default udp port
     std::vector<std::string> allowedPlayers;
+    bool isTestMode = false;
 
     static ServerConfig Parse(int argc, char** argv)
     {
@@ -19,7 +20,11 @@ struct ServerConfig
         {
             std::string arg = argv[i];
 
-            if((arg == "--tcp-port" || arg == "-tp") && i + 1 < argc)
+            if(arg == "--test" || arg == "-t")
+            {
+                config.isTestMode = true;
+            }
+            else if((arg == "--tcp-port" || arg == "-tp") && i + 1 < argc)
             {
                 config.tcpPort = static_cast<std::uint16_t>(std::stoi(argv[++i]));
             }
@@ -51,16 +56,17 @@ struct ServerConfig
             {
                 std::cout << "Usage: LogicServer [Options]\n"
                 << "    --match-id <id>         Match UUID\n"
-                << "    --api-key <key>         ApiKey for validate"
+                << "    --api-key <key>         ApiKey for validate\n"
                 << "    --tcp-port <port>       TCP Listen Port\n"
                 << "    --udp-port <port>       UDP Listen Port\n"
-                << "    --players <p1, p2>      Allowed Players tokens (CSV)\n";
+                << "    --players <p1, p2>      Allowed Players tokens (CSV)\n"
+                << "    --test                  Run in test simulation mode\n";
                 std::exit(0);
             }
         }
 
-        spdlog::info("[Config] MatchId: {}, TCP Port: {}, UDP Port: {}, Player Count: {}",
-                     config.matchId, config.tcpPort, config.udpPort, config.allowedPlayers.size());
+        spdlog::info("[Config] MatchId: {}, TCP Port: {}, UDP Port: {}, Player Count: {}, TestMode: {}",
+                     config.matchId, config.tcpPort, config.udpPort, config.allowedPlayers.size(), config.isTestMode);
 
         return config;
     }

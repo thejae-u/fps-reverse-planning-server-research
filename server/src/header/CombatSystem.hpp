@@ -11,6 +11,8 @@
 #include "GameResult.hpp"
 #include "LagCompensator.hpp"
 
+constexpr std::int16_t TARGET_KILLS = 5;
+
 class Room;
 
 class CombatSystem

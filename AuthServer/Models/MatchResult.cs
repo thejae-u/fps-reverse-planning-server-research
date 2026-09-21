@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AuthServer.Models;
 
@@ -16,6 +16,9 @@ public class MatchResult
     // 5 vs 5
     public string? WinningTeam { get; set; } // "A", "B", "Draw"
     public List<string> WinnerUserIds { get; set; } = new();
+    
+    public int TeamAScore { get; set; } = 0;
+    public int TeamBScore { get; set; } = 0;
     
     public DateTime MatchedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? FinishedAtUtc { get; set; }

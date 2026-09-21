@@ -14,9 +14,10 @@ struct PlayerSnapshot
 
 enum class TeamType
 {
-    None,
-    TeamA,
-    TeamB,
+    None = 0,
+    TeamA = 1,
+    TeamB = 2,
+    Draw = 3,
 };
 
 constexpr float GRAVITY = 9.8f;

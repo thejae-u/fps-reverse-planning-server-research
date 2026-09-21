@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Player.hpp"
 
@@ -29,6 +29,11 @@ struct GameResult
     {
         teamAInfo = teamInfos[0]; 
         teamBInfo = teamInfos[1];
-        winningTeam = teamAInfo.kills > teamBInfo.kills ? TeamType::TeamA : TeamType::TeamB; // kill이 더 많은 팀이 승리 (임시조건)
+        if (teamAInfo.kills > teamBInfo.kills)
+            winningTeam = TeamType::TeamA;
+        else if (teamBInfo.kills > teamAInfo.kills)
+            winningTeam = TeamType::TeamB;
+        else
+            winningTeam = TeamType::Draw;
     }
 };
