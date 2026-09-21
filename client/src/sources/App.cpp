@@ -54,6 +54,26 @@ bool App::Init()
     _ioManager = IOManager::Create("ClientIO", 2, 2);
     _dedicatedClient = std::make_shared<DedicatedClient>(_ioManager);
 
+    _dedicatedClient->SetOnIngameReady([this]() {
+        AddLog("[Event] Ingame Ready confirmed by Dedicated Server!");
+        if (_autoSendRandomInput)
+        {
+            _dedicatedClient->StartRandomInput(_randomInputIntervalMs);
+        }
+    });
+
+    _dedicatedClient->SetOnDisconnected([this](const std::string& reason) {
+        AddLog("[Event] Disconnected from server: " + reason);
+        if (!_isAutomatedTesting)
+        {
+            std::thread([this]() {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                HttpCheckStatus();
+                ShowFinishBanner("MATCH TERMINATED", std::format("Session ended. Packets sent: {}", _dedicatedClient ? _dedicatedClient->GetRandomPacketsSent() : 0));
+            }).detach();
+        }
+    });
+
     AddLog("[System] Client initialized successfully.");
     return true;
 }
@@ -147,6 +167,8 @@ void App::RenderUI()
 
     ImGui::Columns(1);
     ImGui::End();
+
+    RenderFinishModal();
 }
 
 void App::RenderAuthPanel()
@@ -234,6 +256,27 @@ void App::RenderAuthPanel()
             TriggerTenPlayerMatch();
         }
     }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    // Automated E2E Lifecycle & Combat Test (Bat Migration)
+    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.5f, 1.0f), "Full E2E Lifecycle & Combat Test (Bat Migration):");
+    ImGui::TextWrapped("Fully automated test: Queues 10 players, waits for Dedicated Server, connects socket & UDP hole punch, streams random inputs, and displays match summary!");
+
+    if (_isAutomatedTesting)
+    {
+        ImGui::BeginDisabled();
+        ImGui::Button("E2E Test Running in Progress...", ImVec2(380, 45));
+        ImGui::EndDisabled();
+    }
+    else
+    {
+        if (ImGui::Button("▶ RUN AUTOMATED E2E TEST (MIGRATION)", ImVec2(380, 45)))
+        {
+            RunAutomatedLifecycleTest();
+        }
+    }
 }
 
 void App::RenderDedicatedPanel()
@@ -313,6 +356,36 @@ void App::RenderDedicatedPanel()
     if (ImGui::Button("Send Shoot"))
     {
         _dedicatedClient->SendIngamePacket(Protocol::IngameType::Shoot, "");
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Random Input Streamer:");
+    ImGui::Checkbox("Auto-start on Ingame", &_autoSendRandomInput);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120);
+    ImGui::SliderInt("Interval (ms)", &_randomInputIntervalMs, 10, 200);
+
+    bool isRandomActive = _dedicatedClient && _dedicatedClient->IsRandomInputActive();
+
+    if (isRandomActive)
+    {
+        if (ImGui::Button("■ Stop Random Input Stream", ImVec2(240, 32)))
+        {
+            _dedicatedClient->StopRandomInput();
+        }
+    }
+    else
+    {
+        if (ImGui::Button("▶ Start Random Input Stream", ImVec2(240, 32)))
+        {
+            _dedicatedClient->StartRandomInput(_randomInputIntervalMs);
+        }
+    }
+
+    if (_dedicatedClient)
+    {
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.6f, 1.0f), "Random Packets Streamed: %u", _dedicatedClient->GetRandomPacketsSent());
     }
 
     if (!isIngame)
@@ -596,5 +669,205 @@ void App::TriggerTenPlayerMatch()
         }
 
         _isTriggeringMatch = false;
+    });
+}
+
+void App::ShowFinishBanner(const std::string& title, const std::string& details)
+{
+    {
+        std::lock_guard<std::mutex> lock(_bannerMutex);
+        _finishBannerTitle = title;
+        _finishBannerDetails = details;
+    }
+    _triggerFinishModal = true;
+
+    AddLog("========================================================");
+    AddLog(std::format(" [MATCH RESULT BANNER] {}", title));
+    AddLog(std::format(" {}", details));
+    AddLog("========================================================");
+}
+
+void App::RenderFinishModal()
+{
+    if (_triggerFinishModal.exchange(false))
+    {
+        _isFinishModalOpen = true;
+        ImGui::OpenPopup("Match Finished Notification");
+    }
+
+    if (!_isFinishModalOpen)
+        return;
+
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(520, 260));
+
+    if (ImGui::BeginPopupModal("Match Finished Notification", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+    {
+        std::string title;
+        std::string details;
+        {
+            std::lock_guard<std::mutex> lock(_bannerMutex);
+            title = _finishBannerTitle;
+            details = _finishBannerDetails;
+        }
+
+        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "=== %s ===", title.c_str());
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextWrapped("%s", details.c_str());
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Close Notification", ImVec2(150, 35)))
+        {
+            _isFinishModalOpen = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void App::ConnectToDedicatedServerAuto()
+{
+    if (_serverAddress.empty() || _serverAddress == "pending")
+    {
+        AddLog("[Client] Target server address not ready yet.");
+        return;
+    }
+
+    auto colon = _serverAddress.find(':');
+    if (colon != std::string::npos)
+    {
+        std::string host = _serverAddress.substr(0, colon);
+        int port = std::stoi(_serverAddress.substr(colon + 1));
+        strncpy_s(_targetHost, sizeof(_targetHost), host.c_str(), _TRUNCATE);
+        _targetPort = port;
+        AddLog(std::format("[Client] Auto-connecting to Dedicated Server {}:{}...", host, port));
+        _dedicatedClient->Connect(host, static_cast<uint16_t>(port));
+    }
+}
+
+void App::RunAutomatedLifecycleTest()
+{
+    if (_isAutomatedTesting)
+        return;
+
+    _isAutomatedTesting = true;
+    _triggerFinishModal = false;
+    _isFinishModalOpen = false;
+
+    _testFuture = std::async(std::launch::async, [this]() {
+        try
+        {
+            AddLog("========================================================");
+            AddLog("    STARTING AUTOMATED CLIENT E2E LIFECYCLE TEST        ");
+            AddLog("========================================================");
+
+            // 1. Ensure AuthServer login & 10 players matchmaking
+            AddLog("[Test 1/5] Registering/logging in and queuing 10 players...");
+            if (_jwtToken.empty())
+            {
+                HttpRegister();
+                HttpLogin();
+            }
+            HttpJoinQueue();
+
+            auto timestamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count() % 1000000);
+            for (int i = 1; i <= 9; ++i)
+            {
+                std::string botName = std::format("test_bot_{}_{}", timestamp, i);
+                std::string botPass = "password123!";
+                nlohmann::json botJson = {{"username", botName}, {"password", botPass}};
+
+                cpr::Post(cpr::Url{std::string(_authServerUrl) + "/auth/register"},
+                          cpr::Header{{"Content-Type", "application/json"}},
+                          cpr::Body{botJson.dump()}, cpr::Timeout{2000});
+
+                auto loginRes = cpr::Post(cpr::Url{std::string(_authServerUrl) + "/auth/login"},
+                                          cpr::Header{{"Content-Type", "application/json"}},
+                                          cpr::Body{botJson.dump()}, cpr::Timeout{2000});
+
+                if (loginRes.status_code == 200)
+                {
+                    auto parsed = nlohmann::json::parse(loginRes.text);
+                    std::string botToken = parsed["token"].get<std::string>();
+                    cpr::Post(cpr::Url{std::string(_authServerUrl) + "/match/join"},
+                              cpr::Header{{"Authorization", "Bearer " + botToken}},
+                              cpr::Timeout{2000});
+                }
+            }
+
+            // 2. Wait for match to be created & Dedicated Server spawned
+            AddLog("[Test 2/5] Waiting for match assignment from AuthServer...");
+            int retry = 0;
+            while (retry++ < 15)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                HttpCheckStatus();
+                if (!_serverAddress.empty() && _serverAddress != "pending")
+                    break;
+            }
+
+            if (_serverAddress.empty() || _serverAddress == "pending")
+            {
+                AddLog("[Test FAIL] Dedicated Server was not spawned within timeout!");
+                _isAutomatedTesting = false;
+                return;
+            }
+
+            // 3. Connect to Dedicated Server
+            AddLog(std::format("[Test 3/5] Connecting client to Dedicated Server: {}...", _serverAddress));
+            ConnectToDedicatedServerAuto();
+
+            // Wait for Ingame Ready (Hole punching)
+            int connectRetry = 0;
+            while (connectRetry++ < 30 && (!_dedicatedClient || !_dedicatedClient->IsIngame()))
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+
+            if (!_dedicatedClient || !_dedicatedClient->IsIngame())
+            {
+                AddLog("[Test FAIL] Failed to achieve Ingame Ready state with server!");
+                _isAutomatedTesting = false;
+                return;
+            }
+
+            AddLog("[Test PASS] Client successfully connected & UDP hole punch authenticated!");
+
+            // 4. Stream random inputs
+            AddLog("[Test 4/5] Streaming random input packets (Movement & Shoot) for 3 seconds...");
+            _dedicatedClient->StopRandomInput();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            _dedicatedClient->StartRandomInput(50);
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            uint32_t sent = _dedicatedClient->GetRandomPacketsSent();
+            _dedicatedClient->StopRandomInput();
+            AddLog(std::format("[Test 4/5] Successfully sent {} random input packets!", sent));
+
+            // 5. Verification & Final Results
+            AddLog("[Test 5/5] Fetching final match results from AuthServer...");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            HttpCheckStatus();
+
+            std::string summary = std::format("Match ID: {}\nServer Address: {}\nRandom Packets Sent: {}\nMatch Status: {}",
+                                              _matchId, _serverAddress, sent, _matchStatus);
+
+            ShowFinishBanner("AUTOMATED E2E TEST COMPLETED", summary);
+
+            AddLog("========================================================");
+            AddLog("    AUTOMATED CLIENT E2E TEST SUCCESSFULLY FINISHED!     ");
+            AddLog("========================================================");
+        }
+        catch (const std::exception& e)
+        {
+            AddLog(std::format("[Test Exception] {}", e.what()));
+        }
+
+        _isAutomatedTesting = false;
     });
 }

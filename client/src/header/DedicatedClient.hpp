@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <array>
 #include <queue>
 #include <atomic>
 #include <functional>
@@ -33,9 +34,21 @@ public:
 
     void SendIngamePacket(Protocol::IngameType type, const std::string& data);
 
+    // Random input streaming
+    void StartRandomInput(int intervalMs = 50);
+    void StopRandomInput();
+    bool IsRandomInputActive() const { return _randomInputActive; }
+    uint32_t GetRandomPacketsSent() const { return _randomPacketsSent.load(); }
+
+    // Event callbacks
+    void SetOnIngameReady(std::function<void()> cb) { _onIngameReady = cb; }
+    void SetOnDisconnected(std::function<void(const std::string& reason)> cb) { _onDisconnected = cb; }
+
     std::vector<std::string> ConsumeLogs();
 
 private:
+    void ScheduleRandomInput(int intervalMs);
+    void SendRandomInputPacket();
     void AddLog(const std::string& msg);
     void InitUdpSocket();
     void AsyncReadTcp();
@@ -63,7 +76,7 @@ private:
     uint16_t _clientUdpPort = 0;
 
     std::vector<unsigned char> _tcpReadBuffer;
-    std::vector<unsigned char> _udpReadBuffer;
+    std::array<uint8_t, 65536> _udpReadBuffer{};
     asio::ip::udp::endpoint _udpSenderEndpoint;
 
     std::queue<std::shared_ptr<std::vector<unsigned char>>> _sendTcpQueue;
@@ -72,4 +85,11 @@ private:
 
     std::vector<std::string> _logMessages;
     mutable std::mutex _logMutex;
+
+    std::function<void()> _onIngameReady;
+    std::function<void(const std::string& reason)> _onDisconnected;
+
+    std::shared_ptr<asio::steady_timer> _randomInputTimer;
+    std::atomic<bool> _randomInputActive{ false };
+    std::atomic<uint32_t> _randomPacketsSent{ 0 };
 };

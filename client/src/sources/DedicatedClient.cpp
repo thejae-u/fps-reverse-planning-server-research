@@ -5,7 +5,8 @@ DedicatedClient::DedicatedClient(std::shared_ptr<IOManager> ioManager)
     : _ioManager(ioManager),
       _strand(asio::make_strand(ioManager->GetIoContext())),
       _tcpSocket(std::make_shared<asio::ip::tcp::socket>(_strand)),
-      _udpSocket(_strand)
+      _udpSocket(_strand),
+      _randomInputTimer(std::make_shared<asio::steady_timer>(_strand))
 {
     InitUdpSocket();
 }
@@ -99,7 +100,8 @@ void DedicatedClient::Connect(const std::string& host, uint16_t port)
 
 void DedicatedClient::Disconnect()
 {
-    _connected = false;
+    StopRandomInput();
+    bool wasConnected = _connected.exchange(false);
     _handshaked = false;
     _isIngame = false;
     _sessionId.clear();
@@ -123,6 +125,10 @@ void DedicatedClient::Disconnect()
     InitUdpSocket();
 
     AddLog("[TCP] Disconnected from Dedicated Server");
+    if (wasConnected && _onDisconnected)
+    {
+        _onDisconnected("Connection closed by server or client");
+    }
 }
 
 void DedicatedClient::AsyncHandshake()
@@ -205,7 +211,7 @@ void DedicatedClient::SendUdpHolePunching()
     asio::ip::udp::endpoint serverEndpoint(_serverAddress, _serverUdpPort);
     auto self = shared_from_this();
 
-    _udpSocket.async_send_to(asio::buffer(*sendBuffer), serverEndpoint, asio::bind_executor(_strand, [this, self](std::error_code ec, std::size_t bytes) {
+    _udpSocket.async_send_to(asio::buffer(*sendBuffer), serverEndpoint, asio::bind_executor(_strand, [this, self, sendBuffer](std::error_code ec, std::size_t bytes) {
         if (ec)
         {
             AddLog("[UDP] Hole punching send failed: " + ec.message());
@@ -222,7 +228,6 @@ void DedicatedClient::AsyncReadUdp()
     if (!_udpSocket.is_open())
         return;
 
-    _udpReadBuffer.resize(65535);
     auto self = shared_from_this();
 
     _udpSocket.async_receive_from(
@@ -247,6 +252,10 @@ void DedicatedClient::AsyncReadUdp()
                                 {
                                     _isIngame = true;
                                     AddLog("[UDP] Hole Punching Authenticated! Ingame Ready.");
+                                    if (_onIngameReady)
+                                    {
+                                        _onIngameReady();
+                                    }
                                 }
                             }
                         }
@@ -343,10 +352,99 @@ void DedicatedClient::SendIngamePacket(Protocol::IngameType type, const std::str
     asio::ip::udp::endpoint serverEndpoint(_serverAddress, _serverUdpPort);
     auto self = shared_from_this();
 
-    _udpSocket.async_send_to(asio::buffer(*sendBuffer), serverEndpoint, asio::bind_executor(_strand, [this, self, type](std::error_code ec, std::size_t) {
+    _udpSocket.async_send_to(asio::buffer(*sendBuffer), serverEndpoint, asio::bind_executor(_strand, [this, self, sendBuffer, type](std::error_code ec, std::size_t) {
         if (ec)
             AddLog(std::format("[UDP] Send Ingame Packet failed: {}", ec.message()));
         else
             AddLog(std::format("[UDP] Sent Ingame Packet (Type: {})", static_cast<int>(type)));
     }));
+}
+
+void DedicatedClient::StartRandomInput(int intervalMs)
+{
+    if (!_isIngame)
+    {
+        AddLog("[RandomInput] Cannot start: not in ingame state yet");
+        return;
+    }
+
+    if (_randomInputActive.exchange(true))
+        return; // already active
+
+    _randomPacketsSent = 0;
+    AddLog(std::format("[RandomInput] Started streaming random input every {}ms", intervalMs));
+
+    asio::post(_strand, [this, self = shared_from_this(), intervalMs]() {
+        ScheduleRandomInput(intervalMs);
+    });
+}
+
+void DedicatedClient::StopRandomInput()
+{
+    if (_randomInputActive.exchange(false))
+    {
+        asio::post(_strand, [this, self = shared_from_this()]() {
+            if (_randomInputTimer)
+            {
+                std::error_code ec;
+                _randomInputTimer->cancel(ec);
+            }
+        });
+        AddLog(std::format("[RandomInput] Stopped. Total packets sent: {}", _randomPacketsSent.load()));
+    }
+}
+
+void DedicatedClient::ScheduleRandomInput(int intervalMs)
+{
+    if (!_randomInputActive || !_isIngame)
+        return;
+
+    auto self = shared_from_this();
+    _randomInputTimer->expires_after(std::chrono::milliseconds(intervalMs));
+    _randomInputTimer->async_wait(asio::bind_executor(_strand, [this, self, intervalMs](std::error_code ec) {
+        if (!ec)
+        {
+            if (_randomInputActive && _isIngame)
+            {
+                SendRandomInputPacket();
+                ScheduleRandomInput(intervalMs);
+            }
+        }
+        else if (ec != asio::error::operation_aborted)
+        {
+            AddLog("[RandomInput] Timer error: " + ec.message());
+        }
+    }));
+}
+
+void DedicatedClient::SendRandomInputPacket()
+{
+    // Generate random move direction
+    float dirX = (static_cast<float>(rand() % 200) - 100.0f) / 100.0f;
+    float dirZ = (static_cast<float>(rand() % 200) - 100.0f) / 100.0f;
+    float posX = static_cast<float>(rand() % 100 - 50);
+    float posZ = static_cast<float>(rand() % 100 - 50);
+
+    Protocol::MovePacket move;
+    move.set_playerid(_sessionId);
+    move.set_originx(posX);
+    move.set_originy(0.0f);
+    move.set_originz(posZ);
+    move.set_dirx(dirX);
+    move.set_diry(0.0f);
+    move.set_dirz(dirZ);
+
+    std::string moveSerialized;
+    if (move.SerializeToString(&moveSerialized))
+    {
+        SendIngamePacket(Protocol::IngameType::Move, moveSerialized);
+    }
+
+    // Intermittently (1 in 5 times) send Shoot packet
+    if (rand() % 5 == 0)
+    {
+        SendIngamePacket(Protocol::IngameType::Shoot, "");
+    }
+
+    _randomPacketsSent++;
 }

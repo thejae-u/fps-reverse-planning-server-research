@@ -39,7 +39,7 @@ else()
 endif()
 
 # 소스 및 헤더 파일 자동 수집
-file(GLOB_RECURSE CLIENT_SOURCES "src/sources/*.cpp" "src/sources/*.c" "src/sources/*.cc")
+file(GLOB_RECURSE CLIENT_SOURCES "src/sources/*.cpp" "src/sources/*.c")
 file(GLOB_RECURSE CLIENT_HEADERS "src/header/*.h" "src/header/*.hpp")
 
 # ImGui 소스 수집 (thirdparty/imgui)

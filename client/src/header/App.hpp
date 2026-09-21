@@ -38,6 +38,10 @@ private:
     void HttpCancelQueue();
     void HttpCheckStatus();
     void TriggerTenPlayerMatch();
+    void RunAutomatedLifecycleTest();
+    void ConnectToDedicatedServerAuto();
+    void RenderFinishModal();
+    void ShowFinishBanner(const std::string& title, const std::string& details);
 
     void AddLog(const std::string& msg);
 
@@ -66,6 +70,21 @@ private:
     // Async task handling for 10-player match
     std::atomic<bool> _isTriggeringMatch{ false };
     std::future<void> _matchFuture;
+
+    // Automated Test State
+    std::atomic<bool> _isAutomatedTesting{ false };
+    std::future<void> _testFuture;
+
+    // Random input streaming
+    bool _autoSendRandomInput = true;
+    int _randomInputIntervalMs = 50;
+
+    // Match finished modal / banner
+    std::atomic<bool> _triggerFinishModal{ false };
+    bool _isFinishModalOpen = false;
+    std::string _finishBannerTitle;
+    std::string _finishBannerDetails;
+    std::mutex _bannerMutex;
 
     // Logs
     std::vector<std::string> _logs;
