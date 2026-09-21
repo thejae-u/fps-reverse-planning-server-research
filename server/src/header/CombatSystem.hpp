@@ -27,7 +27,7 @@ public:
         std::vector<TeamInfo>& teamInfos,
         std::weak_ptr<Room> weakRoom);
 
-    void Hit(
+    void OnHit(
         uuids::uuid hitId,
         std::int32_t damage,
         uuids::uuid shooterId,

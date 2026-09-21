@@ -14,6 +14,7 @@ void CombatSystem::Shoot(
     std::vector<TeamInfo>& teamInfos,
     std::weak_ptr<Room> weakRoom)
 {
+    // player 유효성 확인
     auto shooterIt = players.find(shooterId);
     if(shooterIt == players.end() || !shooterIt->second)
         return;
@@ -26,7 +27,7 @@ void CombatSystem::Shoot(
     Vector3 shootOrigin = shooter->position;
 
     constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS; // 충돌 구체 범위
-    Vector3 normalizedDirection = direction.normalized(); // 방향 벡터 정규화
+    Vector3 normalizedDirection = direction.normalized();    // 방향 벡터 정규화
 
     // shooter 미포함 rewind 데이터
     for(auto& [rewindId, rewindPlayer, originPosition, rewindPosition, isHit] : rewinds)
@@ -44,7 +45,7 @@ void CombatSystem::Shoot(
          *  P = O + tD : 발사선 상의 적의 최근접점 (발사선과 가장 가까운 벡터)
          *  ||P - C||^2 : P와 C의 최단거리 제곱
          */
-        
+
         // V = enemy - shooter (shooter로부터 적의 방향 벡터)
         Vector3 v = rewindPosition - shootOrigin;
 
@@ -59,27 +60,26 @@ void CombatSystem::Shoot(
         Vector3 p = normalizedDirection * t + shootOrigin;
 
         // ||P - C||^2
-        Vector3 diff = p - rewindPosition; // P - C
+        Vector3 diff = p - rewindPosition;   // P - C
         const float distSq = diff.dot(diff); // ||PC||^2 = PC dot PC (자기 자신의 내적 값은 제곱 크기)
 
         // Collide Check
         if(distSq <= HIT_RADIUS_SQ)
         {
-            Hit(rewindId, shooter->attackPower, shooterId, players, teamInfos, weakRoom);
             isHit = true;
         }
     }
 
+    // 2. Broadcast Shoot (LagComp) packet first
     if(auto room = weakRoom.lock())
     {
-        // broadcast 할 지연보상 패킷
         Protocol::LagCompPacket lagCompPacket;
         lagCompPacket.set_shooterid(uuids::to_string(shooterId));
-        
+
         lagCompPacket.set_originx(shootOrigin.x);
         lagCompPacket.set_originy(shootOrigin.y);
         lagCompPacket.set_originz(shootOrigin.z);
-        
+
         lagCompPacket.set_dirx(normalizedDirection.x);
         lagCompPacket.set_diry(normalizedDirection.y);
         lagCompPacket.set_dirz(normalizedDirection.z);
@@ -98,7 +98,7 @@ void CombatSystem::Shoot(
             targetMsg->set_rewoundx(rp.x);
             targetMsg->set_rewoundy(rp.y);
             targetMsg->set_rewoundz(rp.z);
-            
+
             targetMsg->set_ishit(isHit);
         }
 
@@ -121,9 +121,18 @@ void CombatSystem::Shoot(
             }
         }
     }
+
+    // 3. Process Hits and Broadcast HitPackets after Shoot packet
+    for(const auto& [id, player, op, rp, isHit] : rewinds)
+    {
+        if(isHit)
+        {
+            OnHit(id, shooter->attackPower, shooterId, players, teamInfos, weakRoom);
+        }
+    }
 }
 
-void CombatSystem::Hit(
+void CombatSystem::OnHit(
     uuids::uuid hitId,
     std::int32_t damage,
     uuids::uuid shooterId,
@@ -184,6 +193,7 @@ void CombatSystem::Hit(
                      uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(hitId));
     }
 
+    // Broadcast Hit Packet
     if(auto room = weakRoom.lock())
     {
         // 1. Create and populate HitPacket protobuf message

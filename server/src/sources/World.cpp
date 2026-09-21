@@ -70,7 +70,7 @@ void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTi
 void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 {
     std::lock_guard lock(_playerMutex);
-    _combatSystem.Hit(hitId, damage, shooterId, _players, _teamInfos, _weakRoom);
+    _combatSystem.OnHit(hitId, damage, shooterId, _players, _teamInfos, _weakRoom);
 }
 
 std::unique_ptr<GameResult> World::GetResult()
