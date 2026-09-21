@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <spdlog/spdlog.h>
 #include <asio.hpp>
@@ -12,6 +12,7 @@ public:
     
 public:
     void RunTestMode();
+    void RunSimulation();
     
 private:
     std::uint16_t _testClientCount;
