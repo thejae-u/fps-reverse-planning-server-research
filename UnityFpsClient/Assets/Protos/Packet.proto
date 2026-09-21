@@ -25,7 +25,7 @@ enum IngameType {
   Jump = 2;
   Shoot = 3;
   Hit = 4;
-  DebugLagComp = 5;
+  LagComp = 5;
   Score = 6;
 }
 
@@ -79,7 +79,7 @@ message HitPacket {
   int32 damage = 6;
 }
 
-message DebugLagCompTarget {
+message LagCompTarget {
   bytes targetId = 1;
   float presentX = 2;
   float presentY = 3;
@@ -90,7 +90,7 @@ message DebugLagCompTarget {
   bool isHit = 8;
 }
 
-message DebugLagCompPacket {
+message LagCompPacket {
   bytes shooterId = 1;
   float originX = 2;
   float originY = 3;
@@ -98,7 +98,7 @@ message DebugLagCompPacket {
   float dirX = 5;
   float dirY = 6;
   float dirZ = 7;
-  repeated DebugLagCompTarget targets = 8;
+  repeated LagCompTarget targets = 8;
 }
 
 message MovePacket {

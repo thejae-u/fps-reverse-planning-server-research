@@ -56,18 +56,18 @@ namespace Protocol {
 class AuthenticationPacket;
 struct AuthenticationPacketDefaultTypeInternal;
 extern AuthenticationPacketDefaultTypeInternal _AuthenticationPacket_default_instance_;
-class DebugLagCompPacket;
-struct DebugLagCompPacketDefaultTypeInternal;
-extern DebugLagCompPacketDefaultTypeInternal _DebugLagCompPacket_default_instance_;
-class DebugLagCompTarget;
-struct DebugLagCompTargetDefaultTypeInternal;
-extern DebugLagCompTargetDefaultTypeInternal _DebugLagCompTarget_default_instance_;
 class HitPacket;
 struct HitPacketDefaultTypeInternal;
 extern HitPacketDefaultTypeInternal _HitPacket_default_instance_;
 class IngamePacket;
 struct IngamePacketDefaultTypeInternal;
 extern IngamePacketDefaultTypeInternal _IngamePacket_default_instance_;
+class LagCompPacket;
+struct LagCompPacketDefaultTypeInternal;
+extern LagCompPacketDefaultTypeInternal _LagCompPacket_default_instance_;
+class LagCompTarget;
+struct LagCompTargetDefaultTypeInternal;
+extern LagCompTargetDefaultTypeInternal _LagCompTarget_default_instance_;
 class Matchmaking;
 struct MatchmakingDefaultTypeInternal;
 extern MatchmakingDefaultTypeInternal _Matchmaking_default_instance_;
@@ -130,7 +130,7 @@ enum IngameType : int {
   Jump = 2,
   Shoot = 3,
   Hit = 4,
-  DebugLagComp = 5,
+  LagComp = 5,
   Score = 6,
   IngameType_INT_MIN_SENTINEL_DO_NOT_USE_ =
       std::numeric_limits<::int32_t>::min(),
@@ -1174,6 +1174,286 @@ class Matchmaking final : public ::google::protobuf::Message
 };
 // -------------------------------------------------------------------
 
+class LagCompTarget final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:Protocol.LagCompTarget) */ {
+ public:
+  inline LagCompTarget() : LagCompTarget(nullptr) {}
+  ~LagCompTarget() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(LagCompTarget* msg, std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(LagCompTarget));
+  }
+#endif
+
+  template <typename = void>
+  explicit PROTOBUF_CONSTEXPR LagCompTarget(
+      ::google::protobuf::internal::ConstantInitialized);
+
+  inline LagCompTarget(const LagCompTarget& from) : LagCompTarget(nullptr, from) {}
+  inline LagCompTarget(LagCompTarget&& from) noexcept
+      : LagCompTarget(nullptr, std::move(from)) {}
+  inline LagCompTarget& operator=(const LagCompTarget& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline LagCompTarget& operator=(LagCompTarget&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields()
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::google::protobuf::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::google::protobuf::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const LagCompTarget& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const LagCompTarget* internal_default_instance() {
+    return reinterpret_cast<const LagCompTarget*>(
+        &_LagCompTarget_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 5;
+  friend void swap(LagCompTarget& a, LagCompTarget& b) { a.Swap(&b); }
+  inline void Swap(LagCompTarget* other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(LagCompTarget* other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  LagCompTarget* New(::google::protobuf::Arena* arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<LagCompTarget>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const LagCompTarget& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const LagCompTarget& from) { LagCompTarget::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(
+      ::google::protobuf::MessageLite& to_msg,
+      const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  static ::uint8_t* _InternalSerialize(
+      const MessageLite& msg, ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream);
+
+  public:
+  ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  ::size_t ByteSizeLong() const final;
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  int GetCachedSize() const { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(LagCompTarget* other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(
+      ::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "Protocol.LagCompTarget"; }
+
+ protected:
+  explicit LagCompTarget(::google::protobuf::Arena* arena);
+  LagCompTarget(::google::protobuf::Arena* arena, const LagCompTarget& from);
+  LagCompTarget(::google::protobuf::Arena* arena, LagCompTarget&& from) noexcept
+      : LagCompTarget(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* GetClassData() const PROTOBUF_FINAL;
+  static void* PlacementNew_(const void*, void* mem,
+                             ::google::protobuf::Arena* arena);
+  static constexpr auto InternalNewImpl_();
+  static const ::google::protobuf::internal::ClassDataFull _class_data_;
+
+ public:
+  ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTargetIdFieldNumber = 1,
+    kPresentXFieldNumber = 2,
+    kPresentYFieldNumber = 3,
+    kPresentZFieldNumber = 4,
+    kRewoundXFieldNumber = 5,
+    kRewoundYFieldNumber = 6,
+    kRewoundZFieldNumber = 7,
+    kIsHitFieldNumber = 8,
+  };
+  // bytes targetId = 1;
+  void clear_targetid() ;
+  const std::string& targetid() const;
+  template <typename Arg_ = const std::string&, typename... Args_>
+  void set_targetid(Arg_&& arg, Args_... args);
+  std::string* mutable_targetid();
+  PROTOBUF_NODISCARD std::string* release_targetid();
+  void set_allocated_targetid(std::string* value);
+
+  private:
+  const std::string& _internal_targetid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_targetid(
+      const std::string& value);
+  std::string* _internal_mutable_targetid();
+
+  public:
+  // float presentX = 2;
+  void clear_presentx() ;
+  float presentx() const;
+  void set_presentx(float value);
+
+  private:
+  float _internal_presentx() const;
+  void _internal_set_presentx(float value);
+
+  public:
+  // float presentY = 3;
+  void clear_presenty() ;
+  float presenty() const;
+  void set_presenty(float value);
+
+  private:
+  float _internal_presenty() const;
+  void _internal_set_presenty(float value);
+
+  public:
+  // float presentZ = 4;
+  void clear_presentz() ;
+  float presentz() const;
+  void set_presentz(float value);
+
+  private:
+  float _internal_presentz() const;
+  void _internal_set_presentz(float value);
+
+  public:
+  // float rewoundX = 5;
+  void clear_rewoundx() ;
+  float rewoundx() const;
+  void set_rewoundx(float value);
+
+  private:
+  float _internal_rewoundx() const;
+  void _internal_set_rewoundx(float value);
+
+  public:
+  // float rewoundY = 6;
+  void clear_rewoundy() ;
+  float rewoundy() const;
+  void set_rewoundy(float value);
+
+  private:
+  float _internal_rewoundy() const;
+  void _internal_set_rewoundy(float value);
+
+  public:
+  // float rewoundZ = 7;
+  void clear_rewoundz() ;
+  float rewoundz() const;
+  void set_rewoundz(float value);
+
+  private:
+  float _internal_rewoundz() const;
+  void _internal_set_rewoundz(float value);
+
+  public:
+  // bool isHit = 8;
+  void clear_ishit() ;
+  bool ishit() const;
+  void set_ishit(bool value);
+
+  private:
+  bool _internal_ishit() const;
+  void _internal_set_ishit(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:Protocol.LagCompTarget)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<
+      3, 8, 0,
+      0, 2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(
+        ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena);
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena, const Impl_& from,
+                          const LagCompTarget& from_msg);
+    ::google::protobuf::internal::ArenaStringPtr targetid_;
+    float presentx_;
+    float presenty_;
+    float presentz_;
+    float rewoundx_;
+    float rewoundy_;
+    float rewoundz_;
+    bool ishit_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_Packet_2eproto;
+};
+// -------------------------------------------------------------------
+
 class IngamePacket final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:Protocol.IngamePacket) */ {
  public:
@@ -1692,286 +1972,6 @@ class HitPacket final : public ::google::protobuf::Message
 };
 // -------------------------------------------------------------------
 
-class DebugLagCompTarget final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:Protocol.DebugLagCompTarget) */ {
- public:
-  inline DebugLagCompTarget() : DebugLagCompTarget(nullptr) {}
-  ~DebugLagCompTarget() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(DebugLagCompTarget* msg, std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(DebugLagCompTarget));
-  }
-#endif
-
-  template <typename = void>
-  explicit PROTOBUF_CONSTEXPR DebugLagCompTarget(
-      ::google::protobuf::internal::ConstantInitialized);
-
-  inline DebugLagCompTarget(const DebugLagCompTarget& from) : DebugLagCompTarget(nullptr, from) {}
-  inline DebugLagCompTarget(DebugLagCompTarget&& from) noexcept
-      : DebugLagCompTarget(nullptr, std::move(from)) {}
-  inline DebugLagCompTarget& operator=(const DebugLagCompTarget& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline DebugLagCompTarget& operator=(DebugLagCompTarget&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields()
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  static const ::google::protobuf::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::google::protobuf::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::google::protobuf::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const DebugLagCompTarget& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const DebugLagCompTarget* internal_default_instance() {
-    return reinterpret_cast<const DebugLagCompTarget*>(
-        &_DebugLagCompTarget_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 5;
-  friend void swap(DebugLagCompTarget& a, DebugLagCompTarget& b) { a.Swap(&b); }
-  inline void Swap(DebugLagCompTarget* other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(DebugLagCompTarget* other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  DebugLagCompTarget* New(::google::protobuf::Arena* arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<DebugLagCompTarget>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const DebugLagCompTarget& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const DebugLagCompTarget& from) { DebugLagCompTarget::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(
-      ::google::protobuf::MessageLite& to_msg,
-      const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  static ::uint8_t* _InternalSerialize(
-      const MessageLite& msg, ::uint8_t* target,
-      ::google::protobuf::io::EpsCopyOutputStream* stream);
-
-  public:
-  ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  ::uint8_t* _InternalSerialize(
-      ::uint8_t* target,
-      ::google::protobuf::io::EpsCopyOutputStream* stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  ::size_t ByteSizeLong() const final;
-  ::uint8_t* _InternalSerialize(
-      ::uint8_t* target,
-      ::google::protobuf::io::EpsCopyOutputStream* stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  int GetCachedSize() const { return _impl_._cached_size_.Get(); }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(DebugLagCompTarget* other);
- private:
-  template <typename T>
-  friend ::absl::string_view(
-      ::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "Protocol.DebugLagCompTarget"; }
-
- protected:
-  explicit DebugLagCompTarget(::google::protobuf::Arena* arena);
-  DebugLagCompTarget(::google::protobuf::Arena* arena, const DebugLagCompTarget& from);
-  DebugLagCompTarget(::google::protobuf::Arena* arena, DebugLagCompTarget&& from) noexcept
-      : DebugLagCompTarget(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* GetClassData() const PROTOBUF_FINAL;
-  static void* PlacementNew_(const void*, void* mem,
-                             ::google::protobuf::Arena* arena);
-  static constexpr auto InternalNewImpl_();
-  static const ::google::protobuf::internal::ClassDataFull _class_data_;
-
- public:
-  ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kTargetIdFieldNumber = 1,
-    kPresentXFieldNumber = 2,
-    kPresentYFieldNumber = 3,
-    kPresentZFieldNumber = 4,
-    kRewoundXFieldNumber = 5,
-    kRewoundYFieldNumber = 6,
-    kRewoundZFieldNumber = 7,
-    kIsHitFieldNumber = 8,
-  };
-  // bytes targetId = 1;
-  void clear_targetid() ;
-  const std::string& targetid() const;
-  template <typename Arg_ = const std::string&, typename... Args_>
-  void set_targetid(Arg_&& arg, Args_... args);
-  std::string* mutable_targetid();
-  PROTOBUF_NODISCARD std::string* release_targetid();
-  void set_allocated_targetid(std::string* value);
-
-  private:
-  const std::string& _internal_targetid() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_targetid(
-      const std::string& value);
-  std::string* _internal_mutable_targetid();
-
-  public:
-  // float presentX = 2;
-  void clear_presentx() ;
-  float presentx() const;
-  void set_presentx(float value);
-
-  private:
-  float _internal_presentx() const;
-  void _internal_set_presentx(float value);
-
-  public:
-  // float presentY = 3;
-  void clear_presenty() ;
-  float presenty() const;
-  void set_presenty(float value);
-
-  private:
-  float _internal_presenty() const;
-  void _internal_set_presenty(float value);
-
-  public:
-  // float presentZ = 4;
-  void clear_presentz() ;
-  float presentz() const;
-  void set_presentz(float value);
-
-  private:
-  float _internal_presentz() const;
-  void _internal_set_presentz(float value);
-
-  public:
-  // float rewoundX = 5;
-  void clear_rewoundx() ;
-  float rewoundx() const;
-  void set_rewoundx(float value);
-
-  private:
-  float _internal_rewoundx() const;
-  void _internal_set_rewoundx(float value);
-
-  public:
-  // float rewoundY = 6;
-  void clear_rewoundy() ;
-  float rewoundy() const;
-  void set_rewoundy(float value);
-
-  private:
-  float _internal_rewoundy() const;
-  void _internal_set_rewoundy(float value);
-
-  public:
-  // float rewoundZ = 7;
-  void clear_rewoundz() ;
-  float rewoundz() const;
-  void set_rewoundz(float value);
-
-  private:
-  float _internal_rewoundz() const;
-  void _internal_set_rewoundz(float value);
-
-  public:
-  // bool isHit = 8;
-  void clear_ishit() ;
-  bool ishit() const;
-  void set_ishit(bool value);
-
-  private:
-  bool _internal_ishit() const;
-  void _internal_set_ishit(bool value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:Protocol.DebugLagCompTarget)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<
-      3, 8, 0,
-      0, 2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(
-        ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                          ::google::protobuf::Arena* arena);
-    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                          ::google::protobuf::Arena* arena, const Impl_& from,
-                          const DebugLagCompTarget& from_msg);
-    ::google::protobuf::internal::ArenaStringPtr targetid_;
-    float presentx_;
-    float presenty_;
-    float presentz_;
-    float rewoundx_;
-    float rewoundy_;
-    float rewoundz_;
-    bool ishit_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_Packet_2eproto;
-};
-// -------------------------------------------------------------------
-
 class AuthenticationPacket final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:Protocol.AuthenticationPacket) */ {
  public:
@@ -2431,31 +2431,31 @@ class ScoreboardPacket final : public ::google::protobuf::Message
 };
 // -------------------------------------------------------------------
 
-class DebugLagCompPacket final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:Protocol.DebugLagCompPacket) */ {
+class LagCompPacket final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:Protocol.LagCompPacket) */ {
  public:
-  inline DebugLagCompPacket() : DebugLagCompPacket(nullptr) {}
-  ~DebugLagCompPacket() PROTOBUF_FINAL;
+  inline LagCompPacket() : LagCompPacket(nullptr) {}
+  ~LagCompPacket() PROTOBUF_FINAL;
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(DebugLagCompPacket* msg, std::destroying_delete_t) {
+  void operator delete(LagCompPacket* msg, std::destroying_delete_t) {
     SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(DebugLagCompPacket));
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(LagCompPacket));
   }
 #endif
 
   template <typename = void>
-  explicit PROTOBUF_CONSTEXPR DebugLagCompPacket(
+  explicit PROTOBUF_CONSTEXPR LagCompPacket(
       ::google::protobuf::internal::ConstantInitialized);
 
-  inline DebugLagCompPacket(const DebugLagCompPacket& from) : DebugLagCompPacket(nullptr, from) {}
-  inline DebugLagCompPacket(DebugLagCompPacket&& from) noexcept
-      : DebugLagCompPacket(nullptr, std::move(from)) {}
-  inline DebugLagCompPacket& operator=(const DebugLagCompPacket& from) {
+  inline LagCompPacket(const LagCompPacket& from) : LagCompPacket(nullptr, from) {}
+  inline LagCompPacket(LagCompPacket&& from) noexcept
+      : LagCompPacket(nullptr, std::move(from)) {}
+  inline LagCompPacket& operator=(const LagCompPacket& from) {
     CopyFrom(from);
     return *this;
   }
-  inline DebugLagCompPacket& operator=(DebugLagCompPacket&& from) noexcept {
+  inline LagCompPacket& operator=(LagCompPacket&& from) noexcept {
     if (this == &from) return *this;
     if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
       InternalSwap(&from);
@@ -2483,16 +2483,16 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
   static const ::google::protobuf::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const DebugLagCompPacket& default_instance() {
+  static const LagCompPacket& default_instance() {
     return *internal_default_instance();
   }
-  static inline const DebugLagCompPacket* internal_default_instance() {
-    return reinterpret_cast<const DebugLagCompPacket*>(
-        &_DebugLagCompPacket_default_instance_);
+  static inline const LagCompPacket* internal_default_instance() {
+    return reinterpret_cast<const LagCompPacket*>(
+        &_LagCompPacket_default_instance_);
   }
   static constexpr int kIndexInFileMessages = 6;
-  friend void swap(DebugLagCompPacket& a, DebugLagCompPacket& b) { a.Swap(&b); }
-  inline void Swap(DebugLagCompPacket* other) {
+  friend void swap(LagCompPacket& a, LagCompPacket& b) { a.Swap(&b); }
+  inline void Swap(LagCompPacket* other) {
     if (other == this) return;
     if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
       InternalSwap(other);
@@ -2500,7 +2500,7 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
       ::google::protobuf::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(DebugLagCompPacket* other) {
+  void UnsafeArenaSwap(LagCompPacket* other) {
     if (other == this) return;
     ABSL_DCHECK(GetArena() == other->GetArena());
     InternalSwap(other);
@@ -2508,13 +2508,13 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
 
   // implements Message ----------------------------------------------
 
-  DebugLagCompPacket* New(::google::protobuf::Arena* arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<DebugLagCompPacket>(arena);
+  LagCompPacket* New(::google::protobuf::Arena* arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<LagCompPacket>(arena);
   }
   using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const DebugLagCompPacket& from);
+  void CopyFrom(const LagCompPacket& from);
   using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const DebugLagCompPacket& from) { DebugLagCompPacket::MergeImpl(*this, from); }
+  void MergeFrom(const LagCompPacket& from) { LagCompPacket::MergeImpl(*this, from); }
 
   private:
   static void MergeImpl(
@@ -2551,18 +2551,18 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
   private:
   void SharedCtor(::google::protobuf::Arena* arena);
   static void SharedDtor(MessageLite& self);
-  void InternalSwap(DebugLagCompPacket* other);
+  void InternalSwap(LagCompPacket* other);
  private:
   template <typename T>
   friend ::absl::string_view(
       ::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "Protocol.DebugLagCompPacket"; }
+  static ::absl::string_view FullMessageName() { return "Protocol.LagCompPacket"; }
 
  protected:
-  explicit DebugLagCompPacket(::google::protobuf::Arena* arena);
-  DebugLagCompPacket(::google::protobuf::Arena* arena, const DebugLagCompPacket& from);
-  DebugLagCompPacket(::google::protobuf::Arena* arena, DebugLagCompPacket&& from) noexcept
-      : DebugLagCompPacket(arena) {
+  explicit LagCompPacket(::google::protobuf::Arena* arena);
+  LagCompPacket(::google::protobuf::Arena* arena, const LagCompPacket& from);
+  LagCompPacket(::google::protobuf::Arena* arena, LagCompPacket&& from) noexcept
+      : LagCompPacket(arena) {
     *this = ::std::move(from);
   }
   const ::google::protobuf::internal::ClassData* GetClassData() const PROTOBUF_FINAL;
@@ -2586,23 +2586,23 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
     kDirYFieldNumber = 6,
     kDirZFieldNumber = 7,
   };
-  // repeated .Protocol.DebugLagCompTarget targets = 8;
+  // repeated .Protocol.LagCompTarget targets = 8;
   int targets_size() const;
   private:
   int _internal_targets_size() const;
 
   public:
   void clear_targets() ;
-  ::Protocol::DebugLagCompTarget* mutable_targets(int index);
-  ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>* mutable_targets();
+  ::Protocol::LagCompTarget* mutable_targets(int index);
+  ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>* mutable_targets();
 
   private:
-  const ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>& _internal_targets() const;
-  ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>* _internal_mutable_targets();
+  const ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>& _internal_targets() const;
+  ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>* _internal_mutable_targets();
   public:
-  const ::Protocol::DebugLagCompTarget& targets(int index) const;
-  ::Protocol::DebugLagCompTarget* add_targets();
-  const ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>& targets() const;
+  const ::Protocol::LagCompTarget& targets(int index) const;
+  ::Protocol::LagCompTarget* add_targets();
+  const ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>& targets() const;
   // bytes shooterId = 1;
   void clear_shooterid() ;
   const std::string& shooterid() const;
@@ -2679,7 +2679,7 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
   void _internal_set_dirz(float value);
 
   public:
-  // @@protoc_insertion_point(class_scope:Protocol.DebugLagCompPacket)
+  // @@protoc_insertion_point(class_scope:Protocol.LagCompPacket)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
@@ -2701,8 +2701,8 @@ class DebugLagCompPacket final : public ::google::protobuf::Message
                           ::google::protobuf::Arena* arena);
     inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
                           ::google::protobuf::Arena* arena, const Impl_& from,
-                          const DebugLagCompPacket& from_msg);
-    ::google::protobuf::RepeatedPtrField< ::Protocol::DebugLagCompTarget > targets_;
+                          const LagCompPacket& from_msg);
+    ::google::protobuf::RepeatedPtrField< ::Protocol::LagCompTarget > targets_;
     ::google::protobuf::internal::ArenaStringPtr shooterid_;
     float originx_;
     float originy_;
@@ -3498,439 +3498,439 @@ inline void HitPacket::_internal_set_damage(::int32_t value) {
 
 // -------------------------------------------------------------------
 
-// DebugLagCompTarget
+// LagCompTarget
 
 // bytes targetId = 1;
-inline void DebugLagCompTarget::clear_targetid() {
+inline void LagCompTarget::clear_targetid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.targetid_.ClearToEmpty();
 }
-inline const std::string& DebugLagCompTarget::targetid() const
+inline const std::string& LagCompTarget::targetid() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.targetId)
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.targetId)
   return _internal_targetid();
 }
 template <typename Arg_, typename... Args_>
-inline PROTOBUF_ALWAYS_INLINE void DebugLagCompTarget::set_targetid(Arg_&& arg,
+inline PROTOBUF_ALWAYS_INLINE void LagCompTarget::set_targetid(Arg_&& arg,
                                                      Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.targetid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.targetId)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.targetId)
 }
-inline std::string* DebugLagCompTarget::mutable_targetid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline std::string* LagCompTarget::mutable_targetid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
   std::string* _s = _internal_mutable_targetid();
-  // @@protoc_insertion_point(field_mutable:Protocol.DebugLagCompTarget.targetId)
+  // @@protoc_insertion_point(field_mutable:Protocol.LagCompTarget.targetId)
   return _s;
 }
-inline const std::string& DebugLagCompTarget::_internal_targetid() const {
+inline const std::string& LagCompTarget::_internal_targetid() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.targetid_.Get();
 }
-inline void DebugLagCompTarget::_internal_set_targetid(const std::string& value) {
+inline void LagCompTarget::_internal_set_targetid(const std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.targetid_.Set(value, GetArena());
 }
-inline std::string* DebugLagCompTarget::_internal_mutable_targetid() {
+inline std::string* LagCompTarget::_internal_mutable_targetid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   return _impl_.targetid_.Mutable( GetArena());
 }
-inline std::string* DebugLagCompTarget::release_targetid() {
+inline std::string* LagCompTarget::release_targetid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:Protocol.DebugLagCompTarget.targetId)
+  // @@protoc_insertion_point(field_release:Protocol.LagCompTarget.targetId)
   return _impl_.targetid_.Release();
 }
-inline void DebugLagCompTarget::set_allocated_targetid(std::string* value) {
+inline void LagCompTarget::set_allocated_targetid(std::string* value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.targetid_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.targetid_.IsDefault()) {
     _impl_.targetid_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:Protocol.DebugLagCompTarget.targetId)
+  // @@protoc_insertion_point(field_set_allocated:Protocol.LagCompTarget.targetId)
 }
 
 // float presentX = 2;
-inline void DebugLagCompTarget::clear_presentx() {
+inline void LagCompTarget::clear_presentx() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presentx_ = 0;
 }
-inline float DebugLagCompTarget::presentx() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.presentX)
+inline float LagCompTarget::presentx() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.presentX)
   return _internal_presentx();
 }
-inline void DebugLagCompTarget::set_presentx(float value) {
+inline void LagCompTarget::set_presentx(float value) {
   _internal_set_presentx(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.presentX)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.presentX)
 }
-inline float DebugLagCompTarget::_internal_presentx() const {
+inline float LagCompTarget::_internal_presentx() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.presentx_;
 }
-inline void DebugLagCompTarget::_internal_set_presentx(float value) {
+inline void LagCompTarget::_internal_set_presentx(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presentx_ = value;
 }
 
 // float presentY = 3;
-inline void DebugLagCompTarget::clear_presenty() {
+inline void LagCompTarget::clear_presenty() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presenty_ = 0;
 }
-inline float DebugLagCompTarget::presenty() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.presentY)
+inline float LagCompTarget::presenty() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.presentY)
   return _internal_presenty();
 }
-inline void DebugLagCompTarget::set_presenty(float value) {
+inline void LagCompTarget::set_presenty(float value) {
   _internal_set_presenty(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.presentY)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.presentY)
 }
-inline float DebugLagCompTarget::_internal_presenty() const {
+inline float LagCompTarget::_internal_presenty() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.presenty_;
 }
-inline void DebugLagCompTarget::_internal_set_presenty(float value) {
+inline void LagCompTarget::_internal_set_presenty(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presenty_ = value;
 }
 
 // float presentZ = 4;
-inline void DebugLagCompTarget::clear_presentz() {
+inline void LagCompTarget::clear_presentz() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presentz_ = 0;
 }
-inline float DebugLagCompTarget::presentz() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.presentZ)
+inline float LagCompTarget::presentz() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.presentZ)
   return _internal_presentz();
 }
-inline void DebugLagCompTarget::set_presentz(float value) {
+inline void LagCompTarget::set_presentz(float value) {
   _internal_set_presentz(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.presentZ)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.presentZ)
 }
-inline float DebugLagCompTarget::_internal_presentz() const {
+inline float LagCompTarget::_internal_presentz() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.presentz_;
 }
-inline void DebugLagCompTarget::_internal_set_presentz(float value) {
+inline void LagCompTarget::_internal_set_presentz(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presentz_ = value;
 }
 
 // float rewoundX = 5;
-inline void DebugLagCompTarget::clear_rewoundx() {
+inline void LagCompTarget::clear_rewoundx() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rewoundx_ = 0;
 }
-inline float DebugLagCompTarget::rewoundx() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.rewoundX)
+inline float LagCompTarget::rewoundx() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.rewoundX)
   return _internal_rewoundx();
 }
-inline void DebugLagCompTarget::set_rewoundx(float value) {
+inline void LagCompTarget::set_rewoundx(float value) {
   _internal_set_rewoundx(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.rewoundX)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.rewoundX)
 }
-inline float DebugLagCompTarget::_internal_rewoundx() const {
+inline float LagCompTarget::_internal_rewoundx() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.rewoundx_;
 }
-inline void DebugLagCompTarget::_internal_set_rewoundx(float value) {
+inline void LagCompTarget::_internal_set_rewoundx(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rewoundx_ = value;
 }
 
 // float rewoundY = 6;
-inline void DebugLagCompTarget::clear_rewoundy() {
+inline void LagCompTarget::clear_rewoundy() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rewoundy_ = 0;
 }
-inline float DebugLagCompTarget::rewoundy() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.rewoundY)
+inline float LagCompTarget::rewoundy() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.rewoundY)
   return _internal_rewoundy();
 }
-inline void DebugLagCompTarget::set_rewoundy(float value) {
+inline void LagCompTarget::set_rewoundy(float value) {
   _internal_set_rewoundy(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.rewoundY)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.rewoundY)
 }
-inline float DebugLagCompTarget::_internal_rewoundy() const {
+inline float LagCompTarget::_internal_rewoundy() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.rewoundy_;
 }
-inline void DebugLagCompTarget::_internal_set_rewoundy(float value) {
+inline void LagCompTarget::_internal_set_rewoundy(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rewoundy_ = value;
 }
 
 // float rewoundZ = 7;
-inline void DebugLagCompTarget::clear_rewoundz() {
+inline void LagCompTarget::clear_rewoundz() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rewoundz_ = 0;
 }
-inline float DebugLagCompTarget::rewoundz() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.rewoundZ)
+inline float LagCompTarget::rewoundz() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.rewoundZ)
   return _internal_rewoundz();
 }
-inline void DebugLagCompTarget::set_rewoundz(float value) {
+inline void LagCompTarget::set_rewoundz(float value) {
   _internal_set_rewoundz(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.rewoundZ)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.rewoundZ)
 }
-inline float DebugLagCompTarget::_internal_rewoundz() const {
+inline float LagCompTarget::_internal_rewoundz() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.rewoundz_;
 }
-inline void DebugLagCompTarget::_internal_set_rewoundz(float value) {
+inline void LagCompTarget::_internal_set_rewoundz(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rewoundz_ = value;
 }
 
 // bool isHit = 8;
-inline void DebugLagCompTarget::clear_ishit() {
+inline void LagCompTarget::clear_ishit() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.ishit_ = false;
 }
-inline bool DebugLagCompTarget::ishit() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompTarget.isHit)
+inline bool LagCompTarget::ishit() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompTarget.isHit)
   return _internal_ishit();
 }
-inline void DebugLagCompTarget::set_ishit(bool value) {
+inline void LagCompTarget::set_ishit(bool value) {
   _internal_set_ishit(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompTarget.isHit)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompTarget.isHit)
 }
-inline bool DebugLagCompTarget::_internal_ishit() const {
+inline bool LagCompTarget::_internal_ishit() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.ishit_;
 }
-inline void DebugLagCompTarget::_internal_set_ishit(bool value) {
+inline void LagCompTarget::_internal_set_ishit(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.ishit_ = value;
 }
 
 // -------------------------------------------------------------------
 
-// DebugLagCompPacket
+// LagCompPacket
 
 // bytes shooterId = 1;
-inline void DebugLagCompPacket::clear_shooterid() {
+inline void LagCompPacket::clear_shooterid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.shooterid_.ClearToEmpty();
 }
-inline const std::string& DebugLagCompPacket::shooterid() const
+inline const std::string& LagCompPacket::shooterid() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.shooterId)
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.shooterId)
   return _internal_shooterid();
 }
 template <typename Arg_, typename... Args_>
-inline PROTOBUF_ALWAYS_INLINE void DebugLagCompPacket::set_shooterid(Arg_&& arg,
+inline PROTOBUF_ALWAYS_INLINE void LagCompPacket::set_shooterid(Arg_&& arg,
                                                      Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.shooterid_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.shooterId)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.shooterId)
 }
-inline std::string* DebugLagCompPacket::mutable_shooterid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline std::string* LagCompPacket::mutable_shooterid() ABSL_ATTRIBUTE_LIFETIME_BOUND {
   std::string* _s = _internal_mutable_shooterid();
-  // @@protoc_insertion_point(field_mutable:Protocol.DebugLagCompPacket.shooterId)
+  // @@protoc_insertion_point(field_mutable:Protocol.LagCompPacket.shooterId)
   return _s;
 }
-inline const std::string& DebugLagCompPacket::_internal_shooterid() const {
+inline const std::string& LagCompPacket::_internal_shooterid() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.shooterid_.Get();
 }
-inline void DebugLagCompPacket::_internal_set_shooterid(const std::string& value) {
+inline void LagCompPacket::_internal_set_shooterid(const std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.shooterid_.Set(value, GetArena());
 }
-inline std::string* DebugLagCompPacket::_internal_mutable_shooterid() {
+inline std::string* LagCompPacket::_internal_mutable_shooterid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   return _impl_.shooterid_.Mutable( GetArena());
 }
-inline std::string* DebugLagCompPacket::release_shooterid() {
+inline std::string* LagCompPacket::release_shooterid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:Protocol.DebugLagCompPacket.shooterId)
+  // @@protoc_insertion_point(field_release:Protocol.LagCompPacket.shooterId)
   return _impl_.shooterid_.Release();
 }
-inline void DebugLagCompPacket::set_allocated_shooterid(std::string* value) {
+inline void LagCompPacket::set_allocated_shooterid(std::string* value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.shooterid_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.shooterid_.IsDefault()) {
     _impl_.shooterid_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:Protocol.DebugLagCompPacket.shooterId)
+  // @@protoc_insertion_point(field_set_allocated:Protocol.LagCompPacket.shooterId)
 }
 
 // float originX = 2;
-inline void DebugLagCompPacket::clear_originx() {
+inline void LagCompPacket::clear_originx() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.originx_ = 0;
 }
-inline float DebugLagCompPacket::originx() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.originX)
+inline float LagCompPacket::originx() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.originX)
   return _internal_originx();
 }
-inline void DebugLagCompPacket::set_originx(float value) {
+inline void LagCompPacket::set_originx(float value) {
   _internal_set_originx(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.originX)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.originX)
 }
-inline float DebugLagCompPacket::_internal_originx() const {
+inline float LagCompPacket::_internal_originx() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.originx_;
 }
-inline void DebugLagCompPacket::_internal_set_originx(float value) {
+inline void LagCompPacket::_internal_set_originx(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.originx_ = value;
 }
 
 // float originY = 3;
-inline void DebugLagCompPacket::clear_originy() {
+inline void LagCompPacket::clear_originy() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.originy_ = 0;
 }
-inline float DebugLagCompPacket::originy() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.originY)
+inline float LagCompPacket::originy() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.originY)
   return _internal_originy();
 }
-inline void DebugLagCompPacket::set_originy(float value) {
+inline void LagCompPacket::set_originy(float value) {
   _internal_set_originy(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.originY)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.originY)
 }
-inline float DebugLagCompPacket::_internal_originy() const {
+inline float LagCompPacket::_internal_originy() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.originy_;
 }
-inline void DebugLagCompPacket::_internal_set_originy(float value) {
+inline void LagCompPacket::_internal_set_originy(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.originy_ = value;
 }
 
 // float originZ = 4;
-inline void DebugLagCompPacket::clear_originz() {
+inline void LagCompPacket::clear_originz() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.originz_ = 0;
 }
-inline float DebugLagCompPacket::originz() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.originZ)
+inline float LagCompPacket::originz() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.originZ)
   return _internal_originz();
 }
-inline void DebugLagCompPacket::set_originz(float value) {
+inline void LagCompPacket::set_originz(float value) {
   _internal_set_originz(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.originZ)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.originZ)
 }
-inline float DebugLagCompPacket::_internal_originz() const {
+inline float LagCompPacket::_internal_originz() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.originz_;
 }
-inline void DebugLagCompPacket::_internal_set_originz(float value) {
+inline void LagCompPacket::_internal_set_originz(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.originz_ = value;
 }
 
 // float dirX = 5;
-inline void DebugLagCompPacket::clear_dirx() {
+inline void LagCompPacket::clear_dirx() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.dirx_ = 0;
 }
-inline float DebugLagCompPacket::dirx() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.dirX)
+inline float LagCompPacket::dirx() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.dirX)
   return _internal_dirx();
 }
-inline void DebugLagCompPacket::set_dirx(float value) {
+inline void LagCompPacket::set_dirx(float value) {
   _internal_set_dirx(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.dirX)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.dirX)
 }
-inline float DebugLagCompPacket::_internal_dirx() const {
+inline float LagCompPacket::_internal_dirx() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.dirx_;
 }
-inline void DebugLagCompPacket::_internal_set_dirx(float value) {
+inline void LagCompPacket::_internal_set_dirx(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.dirx_ = value;
 }
 
 // float dirY = 6;
-inline void DebugLagCompPacket::clear_diry() {
+inline void LagCompPacket::clear_diry() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.diry_ = 0;
 }
-inline float DebugLagCompPacket::diry() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.dirY)
+inline float LagCompPacket::diry() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.dirY)
   return _internal_diry();
 }
-inline void DebugLagCompPacket::set_diry(float value) {
+inline void LagCompPacket::set_diry(float value) {
   _internal_set_diry(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.dirY)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.dirY)
 }
-inline float DebugLagCompPacket::_internal_diry() const {
+inline float LagCompPacket::_internal_diry() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.diry_;
 }
-inline void DebugLagCompPacket::_internal_set_diry(float value) {
+inline void LagCompPacket::_internal_set_diry(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.diry_ = value;
 }
 
 // float dirZ = 7;
-inline void DebugLagCompPacket::clear_dirz() {
+inline void LagCompPacket::clear_dirz() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.dirz_ = 0;
 }
-inline float DebugLagCompPacket::dirz() const {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.dirZ)
+inline float LagCompPacket::dirz() const {
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.dirZ)
   return _internal_dirz();
 }
-inline void DebugLagCompPacket::set_dirz(float value) {
+inline void LagCompPacket::set_dirz(float value) {
   _internal_set_dirz(value);
-  // @@protoc_insertion_point(field_set:Protocol.DebugLagCompPacket.dirZ)
+  // @@protoc_insertion_point(field_set:Protocol.LagCompPacket.dirZ)
 }
-inline float DebugLagCompPacket::_internal_dirz() const {
+inline float LagCompPacket::_internal_dirz() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.dirz_;
 }
-inline void DebugLagCompPacket::_internal_set_dirz(float value) {
+inline void LagCompPacket::_internal_set_dirz(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.dirz_ = value;
 }
 
-// repeated .Protocol.DebugLagCompTarget targets = 8;
-inline int DebugLagCompPacket::_internal_targets_size() const {
+// repeated .Protocol.LagCompTarget targets = 8;
+inline int LagCompPacket::_internal_targets_size() const {
   return _internal_targets().size();
 }
-inline int DebugLagCompPacket::targets_size() const {
+inline int LagCompPacket::targets_size() const {
   return _internal_targets_size();
 }
-inline void DebugLagCompPacket::clear_targets() {
+inline void LagCompPacket::clear_targets() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.targets_.Clear();
 }
-inline ::Protocol::DebugLagCompTarget* DebugLagCompPacket::mutable_targets(int index)
+inline ::Protocol::LagCompTarget* LagCompPacket::mutable_targets(int index)
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:Protocol.DebugLagCompPacket.targets)
+  // @@protoc_insertion_point(field_mutable:Protocol.LagCompPacket.targets)
   return _internal_mutable_targets()->Mutable(index);
 }
-inline ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>* DebugLagCompPacket::mutable_targets()
+inline ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>* LagCompPacket::mutable_targets()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable_list:Protocol.DebugLagCompPacket.targets)
+  // @@protoc_insertion_point(field_mutable_list:Protocol.LagCompPacket.targets)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   return _internal_mutable_targets();
 }
-inline const ::Protocol::DebugLagCompTarget& DebugLagCompPacket::targets(int index) const
+inline const ::Protocol::LagCompTarget& LagCompPacket::targets(int index) const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:Protocol.DebugLagCompPacket.targets)
+  // @@protoc_insertion_point(field_get:Protocol.LagCompPacket.targets)
   return _internal_targets().Get(index);
 }
-inline ::Protocol::DebugLagCompTarget* DebugLagCompPacket::add_targets() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+inline ::Protocol::LagCompTarget* LagCompPacket::add_targets() ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::Protocol::DebugLagCompTarget* _add = _internal_mutable_targets()->Add();
-  // @@protoc_insertion_point(field_add:Protocol.DebugLagCompPacket.targets)
+  ::Protocol::LagCompTarget* _add = _internal_mutable_targets()->Add();
+  // @@protoc_insertion_point(field_add:Protocol.LagCompPacket.targets)
   return _add;
 }
-inline const ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>& DebugLagCompPacket::targets() const
+inline const ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>& LagCompPacket::targets() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:Protocol.DebugLagCompPacket.targets)
+  // @@protoc_insertion_point(field_list:Protocol.LagCompPacket.targets)
   return _internal_targets();
 }
-inline const ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>&
-DebugLagCompPacket::_internal_targets() const {
+inline const ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>&
+LagCompPacket::_internal_targets() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return _impl_.targets_;
 }
-inline ::google::protobuf::RepeatedPtrField<::Protocol::DebugLagCompTarget>*
-DebugLagCompPacket::_internal_mutable_targets() {
+inline ::google::protobuf::RepeatedPtrField<::Protocol::LagCompTarget>*
+LagCompPacket::_internal_mutable_targets() {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return &_impl_.targets_;
 }

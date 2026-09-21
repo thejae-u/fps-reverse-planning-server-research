@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.22)
 
 # 지원되는 경우 MSVC 컴파일러에 대해 핫 다시 로드 사용하도록 설정합니다.
 if (POLICY CMP0141)
@@ -10,7 +10,7 @@ endif ()
 project("reverse-planning")
 
 # 소스, 헤더 자동 수집
-file(GLOB_RECURSE SOURCES "src/sources/*.cpp" "src/sources/*.c" "src/sources/*.cc")
+file(GLOB_RECURSE SOURCES "src/sources/*.cpp" "src/sources/*.c")
 file(GLOB_RECURSE HEADERS "src/header/*.h" "src/header/*.hpp")
 
 # 실행 파일 타깃 설정
