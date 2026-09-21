@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <unordered_map>
 #include <memory>
@@ -14,20 +14,16 @@
 #include "Vector3.hpp"
 #include "Player.hpp"
 #include "GameResult.hpp"
+#include "CombatSystem.hpp"
 
 class Session;
 class Room;
-
-constexpr float GRAVITY = 9.8f;
-constexpr float DELTA_TIME = 0.05f;
-constexpr float JUMP_SPEED = 5.0f;
-constexpr float BASE_MOVE_SPEED = 10.0f;
 
 class World
 {
 public:
     explicit World(asio::io_context& ioContext, const uuids::uuid roomId)
-    : _roomId(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false), _gen(_rd()),
+    : _roomId(roomId), _combatSystem(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false), _gen(_rd()),
       _dis(static_cast<int>(TeamType::TeamA), static_cast<int>(TeamType::TeamB)), _teamACount(0), _teamBCount(0)
     {
         _teamInfos.reserve(2);
@@ -42,8 +38,6 @@ public:
 
     void Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions);
     bool GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition);
-    std::unordered_map<uuids::uuid, Vector3> RewindPlayers(uuids::uuid shooterId, std::size_t targetTick);
-    void RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup);
 
     void StartUpdate(std::weak_ptr<Room> weakRoom, std::chrono::microseconds interval = std::chrono::microseconds(16666));
     void StopUpdate();
@@ -82,14 +76,10 @@ private:
     void Move(uuids::uuid player, Vector3 direction, std::int32_t speed);
     void Jump(uuids::uuid player);
     void Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick);
-    void HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
-    
-    std::unordered_map<uuids::uuid, Vector3> RewindPlayersNoLock(uuids::uuid shooterId, std::size_t targetTick);
-    void RestorePlayersNoLock(const std::unordered_map<uuids::uuid, Vector3>& backup);
 
 private:
-    static constexpr std::int32_t MAX_SPEED = 20;
     uuids::uuid _roomId;
+    CombatSystem _combatSystem;
     
     // Session Info
     std::mutex _sessionsMutex;

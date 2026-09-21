@@ -1,4 +1,4 @@
-﻿#include "World.hpp"
+#include "World.hpp"
 #include "Session.hpp"
 #include "Room.hpp"
 #include "PacketPool.hpp"
@@ -38,239 +38,39 @@ void World::DivideTeam()
 void World::Move(uuids::uuid playerId, Vector3 direction, std::int32_t speed)
 {
     std::lock_guard playerLock(_playerMutex);
-    if(!_players.contains(playerId))
+    auto it = _players.find(playerId);
+    if(it == _players.end() || !it->second)
     {
         spdlog::info("world(room id) {}: no player {}", uuids::to_string(_roomId), uuids::to_string(playerId));
         return;
     }
 
-    // Validation 1: Speed check (no negative speed, cap at MAX_SPEED)
-    if(speed < 0)
-    {
-        speed = 0;
-    }
-    else if(speed > MAX_SPEED)
-    {
-        speed = MAX_SPEED;
-    }
-
-    // Validation 2: Direction vector components constraint [-1, 1]
-    if(std::abs(direction.x) > 1 || std::abs(direction.y) > 1 || std::abs(direction.z) > 1)
-    {
-        spdlog::warn("world(room id) {}: player {} sent invalid direction ({}, {}, {})",
-                     uuids::to_string(_roomId), uuids::to_string(playerId), direction.x, direction.y, direction.z);
-        return;
-    }
-
-    // 검증된 speed에 의한 velocity 연산 및 업데이트
-    _players[playerId]->velocity = direction * speed;
+    it->second->Move(direction, speed);
 }
 
 void World::Jump(uuids::uuid player)
 {
     std::lock_guard lock(_playerMutex);
-    if(!_players.contains(player))
+    auto it = _players.find(player);
+    if(it == _players.end() || !it->second)
     {
         spdlog::error("world(room id) {}: player {} is not found.", uuids::to_string(_roomId), uuids::to_string(player));
         return;
     }
 
-    auto& targetPlayer = _players[player];
-    if(targetPlayer->isGrounded)
-    {
-        targetPlayer->velocity.y = JUMP_SPEED;
-        targetPlayer->isGrounded = false;
-    }
+    it->second->Jump();
 }
 
 void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick)
 {
     std::lock_guard lock(_playerMutex);
-    if(!_players.contains(shooterId) || !_players[shooterId])
-        return;
-
-    // 1. Rewind Players
-    auto backup = RewindPlayersNoLock(shooterId, targetTick);
-    Vector3 origin = _players[shooterId]->position;
-
-    // 2. Perform distance-based hit detection
-    constexpr float HIT_RADIUS = 3.0f;
-    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS;
-    float len = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-    Vector3 dirNorm = (len > 0.0f) ? Vector3(direction.x / len, direction.y / len, direction.z / len) : Vector3(0, 0, 1);
-
-    std::unordered_set<uuids::uuid> hitTargetIds;
-    for(auto& [targetId, targetPlayer] : _players)
-    {
-        if(targetId == shooterId || !targetPlayer)
-            continue;
-
-        // V = enemy - shooter
-        Vector3 v(targetPlayer->position.x - origin.x, targetPlayer->position.y - origin.y, targetPlayer->position.z - origin.z);
-
-        // t = V dot D
-        float t = v.x * dirNorm.x + v.y * dirNorm.y + v.z * dirNorm.z;
-
-        // behind pass
-        if(t < 0.0f)
-            continue;
-
-        // P = O + t * D
-        Vector3 p(origin.x + t * dirNorm.x, origin.y + t * dirNorm.y, origin.z + t * dirNorm.z);
-
-        // d^2 = ||P - C||^2
-        float distSq = std::pow(p.x - targetPlayer->position.x, 2) +
-                       std::pow(p.y - targetPlayer->position.y, 2) +
-                       std::pow(p.z - targetPlayer->position.z, 2);
-
-        if(distSq <= HIT_RADIUS_SQ)
-        {
-            HitNoLock(targetId, 10, shooterId);
-            hitTargetIds.insert(targetId);
-        }
-    }
-
-    if(auto room = _weakRoom.lock())
-    {
-        Protocol::DebugLagCompPacket debugPacket;
-        debugPacket.set_shooterid(uuids::to_string(shooterId));
-        debugPacket.set_originx(origin.x);
-        debugPacket.set_originy(origin.y);
-        debugPacket.set_originz(origin.z);
-        debugPacket.set_dirx(dirNorm.x);
-        debugPacket.set_diry(dirNorm.y);
-        debugPacket.set_dirz(dirNorm.z);
-
-        for(const auto& [targetId, targetPlayer] : _players)
-        {
-            if(targetId == shooterId || !targetPlayer)
-                continue;
-            auto* targetMsg = debugPacket.add_targets();
-            targetMsg->set_targetid(uuids::to_string(targetId));
-
-            // 현재 위치 (백업에서 복원)
-            Vector3 presentPos = backup.at(targetId);
-            targetMsg->set_presentx(presentPos.x);
-            targetMsg->set_presenty(presentPos.y);
-            targetMsg->set_presentz(presentPos.z);
-            // 되감겼던 위치 (현재 복원 직전의 targetPlayer->position)
-            targetMsg->set_rewoundx(targetPlayer->position.x);
-            targetMsg->set_rewoundy(targetPlayer->position.y);
-            targetMsg->set_rewoundz(targetPlayer->position.z);
-
-            targetMsg->set_ishit(hitTargetIds.contains(targetId));
-        }
-
-        std::string serializedDebug;
-        if(debugPacket.SerializeToString(&serializedDebug))
-        {
-            auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
-            ingamePacket->set_sessionid(uuids::to_string(shooterId));
-            ingamePacket->set_roomid(uuids::to_string(_roomId));
-            ingamePacket->set_method(Protocol::IngameType::DebugLagComp);
-            ingamePacket->set_data(serializedDebug);
-
-            std::string serializedIngame;
-            if(ingamePacket->SerializeToString(&serializedIngame))
-            {
-                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
-                sendPacket->set_type(Protocol::PacketType::Ingame);
-                sendPacket->set_data(serializedIngame);
-                room->Broadcast(std::move(sendPacket));
-            }
-        }
-    }
-
-    // 3. Restore Players
-    RestorePlayersNoLock(backup);
-}
-
-void World::HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
-{
-    if(!_players.contains(shooterId) || !_players[shooterId])
-    {
-        spdlog::warn("world(room id) {}: shooter {} not found on hit", uuids::to_string(_roomId), uuids::to_string(shooterId));
-        return;
-    }
-
-    if(!_players.contains(hitId) || !_players[hitId])
-    {
-        spdlog::warn("world(room id) {}: hit target {} not found", uuids::to_string(_roomId), uuids::to_string(hitId));
-        return;
-    }
-
-    if(damage < 0)
-    {
-        spdlog::warn("world(room id) {}: invalid damage (damage is negative)", uuids::to_string(_roomId));
-        return;
-    }
-
-    auto& shooter = _players[shooterId];
-    auto shooterTeam = static_cast<int>(shooter->teamType);
-
-    auto& targetPlayer = _players[hitId];
-    auto targetPlayerTeam = static_cast<int>(targetPlayer->teamType);
-
-    // damage 처리 (hit : 체력 감소, shoot : 준 대미지 증가 (팀 포함))
-    targetPlayer->hp -= damage;
-    shooter->damage += damage;
-    _teamInfos[shooterTeam].damages += damage;
-
-    // 플레이어 사망 시
-    bool isDead = false; // 패킷 전송을 위한 사망 플래그 (hit)
-    if(targetPlayer->hp <= 0)
-    {
-        isDead = true;
-        targetPlayer->death++;
-        _teamInfos[targetPlayerTeam].deaths++;
-
-        targetPlayer->hp = 100; // reset
-
-        shooter->kill++;
-        _teamInfos[shooterTeam].kills++;
-
-        spdlog::info("world {}: player {} killed player {}",
-                     uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(hitId));
-    }
-
-    if(auto room = _weakRoom.lock())
-    {
-        // 1. Create and populate HitPacket protobuf message
-        Protocol::HitPacket hitPacket;
-        hitPacket.set_hitplayerid(uuids::to_string(hitId));
-        hitPacket.set_shooterid(uuids::to_string(shooterId));
-        hitPacket.set_currenthp(targetPlayer->hp);
-        hitPacket.set_deaths(targetPlayer->death);
-        hitPacket.set_isdead(isDead);
-        hitPacket.set_damage(damage);
-
-        // 2. Serialize HitPacket
-        std::string serializedData;
-        if(hitPacket.SerializeToString(&serializedData))
-        {
-            auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
-            ingamePacket->set_sessionid(uuids::to_string(hitId));
-            ingamePacket->set_roomid(uuids::to_string(_roomId));
-            ingamePacket->set_method(Protocol::IngameType::Hit);
-            ingamePacket->set_data(serializedData);
-
-            // 3. Serialize outer IngamePacket and broadcast
-            std::string serializedIngame;
-            if(ingamePacket->SerializeToString(&serializedIngame))
-            {
-                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
-                sendPacket->set_type(Protocol::PacketType::Ingame);
-                sendPacket->set_data(serializedIngame);
-                room->Broadcast(std::move(sendPacket));
-            }
-        }
-    }
+    _combatSystem.Shoot(shooterId, direction, targetTick, _players, _teamInfos, _weakRoom);
 }
 
 void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 {
     std::lock_guard lock(_playerMutex);
-    HitNoLock(hitId, damage, shooterId);
+    _combatSystem.Hit(hitId, damage, shooterId, _players, _teamInfos, _weakRoom);
 }
 
 std::unique_ptr<GameResult> World::GetResult()
@@ -519,7 +319,7 @@ void World::UpdateState()
 {
     std::lock_guard playerLock(_playerMutex);
 
-    // 60fps 고정 틱에 맞춰 초 단위의 dt(델타 타임)를 산출하고 중력을 적용
+    // 60fps 고정 틱에 맞춰 초 단위의 dt(델타 타임)를 산출하고 물리 적용
     constexpr float div = 1'000'000.0f;
     const float dt = static_cast<float>(_tickInterval.count()) / div;
 
@@ -527,32 +327,8 @@ void World::UpdateState()
     {
         if(player)
         {
-            // position history for rewind
-            PlayerSnapshot snapshot;
-            snapshot.tick = _tickCount.load();
-            snapshot.position = player->position;
-
-            player->positionHistory.push_back(snapshot);
-
-            if(player->positionHistory.size() > 60) // 60틱 초과 시 오래된 순 제거
-            {
-                player->positionHistory.pop_front();
-            }
-
-            // 고정 틱 기반 중력(9.8 * dt) 가속도 누적
-            if(!player->isGrounded)
-            {
-                player->velocity.y -= GRAVITY * dt;
-            }
-
-            player->position += player->velocity * dt;
-
-            if(player->position.y <= 0.0f)
-            {
-                player->position.y = 0.0f;
-                player->velocity.y = 0.0f;
-                player->isGrounded = true;
-            }
+            player->RecordSnapshot(_tickCount.load());
+            player->SimulatePhysics(dt, GRAVITY);
         }
     }
 }
@@ -567,60 +343,6 @@ bool World::GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition)
     }
     outPosition = it->second->position;
     return true;
-}
-
-std::unordered_map<uuids::uuid, Vector3> World::RewindPlayersNoLock(uuids::uuid shooterId, std::size_t targetTick)
-{
-    std::unordered_map<uuids::uuid, Vector3> currentPositionsBackup;
-    for(auto& [id, player] : _players)
-    {
-        if(id == shooterId) // 자기 자신
-            continue;
-
-        // backup current position
-        currentPositionsBackup[id] = player->position;
-
-        // targetTick에 가장 가까운 스냅샷 find
-        Vector3 rewoundPosition = player->position;
-        float minDiff = std::numeric_limits<float>::max();
-
-        for(const auto& snapshot : player->positionHistory)
-        {
-            float diff = std::abs(static_cast<float>(snapshot.tick) - static_cast<float>(targetTick));
-            if(diff < minDiff)
-            {
-                minDiff = diff;
-                rewoundPosition = snapshot.position;
-            }
-        }
-
-        player->position = rewoundPosition;
-    }
-
-    return currentPositionsBackup;
-}
-
-void World::RestorePlayersNoLock(const std::unordered_map<uuids::uuid, Vector3>& backup)
-{
-    for(const auto& [id, originPosition] : backup)
-    {
-        if(_players.contains(id) && _players[id])
-        {
-            _players[id]->position = originPosition;
-        }
-    }
-}
-
-std::unordered_map<uuids::uuid, Vector3> World::RewindPlayers(uuids::uuid shooterId, std::size_t targetTick)
-{
-    std::lock_guard lock(_playerMutex);
-    return RewindPlayersNoLock(shooterId, targetTick);
-}
-
-void World::RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup)
-{
-    std::lock_guard lock(_playerMutex);
-    RestorePlayersNoLock(backup);
 }
 
 void World::PrintScoreboard()

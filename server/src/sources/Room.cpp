@@ -132,7 +132,7 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
     }
 }
 
-void Room::Broadcast(std::shared_ptr<NetworkPacket> packet)
+void Room::Broadcast(const std::shared_ptr<NetworkPacket>& packet) const
 {
     for(const auto& [id, weakSession] : _sessions)
     {
@@ -145,7 +145,7 @@ void Room::Broadcast(std::shared_ptr<NetworkPacket> packet)
     }
 }
 
-void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet) const
+void Room::EnqueuePacket(const std::shared_ptr<IngamePacket>& packet) const
 {
     _world->EnqueuePacket(packet);
 }

@@ -74,9 +74,9 @@ int main(const int argc, char** argv)
     if(!ioManager)
         throw std::runtime_error("failed to create io manager");
     
-    constexpr auto ingamePacketPoolSize = 100;
-    constexpr auto networkPacketPoolSize = 100;
-    constexpr auto byteBufferPoolSize = 100;
+    constexpr auto ingamePacketPoolSize = 500;
+    constexpr auto networkPacketPoolSize = 500;
+    constexpr auto byteBufferPoolSize = 500;
 
     IngamePacketPool::Init(ingamePacketPoolSize);
     NetworkPacketPool::Init(networkPacketPoolSize);

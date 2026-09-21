@@ -210,7 +210,7 @@ void Session::ProcessPacketAsync()
 {
 }
 
-void Session::EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket> data)
+void Session::EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket>& data)
 {
     // serialize NetworkPacket into payload (body)
     auto size = static_cast<int>(data->ByteSizeLong());
@@ -238,7 +238,7 @@ void Session::EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket> data)
     _sendTo(_clientUdpEp, networkBuffer);
 }
 
-void Session::EnqueueTcpSendPacket(const std::shared_ptr<NetworkPacket> data)
+void Session::EnqueueTcpSendPacket(const std::shared_ptr<NetworkPacket>& data)
 {
     auto size = static_cast<int>(data->ByteSizeLong());
     const auto payload = std::make_shared<Raw>(size);

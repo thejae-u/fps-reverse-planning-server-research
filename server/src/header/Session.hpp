@@ -109,8 +109,8 @@ private:
     std::atomic<bool> _isProcessing{ false };
 
 public:
-    void EnqueueUdpSendPacket(std::shared_ptr<NetworkPacket> data);
-    void EnqueueTcpSendPacket(std::shared_ptr<NetworkPacket> data);
+    void EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket>& data);
+    void EnqueueTcpSendPacket(const std::shared_ptr<NetworkPacket>& data);
 
 private:
     // Tcp Async Send Data
