@@ -21,13 +21,12 @@ void CombatSystem::Shoot(
     // shooter 접근 가독성을 위한 캐싱
     auto& [id, shooter] = *shooterIt;
 
-    // 1. Rewind All Players
+    // Rewind All Players
     auto rewinds = _lagCompensator.Rewind(players, id, targetTick);
     Vector3 shootOrigin = shooter->position;
 
-    // 2. Perform distance-based hit detection
-    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS;
-    Vector3 normalizedDirection = direction.normalize();
+    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS; // 충돌 구체 범위
+    Vector3 normalizedDirection = direction.normalized(); // 방향 벡터 정규화
 
     // shooter 미포함 rewind 데이터
     for(auto& [rewindId, rewindPlayer, originPosition, rewindPosition, isHit] : rewinds)
@@ -36,24 +35,34 @@ void CombatSystem::Shoot(
         if(rewindPlayer->teamType == shooter->teamType)
             continue;
 
-        // V = enemy - shooter (플레이어 간 방향 벡터)
-        Vector3 v(rewindPosition - shooter->position);
+        /*
+         *  O = shootOrigin : 발사 중심
+         *  C = rewindPosition : 적 중심 위치
+         *  V = C - O : shooter 로부터 적의 방향 벡터
+         *  D = normalized(shootDirection) : 정규화 된 발사선 방향 벡터
+         *  t = V dot D : 적과 발사선의 내적 값 (Scalar, 음수면 체크 안함)
+         *  P = O + tD : 발사선 상의 적의 최근접점 (발사선과 가장 가까운 벡터)
+         *  ||P - C||^2 : P와 C의 최단거리 제곱
+         */
+        
+        // V = enemy - shooter (shooter로부터 적의 방향 벡터)
+        Vector3 v = rewindPosition - shootOrigin;
 
-        // t = V dot D (플레이어 간 방향 벡터와 Shoot 방향 벡터 Dot product)
+        // t = V dot D (shooter로부터 방향 벡터와 Shoot 방향 벡터 내적)
         float t = v.dot(normalizedDirection);
 
-        // behind pass
+        // 음수면 뒤에 있음 (PASS)
         if(t < 0.0f)
             continue;
 
         // P = O + t * D
-        Vector3 p(normalizedDirection * t + shootOrigin);
+        Vector3 p = normalizedDirection * t + shootOrigin;
 
-        // D^2 = ||P - C||^2
-        float distSq = std::pow(p.x - rewindPosition.x, 2) +
-                       std::pow(p.y - rewindPosition.y, 2) +
-                       std::pow(p.z - rewindPosition.z, 2);
+        // ||P - C||^2
+        Vector3 diff = p - rewindPosition; // P - C
+        const float distSq = diff.dot(diff); // ||PC||^2 = PC dot PC (자기 자신의 내적 값은 제곱 크기)
 
+        // Collide Check
         if(distSq <= HIT_RADIUS_SQ)
         {
             Hit(rewindId, shooter->attackPower, shooterId, players, teamInfos, weakRoom);

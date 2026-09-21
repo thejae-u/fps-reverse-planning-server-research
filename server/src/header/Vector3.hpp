@@ -51,7 +51,7 @@ struct Vector3
         return std::sqrt(x * x + y * y + z * z);
     }
 
-    Vector3 normalize() const
+    Vector3 normalized() const
     {
         const float mag = this->magnitude();
         return mag > 0.0f ? Vector3{ x / mag, y / mag, z / mag } : Vector3(0, 0, 1);
