@@ -29,3 +29,4 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo Build finished successfully!
 pause
+

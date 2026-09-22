@@ -23,3 +23,4 @@ cmake --preset ${PRESET} -S client
 cmake --build client/build/${PRESET}
 
 echo "Build finished!"
+

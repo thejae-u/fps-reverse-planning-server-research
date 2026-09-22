@@ -41,11 +41,21 @@ namespace AuthServer.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("TeamAScore")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TeamBScore")
+                        .HasColumnType("integer");
+
                     b.PrimitiveCollection<List<string>>("UserIds")
                         .IsRequired()
                         .HasColumnType("text[]");
 
-                    b.Property<string>("WinnerId")
+                    b.PrimitiveCollection<List<string>>("WinnerUserIds")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<string>("WinningTeam")
                         .HasColumnType("text");
 
                     b.HasKey("MatchId");
@@ -59,6 +69,10 @@ namespace AuthServer.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");
 

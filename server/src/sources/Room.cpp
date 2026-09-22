@@ -1,40 +1,114 @@
 #include "Room.hpp"
 
+#include "HttpResultReporter.hpp"
 #include "IOManager.hpp"
-#include "SessionManager.hpp"
 #include "Session.hpp"
+#include "GameResult.hpp"
 
-Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, std::shared_ptr<SessionManager> sessionManager, uuids::uuid roomId)
-: _ioManager(ioManager), _sessionManager(sessionManager), _roomId(roomId), _world(std::make_unique<World>(ioManager->GetIoContext(), roomId))
+Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string& authToken, const std::size_t expectedPlayerCount)
+    : _ioManager(ioManager), _matchId(matchId), _authToken(authToken), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
 {
 }
 
 Room::~Room()
 {
-    spdlog::info("room {} destroyed", uuids::to_string(_roomId));
+    spdlog::info("room: destroyed", uuids::to_string(_matchId));
 }
 
-void Room::WorldInit()
+void Room::OnMatchFinished()
 {
-    std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
-    if(_sessions.empty())
+    spdlog::info("room: match finished. reporting results to auth server...");
+
+    const auto playerStats = _world->GetPlayerStats();
+    const auto gameResult = _world->GetResult();
+    auto winningTeam = static_cast<int>(gameResult->winningTeam);
+
+    json j;
+    j["matchId"] = uuids::to_string(_matchId);
+    j["winningTeam"] = winningTeam;
+    j["TeamAScore"] = gameResult->teamAInfo.kills;
+    j["TeamBScore"] = gameResult->teamBInfo.kills;
+
+    // ISO8601 UTC Time
+    j["endTimeUtc"] = std::format("{:%FT%TZ}", std::chrono::system_clock::now());
+
+    j["winnerUserIds"] = json::array();
+    j["playerStats"] = json::array();
+
+    // 팀 별 플레이어 스탯 저장
+    for(const auto& stat : *playerStats)
     {
-        spdlog::info("room {} invalid situation: no session", uuids::to_string(_roomId));
+        if(static_cast<int>(stat.teamType) == winningTeam)
+            j["winnerUserIds"].push_back(uuids::to_string(stat.id));
+
+        j["playerStats"].push_back({
+            { "team", static_cast<int>(stat.teamType) },
+            { "userId", uuids::to_string(stat.id) },
+            { "kills", stat.kill },
+            { "deaths", stat.death },
+            { "assists", stat.assist },
+            { "damage", stat.damage },
+            { "heals", stat.heal },
+            { "guards", stat.guard }
+        });
     }
 
-    _world->Init(_sessions);
-    spdlog::info("room {}: world create complete", uuids::to_string(_roomId));
+    std::string jsonPayload = j.dump();
 
+    if(HttpResultReporter::SendMatchResult(_serverHost, _serverPort, jsonPayload, _authToken))
+        spdlog::info("room: match result successfully reported to auth server.");
+    else
+        spdlog::error("room: failed to report match result"); // TODO : Fail 시 재시도 및 예외 처리 로직 필요
+
+    // 프로세스 종료
+    std::exit(0);
+}
+
+void Room::TryStartGameNoLock()
+{
+    if(_isWorldStarted)
+        return;
+
+    if(_sessions.size() >= _expectedPlayerCount)
+    {
+        if(!_isWorldStarted.exchange(true))
+        {
+            spdlog::info("room: all players connected! starting world...", uuids::to_string(_matchId));
+            WorldInitNoLock();
+        }
+    }
+}
+
+void Room::WorldInitNoLock()
+{
+    _world->Init(_sessions); // world 초기화 (위치, 캐릭터 상태 등)
+    spdlog::info("room: world create complete", uuids::to_string(_matchId));
+
+    _world->StartUpdate(weak_from_this()); // 게임 시작
+}
+
+void Room::StartTestMode(const std::vector<std::string>& allowedPlayers)
+{
+    spdlog::info("room: starting in TEST MODE with {} mock players", allowedPlayers.size());
+    _world->InitMockPlayers(allowedPlayers);
     _world->StartUpdate(weak_from_this());
+    _isWorldStarted = true;
+}
+
+void Room::SimulateKill(TeamType scoringTeam)
+{
+    if(_world)
+        _world->SimulateKill(scoringTeam);
+}
+
+void Room::SetTestScores(int aKills, int bKills)
+{
+    if(_world)
+        _world->SetTestScores(aKills, bKills);
 }
 
 void Room::Stop()
 {
-    if(_removeRoomFromMatchingHandler != nullptr)
-        _removeRoomFromMatchingHandler(shared_from_this());
-
-    _removeRoomFromMatchingHandler = nullptr;
-
     _world->StopUpdate();
 
     if(!_sessions.empty())
@@ -54,6 +128,8 @@ void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
                 self->RemoveSession(removeSession);
         });
     }
+
+    TryStartGameNoLock();
 }
 
 void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
@@ -61,25 +137,22 @@ void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
     std::lock_guard<std::mutex> lock(_sessionsMutex);
     if(const auto removeSession = weakRemoveSession.lock())
     {
-        if (_sessions.erase(removeSession->GetId()) == 0)
+        if(_sessions.erase(removeSession->GetId()) == 0)
         {
             return;
         }
 
-        spdlog::info("room {}: remove session {}", uuids::to_string(_roomId), uuids::to_string(removeSession->GetId()));
+        spdlog::info("room: remove session {}", uuids::to_string(_matchId), uuids::to_string(removeSession->GetId()));
 
         if(!_sessions.empty())
             return;
 
-        spdlog::info("room: room {} is empty", uuids::to_string(_roomId));
-        if (_removeRoomFromMatchingHandler)
-        {
-            _removeRoomFromMatchingHandler(shared_from_this());
-        }
+        spdlog::info("room: all session removed", uuids::to_string(_matchId));
+        _world->StopUpdate();
     }
 }
 
-void Room::Broadcast(std::shared_ptr<Packet> packet)
+void Room::Broadcast(const std::shared_ptr<NetworkPacket>& packet) const
 {
     for(const auto& [id, weakSession] : _sessions)
     {
@@ -92,12 +165,7 @@ void Room::Broadcast(std::shared_ptr<Packet> packet)
     }
 }
 
-void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet) const
+void Room::EnqueuePacket(const std::shared_ptr<IngamePacket>& packet) const
 {
     _world->EnqueuePacket(packet);
-}
-
-void Room::SetRemoveRoomCallback(RemoveRoomCallback handler)
-{
-    _removeRoomFromMatchingHandler = std::move(handler);
 }

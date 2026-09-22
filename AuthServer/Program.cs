@@ -11,8 +11,20 @@ using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.SystemConsole.Themes;
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console().CreateLogger();
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}",
+        theme: AnsiConsoleTheme.Code)
+    .CreateLogger();
 
 Log.Information("Server Starting...");
 var builder = WebApplication.CreateBuilder(args);
@@ -26,7 +38,7 @@ var dbConnectionString = builder.Configuration.GetConnectionString("DefaultConne
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(dbConnectionString));
 
 // Redis Configuration
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["Redis__ConnectionString"] ?? "redis:6379";
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? builder.Configuration["Redis__ConnectionString"] ?? "redis:16379";
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString));
 
 // Cors for dev
@@ -35,7 +47,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("DevCors", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5500")
+            .SetIsOriginAllowed(_ => true)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -50,20 +62,21 @@ builder.Services.AddOpenApi("v1", options =>
 // web socket
 builder.Services.AddSignalR();
 
-// background internal service
-builder.Services.AddHostedService<MatchWorker>();
-builder.Services.AddHostedService<LogicServerListenerService>();
 
 // global fields
 builder.Services.Configure<MatchOptions>(builder.Configuration.GetSection("MatchOptions"));
 builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicServer"));
 
 // Service DI
-builder.Services.AddSingleton<LogicServerConnectionPool>();
+builder.Services.AddSingleton<IDedicatedServerSpawner, DedicatedServerSpawner>();
 builder.Services.AddSingleton<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
 builder.Services.AddLogging();
+builder.Services.AddTransient<DataSeeder>();
+
+// background internal service
+builder.Services.AddHostedService<MatchWorker>();
 
 // JWT Configuration
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
@@ -120,6 +133,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseSerilogRequestLogging();
+
 app.UseCors("DevCors");
 
 app.UseAuthentication();
@@ -130,16 +145,16 @@ app.MapControllers();
 // Server Information Route
 app.MapGet("/ping", () => "AuthServer v1.0 - OK");
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-app.MapGet("/version", () => "AuthServer v0.4.0-develop");
+app.MapGet("/version", () => "AuthServer v0.11.0-develop");
 app.MapGet("/version/detail", () => new
 {
-    Version = "version 0.4.0",
+    Version = "version 0.11.0",
     Status = "feature",
-    Implement = "web server connect to logic server",
+    Implement = "dedicated server implement",
     FeatureBranch = new
     {
-        Name = "feat/7-imp-web-server",
-        Link = "https://thejaeu.com/fps-reverse-planning-server-research/tree/feat/7-impl-web-server"
+        Name = "feat/12-impl-dedicated-process",
+        Link = "https://thejaeu.com/fps-reverse-planning-server-research/tree/feat/12-impl-dedicated-process"
     }
 });
 app.MapGet("/info", () => new
@@ -151,15 +166,46 @@ app.MapGet("/info", () => new
 // SignalR Match Hub Route
 app.MapHub<MatchHub>("/hubs/match");
 
-// Application Connection verification check
-var connectionPool = app.Services.GetRequiredService<LogicServerConnectionPool>();
-app.Lifetime.ApplicationStarted.Register(() =>
+// 구동 직전 인프라 연결 확인 및 시드 데이터 초기화 (Fail-Fast)
+using (var scope = app.Services.CreateScope())
 {
-    Task.Run(async () =>
+    // 1. PostgreSQL 연결 확인
+    try
     {
-        await Task.Delay(2000); // C++ 서버 기동 시차 대기
-        await connectionPool.InternalTestAsync();
-    });
-});
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        if (!await db.Database.CanConnectAsync())
+        {
+            Log.Fatal("[PostgreSQL] Critical: Cannot connect to database. Aborting server startup.");
+            throw new InvalidOperationException("Failed to connect to PostgreSQL database.");
+        }
+        Log.Information("[PostgreSQL] Successfully connected to database.");
+    }
+    catch (Exception ex) when (ex is not InvalidOperationException)
+    {
+        Log.Fatal(ex, "[PostgreSQL] Critical error while connecting to database. Aborting server startup.");
+        throw;
+    }
 
+    // 2. Redis 연결 확인
+    try
+    {
+        var redis = scope.ServiceProvider.GetRequiredService<IConnectionMultiplexer>();
+        if (!redis.IsConnected)
+        {
+            Log.Fatal("[Redis] Critical: Cannot connect to Redis server. Aborting server startup.");
+            throw new InvalidOperationException("Failed to connect to Redis server.");
+        }
+        var endpoints = string.Join(", ", redis.GetEndPoints().Select(e => e.ToString()));
+        Log.Information("[Redis] Successfully connected to Redis server ({Endpoints}).", endpoints);
+    }
+    catch (Exception ex) when (ex is not InvalidOperationException)
+    {
+        Log.Fatal(ex, "[Redis] Critical error while connecting to Redis server. Aborting server startup.");
+        throw;
+    }
+
+    // 3. Admin 및 Internal 계정 시딩
+    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+    await seeder.SeedAsync();
+}
 app.Run();

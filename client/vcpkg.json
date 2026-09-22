@@ -1,13 +1,14 @@
 {
-  "name": "vcpkg",
+  "name": "client",
   "version-string": "1.0.0",
   "dependencies": [
-    "asio",
-    "spdlog",
-    "stduuid",
+    "cpr",
+    "nlohmann-json",
     "glfw3",
     "glad",
-    "imgui",
-    "protobuf"
+    "spdlog",
+    "asio",
+    "protobuf",
+    "stduuid"
   ]
 }

@@ -9,24 +9,26 @@
 #include <queue>
 #include <atomic>
 #include <chrono>
+
 #include "Packet.pb.h"
 #include "Vector3.hpp"
 #include "Player.hpp"
+#include "GameResult.hpp"
+#include "CombatSystem.hpp"
 
 class Session;
 class Room;
 
-constexpr float GRAVITY = 9.8f;
-constexpr float DELTA_TIME = 0.05f;
-constexpr float JUMP_SPEED = 5.0f;
-constexpr float BASE_MOVE_SPEED = 10.0f;
-
 class World
 {
 public:
-    explicit World(asio::io_context& ioContext, uuids::uuid roomId)
-        : _roomId(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false)
+    explicit World(asio::io_context& ioContext, const uuids::uuid roomId)
+    : _roomId(roomId), _combatSystem(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false), _gen(_rd()),
+      _dis(static_cast<int>(TeamType::TeamA), static_cast<int>(TeamType::TeamB)), _teamACount(0), _teamBCount(0)
     {
+        _teamInfos.reserve(2);
+        _teamInfos.emplace_back(TeamInfo(TeamType::TeamA));
+        _teamInfos.emplace_back(TeamInfo(TeamType::TeamB));
     }
 
     ~World()
@@ -36,19 +38,34 @@ public:
 
     void Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions);
     bool GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition);
-    std::unordered_map<uuids::uuid, Vector3> RewindPlayers(uuids::uuid shooterId, std::size_t targetTick);
-    void RestorePlayers(const std::unordered_map<uuids::uuid, Vector3>& backup);
 
     void StartUpdate(std::weak_ptr<Room> weakRoom, std::chrono::microseconds interval = std::chrono::microseconds(16666));
     void StopUpdate();
     void EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet);
 
     std::size_t GetTickCount() const { return _tickCount.load(); }
+    std::unique_ptr<std::vector<PlayerStat>> GetPlayerStats()
+    {
+        std::lock_guard lock(_playerMutex);
+        auto playerStats = std::make_unique<std::vector<PlayerStat>>();
+        playerStats->reserve(_players.size());
+        for (auto& [id, player] : _players)
+        {
+            PlayerStat playerStat(id, *player);
+            playerStats->push_back(playerStat);
+        }
+        
+        return playerStats;
+    }
     
-    // TEST MONITORING
+    // TEST MONITORING & SIMULATION
     void PrintScoreboard();
+    void InitMockPlayers(const std::vector<std::string>& allowedPlayers);
+    void SimulateKill(TeamType scoringTeam);
+    void SetTestScores(int aKills, int bKills);
 
 private:
+    void DivideTeam();
     void ScheduleNextTick();
     void Update();
     void ProcessQueue();
@@ -56,19 +73,16 @@ private:
     
 public:
     void Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
+    std::unique_ptr<GameResult> GetResult();
     
 private:
     void Move(uuids::uuid player, Vector3 direction, std::int32_t speed);
     void Jump(uuids::uuid player);
     void Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick);
-    void HitNoLock(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
-    
-    std::unordered_map<uuids::uuid, Vector3> RewindPlayersNoLock(uuids::uuid shooterId, std::size_t targetTick);
-    void RestorePlayersNoLock(const std::unordered_map<uuids::uuid, Vector3>& backup);
 
 private:
-    static constexpr std::int32_t MAX_SPEED = 20;
     uuids::uuid _roomId;
+    CombatSystem _combatSystem;
     
     // Session Info
     std::mutex _sessionsMutex;
@@ -94,4 +108,13 @@ private:
     // Metrics storage
     std::vector<std::int64_t> _tickDurationsUs;
     std::mutex _metricsMutex;
+
+    // random device for team separate 
+    std::random_device _rd;
+    std::mt19937_64 _gen;
+    std::uniform_int_distribution<> _dis;
+
+    std::vector<TeamInfo> _teamInfos;
+    std::uint16_t _teamACount;
+    std::uint16_t _teamBCount;
 };

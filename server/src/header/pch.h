@@ -1,4 +1,4 @@
-// server/src/header/pch.h
+﻿// server/src/header/pch.h
 #pragma once
 
 // 1. C++ Standard Library Headers
@@ -18,6 +18,7 @@
 #include <limits>
 #include <type_traits>
 #include <utility>
+#include <random>
 
 // 2. Third-Party Library Headers
 #include <asio.hpp>

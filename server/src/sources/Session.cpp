@@ -1,20 +1,13 @@
 #include "Session.hpp"
 
+#include "PacketPool.hpp"
 #include "asio.hpp"
 #include "Listener.hpp"
 #include "CustomUtility.hpp"
+#include "Room.hpp"
 
 void Session::StartTcpRead()
 {
-    {
-        std::lock_guard<std::mutex> lock(_disconnectCallbacksMutex);
-        if(_disconnectCallbacks.empty())
-        {
-            spdlog::error("session {}: disconnect callback not set", uuids::to_string(_id));
-            return;
-        }
-    }
-
     // Tcp read open
     ReadSizeAsync();
 }
@@ -33,23 +26,7 @@ void Session::Stop()
     _isValid = false;
     _socketPtr->close();
 
-    // 콜백들을 로컬로 복사하고 원본 맵을 비움 (순회 중 수정 방지)
-    std::unordered_map<CallbackHandle, NotifyDisconnectCallback> callbacks;
-    {
-        std::lock_guard<std::mutex> lock(_disconnectCallbacksMutex);
-        callbacks = std::move(_disconnectCallbacks);
-        _disconnectCallbacks.clear();
-    }
-
-    // 락 외부에서 콜백 실행 (데드락 방지 및 안전한 순회)
-    for(const auto& [handle, disconnectCallback] : callbacks)
-    {
-        if(disconnectCallback)
-        {
-            disconnectCallback(GetShared<Session>());
-            spdlog::info("session {} disconnect handle {} called", uuids::to_string(_id), handle);
-        }
-    }
+    _disconnectCallback(GetShared<Session>());
 }
 
 void Session::Init()
@@ -78,12 +55,20 @@ void Session::PunchUdpHole(const asio::ip::udp::endpoint& ep)
                     self->_state = SessionState::InitializeComplete;
                     self->_isValid = true; // allow broadcast
 
+                    if(const auto listener = self->_weakListener.lock())
+                    {
+                        if(const auto room = listener->GetDedicatedRoom())
+                        {
+                            room->AddSession(self->_id, self->GetWeak<Session>());
+                        }
+                    }
+
                     spdlog::info("session {}: udp hole punched successfully. ip: {}, port: {}",
                                  uuids::to_string(self->_id), ep.address().to_string(), ep.port());
                 }
 
                 // 포트 등록이 성공하여도 클라이언트가 PunchUdpHole을 요청하면 ACK 유실로 판단 -> 재전송
-                const auto ackPacket = std::make_shared<Packet>();
+                const auto ackPacket = NetworkPacketPool::GetInstance()->Rent();
                 ackPacket->set_type(PacketType::Authentication);
 
                 AuthenticationPacket authResult;
@@ -116,24 +101,21 @@ void Session::SetRoom(const uuids::uuid& roomId)
         return;
     }
 
-    auto sendPacket = std::make_shared<Packet>();
+    auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
     sendPacket->set_type(PacketType::Match);
     sendPacket->set_data(serializedData);
 
     EnqueueTcpSendPacket(std::move(sendPacket));
 }
 
-CallbackHandle Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
+void Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
 {
-    std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
-    _disconnectCallbacks[_callbackHandleCount] = callback;
-    return _callbackHandleCount++;
+    _disconnectCallback = std::move(callback);
 }
 
 void Session::RemoveDisconnectCallback(CallbackHandle handle)
 {
-    std::lock_guard<std::mutex> disconnectCallbacksLock(_disconnectCallbacksMutex);
-    _disconnectCallbacks.erase(handle);
+    _disconnectCallback = nullptr;
 }
 
 void Session::SetSendToHandler(SendToHandler handler)
@@ -194,7 +176,7 @@ void Session::ReadDataAsync(const std::uint16_t& dataSize)
             self->_ioManager->PostOnBlockingPool([weakSelf, receiveBuffer, dataSize]() {
                 if(const auto session = weakSelf.lock())
                 {
-                    session->EnqueueProcessPacket(std::move(receiveBuffer), dataSize);
+                    session->EnqueueProcessPacket(receiveBuffer, dataSize);
                 }
             });
 
@@ -205,7 +187,7 @@ void Session::ReadDataAsync(const std::uint16_t& dataSize)
 
 void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::uint16_t size)
 {
-    const auto packet = std::make_shared<Packet>();
+    auto packet = NetworkPacketPool::GetInstance()->Rent();
     if(!packet->ParseFromArray(data->data(), size))
     {
         spdlog::error("session {}: parsing process packet error", uuids::to_string(_id));
@@ -226,94 +208,24 @@ void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::
 
 void Session::ProcessPacketAsync()
 {
-    std::lock_guard<std::mutex> processQueueLock(_processQueueMutex);
-    while(!_processQueue.empty())
-    {
-        auto packet = _processQueue.front();
-        _processQueue.pop();
-
-        // matching sequence
-        if(packet->type() == PacketType::Match)
-        {
-            const auto dataSize = packet->data().size();
-            const auto matchmakingPacket = std::make_shared<Matchmaking>();
-            if(!matchmakingPacket->ParseFromArray(packet->data().data(), dataSize))
-            {
-                spdlog::error("session {}: parsing match making packet error", uuids::to_string(_id));
-                return;
-            }
-
-            if(uuids::uuid::from_string(matchmakingPacket->sessionid()) != _id)
-            {
-                spdlog::error("session {}: session id is not same ({})", uuids::to_string(_id), matchmakingPacket->sessionid());
-                return;
-            }
-
-            _state = SessionState::WaitMatching; // Update State
-            _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
-                if(const auto self = weakSelf.lock())
-                {
-                    if(const auto listener = self->_weakListener.lock())
-                    {
-                        spdlog::info("session {}: request waiting for match", uuids::to_string(self->GetId()));
-
-                        Matchmaking sendMatchmakingPacket;
-                        if(MatchingLastError e; !listener->AddToMatchmakingQueue(self->GetId(), e))
-                        {
-                            if(e == MatchingLastError::FailedByExsists)
-                            {
-                                return;
-                            }
-
-                            // failed packet send
-                            sendMatchmakingPacket.set_type(MatchmakingType::Failed);
-                            sendMatchmakingPacket.set_sessionid(uuids::to_string(self->GetId()));
-                        }
-                        else
-                        {
-                            // send ok packet
-                            sendMatchmakingPacket.set_type(MatchmakingType::Waiting);
-                            sendMatchmakingPacket.set_sessionid(uuids::to_string(self->GetId()));
-                        }
-
-                        std::string serializedData;
-                        if(!sendMatchmakingPacket.SerializeToString(&serializedData))
-                        {
-                            spdlog::error("session {}: serialize match making packet error", uuids::to_string(self->GetId()));
-                            return;
-                        }
-
-                        auto sendPacket = std::make_shared<Packet>();
-                        sendPacket->set_type(PacketType::Match);
-                        sendPacket->set_data(serializedData);
-                        self->EnqueueTcpSendPacket(std::move(sendPacket)); // send matching complete to client
-                    }
-                }
-            });
-        }
-        else
-        {
-            spdlog::warn("session {}: income not implemented packet type", uuids::to_string(GetId()));
-            return;
-        }
-    }
 }
 
-void Session::EnqueueUdpSendPacket(const std::shared_ptr<Packet> data)
+void Session::EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket>& data)
 {
-    // serialize data
+    // serialize NetworkPacket into payload (body)
     auto size = static_cast<int>(data->ByteSizeLong());
-    const auto sendPacket = std::make_shared<Raw>(size);
-    if(!data->SerializeToArray(sendPacket->data(), size))
+    const auto payload = std::make_shared<Raw>(size);
+    if(!data->SerializeToArray(payload->data(), size))
     {
         spdlog::error("session {}: failed serialize send packet", uuids::to_string(GetId()));
         return;
     }
 
     const std::uint16_t sendNetSize = static_cast<std::uint16_t>(htons(size));
-    const auto payload = std::make_shared<Raw>(sizeof(sendNetSize) + sendPacket->size());
-    std::memcpy(payload->data(), &sendNetSize, sizeof(sendNetSize));
-    std::memcpy(payload->data() + sizeof(sendNetSize), sendPacket->data(), sendPacket->size());
+    // combine 2-byte header + payload into networkBuffer (physical wire buffer)
+    const auto networkBuffer = std::make_shared<Raw>(sizeof(sendNetSize) + payload->size());
+    std::memcpy(networkBuffer->data(), &sendNetSize, sizeof(sendNetSize));
+    std::memcpy(networkBuffer->data() + sizeof(sendNetSize), payload->data(), payload->size());
 
     if(_sendTo == nullptr)
     {
@@ -323,15 +235,15 @@ void Session::EnqueueUdpSendPacket(const std::shared_ptr<Packet> data)
     }
 
     // Udp Send
-    _sendTo(_clientUdpEp, payload);
+    _sendTo(_clientUdpEp, networkBuffer);
 }
 
-void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
+void Session::EnqueueTcpSendPacket(const std::shared_ptr<NetworkPacket>& data)
 {
     auto size = static_cast<int>(data->ByteSizeLong());
-    const auto sendData = std::make_shared<Raw>(size);
+    const auto payload = std::make_shared<Raw>(size);
 
-    if(!data->SerializeToArray(sendData->data(), size))
+    if(!data->SerializeToArray(payload->data(), size))
     {
         spdlog::error("session {}: failed to serialize tcp data", uuids::to_string(_id));
         return;
@@ -339,7 +251,7 @@ void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
 
     {
         std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
-        _sendTcpQueue.push(sendData);
+        _sendTcpQueue.push(payload);
     }
 
     if(_isWriting)
@@ -351,25 +263,25 @@ void Session::EnqueueTcpSendPacket(const std::shared_ptr<Packet> data)
 
 void Session::DoSendAsyncTcpLoop()
 {
-    // Dequeue from send queue
-    std::shared_ptr<Raw> dataBody;
+    // Dequeue payload (body) from send queue
+    std::shared_ptr<Raw> payload;
     {
         std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
-        dataBody = _sendTcpQueue.front();
+        payload = std::move(_sendTcpQueue.front());
         _sendTcpQueue.pop();
     }
 
-    // calculate size for payload
-    const std::uint16_t size = dataBody->size();
+    // calculate size for framing
+    const std::uint16_t size = payload->size();
     const std::uint16_t netSize = htons(size);
     const auto totalSize = sizeof(size) + size;
 
-    // make payload (size header + send data)
-    auto payload = std::make_shared<Raw>(totalSize);
-    std::memcpy(payload->data(), &netSize, sizeof(netSize));
-    std::memcpy(payload->data() + sizeof(netSize), dataBody->data(), size);
+    // make networkBuffer (size header + payload)
+    auto networkBuffer = std::make_shared<Raw>(totalSize);
+    std::memcpy(networkBuffer->data(), &netSize, sizeof(netSize));
+    std::memcpy(networkBuffer->data() + sizeof(netSize), payload->data(), size);
 
-    asio::async_write(*_socketPtr, asio::buffer(*payload), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), payload, totalSize](const std::error_code& ec, std::size_t bytesTransferred) {
+    asio::async_write(*_socketPtr, asio::buffer(*networkBuffer), asio::bind_executor(_strand, [weakSelf = GetWeak<Session>(), networkBuffer, totalSize](const std::error_code& ec, std::size_t bytesTransferred) {
         if(const auto self = weakSelf.lock())
         {
             if(ec)
@@ -394,7 +306,7 @@ void Session::DoSendAsyncTcpLoop()
 
 void Session::SendSessionInfo()
 {
-    auto sendPacket = std::make_shared<Packet>();
+    auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
     sendPacket->set_type(PacketType::PortHandshake);
     sendPacket->set_data(std::format("{},{}", std::to_string(_serverUdpPort), uuids::to_string(GetId())));
 

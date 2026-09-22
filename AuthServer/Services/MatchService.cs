@@ -222,6 +222,18 @@ public class MatchService
         return result;
     }
 
+    public async Task UpdateMatchServerAddressAsync(string matchId, string serverAddress)
+    {
+        var resultJson = await _redisDB.HashGetAsync(REDIS_RESULT_PREFIX, matchId);
+        if (!resultJson.HasValue) return;
+
+        var result = JsonSerializer.Deserialize<MatchResult>(resultJson.ToString());
+        if (result is null) return;
+
+        result.ServerAddress = serverAddress;
+        await _redisDB.HashSetAsync(REDIS_RESULT_PREFIX, matchId, JsonSerializer.Serialize(result));
+    }
+
     public async Task RemoveEntryAsync(string userId)
     {
         var entry = await GetStatus(userId);
@@ -261,35 +273,104 @@ public class MatchService
         _logger.LogInformation("{userId} remove from userConnections success", userId);
     }
 
-    public async Task<bool> FinishMatchAsync(string matchId, string winnerId)
+    public async Task<bool> FinishMatchAsync(string matchId, TeamSide winningTeam, List<string> winnerUserIds)
     {
+        return await FinishMatchAsync(new GameResultReportDto
+        {
+            MatchId = matchId,
+            WinningTeam = winningTeam,
+            WinnerUserIds = winnerUserIds,
+            EndTimeUtc = DateTime.UtcNow
+        });
+    }
+
+    public async Task<bool> FinishMatchAsync(GameResultReportDto report)
+    {
+        // 1. Redis에서 진행 중인 매치 정보 조회
+        var matchJson = await _redisDB.HashGetAsync(REDIS_RESULT_PREFIX, report.MatchId);
+        if (!matchJson.HasValue)
+        {
+            _logger.LogWarning("Match {matchId} not found in Redis (already finished or invalid)", report.MatchId);
+            return false;
+        }
+
+        var redisMatch = JsonSerializer.Deserialize<MatchResult>(matchJson.ToString());
+        if (redisMatch is null)
+        {
+            _logger.LogError("Failed to deserialize Redis MatchResult for match {matchId}", report.MatchId);
+            return false;
+        }
+
+        // 2. PostgreSQL DB 영구 저장 (Scope)
         using var scope = _scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        var matchResult = await dbContext.MatchResults.FindAsync(matchId);
-        if (matchResult is null || matchResult is { IsFinished: true }) return false;
+        var existingInDb = await dbContext.MatchResults.FindAsync(report.MatchId);
+        var finishedAt = report.EndTimeUtc != default ? report.EndTimeUtc : DateTime.UtcNow;
 
-        matchResult.IsFinished = true;
-        matchResult.WinnerId = winnerId;
-        matchResult.FinishedAtUtc = DateTime.UtcNow;
+        if (existingInDb is null)
+        {
+            var matchEntity = new MatchResult
+            {
+                MatchId = report.MatchId,
+                UserIds = redisMatch.UserIds,
+                ServerAddress = redisMatch.ServerAddress,
+                IsFinished = true,
+                WinningTeam = report.WinningTeam.ToString(),
+                WinnerUserIds = report.WinnerUserIds,
+                TeamAScore = report.TeamAScore,
+                TeamBScore = report.TeamBScore,
+                MatchedAtUtc = redisMatch.MatchedAtUtc,
+                FinishedAtUtc = finishedAt
+            };
+            await dbContext.MatchResults.AddAsync(matchEntity);
+        }
+        else
+        {
+            if (existingInDb.IsFinished)
+            {
+                _logger.LogWarning("Match {matchId} is already marked as finished in DB", report.MatchId);
+                return false;
+            }
 
+            existingInDb.IsFinished = true;
+            existingInDb.WinningTeam = report.WinningTeam.ToString();
+            existingInDb.WinnerUserIds = report.WinnerUserIds;
+            existingInDb.TeamAScore = report.TeamAScore;
+            existingInDb.TeamBScore = report.TeamBScore;
+            existingInDb.FinishedAtUtc = finishedAt;
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        // 3. Redis 캐시 및 유저 엔트리 정리 (Transaction)
         var tran = _redisDB.CreateTransaction();
-        _ = tran.HashDeleteAsync(REDIS_RESULT_PREFIX, matchId);
+        _ = tran.HashDeleteAsync(REDIS_RESULT_PREFIX, report.MatchId);
 
-        foreach(var userId in matchResult.UserIds)
+        foreach (var userId in redisMatch.UserIds)
         {
             _ = tran.HashDeleteAsync(REDIS_ENTRY_PREFIX, userId);
         }
 
-        await dbContext.SaveChangesAsync();
-        bool redisSuccess = await tran.ExecuteAsync();
-
-        _logger.LogInformation("Match {matchId} finished, winner: {winnerId}", matchId, winnerId);
-
-        await _hubContext.Clients.Group(MatchHub.GetMatchGroup(matchId)).SendAsync("GameFinished", new
+        bool committed = await tran.ExecuteAsync();
+        if (!committed)
         {
-            winnerId,
-            matchId
+            _logger.LogWarning("Redis transaction failed during match {matchId} cleanup", report.MatchId);
+        }
+
+        _logger.LogInformation("Match {matchId} finished successfully: WinningTeam={winningTeam}, Score={a}:{b}, FinishedAt={dateTime}",
+            report.MatchId, report.WinningTeam, report.TeamAScore, report.TeamBScore, finishedAt.ToString("O"));
+
+        // 4. SignalR 클라이언트들에게 최종 게임 결과 브로드캐스트
+        var matchGroup = MatchHub.GetMatchGroup(report.MatchId);
+        await _hubContext.Clients.Group(matchGroup).SendAsync("GameFinished", new
+        {
+            matchId = report.MatchId,
+            winningTeam = report.WinningTeam.ToString(),
+            winnerUserIds = report.WinnerUserIds,
+            teamAScore = report.TeamAScore,
+            teamBScore = report.TeamBScore,
+            playerStats = report.PlayerStats
         });
 
         return true;
