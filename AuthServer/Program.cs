@@ -11,8 +11,20 @@ using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.SystemConsole.Themes;
 
-Log.Logger = new LoggerConfiguration().MinimumLevel.Information().WriteTo.Console().CreateLogger();
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}",
+        theme: AnsiConsoleTheme.Code)
+    .CreateLogger();
 
 Log.Information("Server Starting...");
 var builder = WebApplication.CreateBuilder(args);
@@ -121,6 +133,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseSerilogRequestLogging();
+
 app.UseCors("DevCors");
 
 app.UseAuthentication();
@@ -152,9 +166,45 @@ app.MapGet("/info", () => new
 // SignalR Match Hub Route
 app.MapHub<MatchHub>("/hubs/match");
 
-// 구동 직전 admin, internal 계정 생성
+// 구동 직전 인프라 연결 확인 및 시드 데이터 초기화 (Fail-Fast)
 using (var scope = app.Services.CreateScope())
 {
+    // 1. PostgreSQL 연결 확인
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        if (!await db.Database.CanConnectAsync())
+        {
+            Log.Fatal("[PostgreSQL] Critical: Cannot connect to database. Aborting server startup.");
+            throw new InvalidOperationException("Failed to connect to PostgreSQL database.");
+        }
+        Log.Information("[PostgreSQL] Successfully connected to database.");
+    }
+    catch (Exception ex) when (ex is not InvalidOperationException)
+    {
+        Log.Fatal(ex, "[PostgreSQL] Critical error while connecting to database. Aborting server startup.");
+        throw;
+    }
+
+    // 2. Redis 연결 확인
+    try
+    {
+        var redis = scope.ServiceProvider.GetRequiredService<IConnectionMultiplexer>();
+        if (!redis.IsConnected)
+        {
+            Log.Fatal("[Redis] Critical: Cannot connect to Redis server. Aborting server startup.");
+            throw new InvalidOperationException("Failed to connect to Redis server.");
+        }
+        var endpoints = string.Join(", ", redis.GetEndPoints().Select(e => e.ToString()));
+        Log.Information("[Redis] Successfully connected to Redis server ({Endpoints}).", endpoints);
+    }
+    catch (Exception ex) when (ex is not InvalidOperationException)
+    {
+        Log.Fatal(ex, "[Redis] Critical error while connecting to Redis server. Aborting server startup.");
+        throw;
+    }
+
+    // 3. Admin 및 Internal 계정 시딩
     var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
     await seeder.SeedAsync();
 }

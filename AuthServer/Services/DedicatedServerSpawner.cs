@@ -25,14 +25,20 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
     private readonly IConfiguration _config;
     private readonly ILogger<DedicatedServerSpawner> _logger;
     private readonly MatchService _matchService;
+    private readonly JwtTokenService _jwtTokenService;
 
-    public DedicatedServerSpawner(IConfiguration config, ILogger<DedicatedServerSpawner> logger, MatchService matchService)
+    public DedicatedServerSpawner(
+        IConfiguration config,
+        ILogger<DedicatedServerSpawner> logger,
+        MatchService matchService,
+        JwtTokenService jwtTokenService)
     {
         _config = config;
         _logger = logger;
         _matchService = matchService;
+        _jwtTokenService = jwtTokenService;
     }
-    
+
     public Task<DedicatedServerInfo?> SpawnServerAsync(string matchId, List<string> userIds)
     {
         try
@@ -44,15 +50,17 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
             string executablePath = ResolveExecutablePath();
             string idCsv = string.Join(",", userIds);
 
-            string apiKey = _config["LogicServer:ApiKey"] ?? "default_api_key";
+            //string apiKey = _config["LogicServer:ApiKey"] ?? "default_api_key";
+            string authToken = _jwtTokenService.GenerateInternalServerToken(matchId);
 
             // CLI 인자 구성
             var startInfo = new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = $"--match-id {matchId} --api-key {apiKey} --tcp-port {tcpPort} --udp-port {udpPort} --players {idCsv}",
-                UseShellExecute = true,
-                CreateNoWindow = false 
+                Arguments =
+                    $"--match-id {matchId} --auth-token {authToken} --tcp-port {tcpPort} --udp-port {udpPort} --players {idCsv}",
+                UseShellExecute = false, // for debugging -> true
+                CreateNoWindow = false
             };
 
             var process = new Process
@@ -113,13 +121,17 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
             candidates.Add(Path.GetFullPath(configuredPath));
             candidates.Add(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath)));
             candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), configuredPath)));
-            candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "AuthServer", configuredPath)));
+            candidates.Add(
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "AuthServer", configuredPath)));
         }
 
         string basePath = AppContext.BaseDirectory;
-        candidates.Add(Path.GetFullPath(Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "x64-debug", binaryName)));
-        candidates.Add(Path.GetFullPath(Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "Debug", binaryName)));
-        candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "server", "build", "x64-debug", binaryName)));
+        candidates.Add(Path.GetFullPath(Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "x64-debug",
+            binaryName)));
+        candidates.Add(Path.GetFullPath(Path.Combine(basePath, "..", "..", "..", "..", "server", "build", "Debug",
+            binaryName)));
+        candidates.Add(Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "server", "build", "x64-debug",
+            binaryName)));
 
         foreach (var path in candidates)
         {
@@ -152,8 +164,8 @@ public class DedicatedServerSpawner : IDedicatedServerSpawner
 
                 return allocatedPort;
             }
-            catch (SocketException) 
-            { 
+            catch (SocketException)
+            {
                 // 같은 포트 배정 실패 시 
                 continue;
             }

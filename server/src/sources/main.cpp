@@ -47,9 +47,9 @@ int main(const int argc, char** argv)
         exit(0);
     }
     
-    if(config.apiKey.empty())
+    if(config.authToken.empty())
     {
-        spdlog::error("invalid api key");
+        spdlog::error("invalid auth token");
         exit(0);
     }
     
@@ -84,7 +84,7 @@ int main(const int argc, char** argv)
     
     // broadcast용 room
     auto matchId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
-    const auto dedicatedRoom = Room::Create(ioManager, matchId, config.apiKey, config.allowedPlayers.size());
+    const auto dedicatedRoom = Room::Create(ioManager, matchId, config.authToken, config.allowedPlayers.size());
     const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort, config.allowedPlayers);
     listener->SetDedicatedRoom(dedicatedRoom);
 

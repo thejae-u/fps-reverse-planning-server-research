@@ -6,7 +6,7 @@
 struct ServerConfig
 {
     std::string matchId = "";
-    std::string apiKey = "";
+    std::string authToken = "";
     std::uint16_t tcpPort = 0; // default tcp port
     std::uint16_t udpPort = 0; // default udp port
     std::vector<std::string> allowedPlayers;
@@ -36,9 +36,9 @@ struct ServerConfig
             {
                 config.matchId = argv[++i];
             }
-            else if((arg == "--api-key" || arg == "-ak") && i + 1 < argc)
+            else if((arg == "--auth-token" || arg == "--token" || arg == "-at") && i + 1 < argc)
             {
-                config.apiKey = argv[++i];
+                config.authToken = argv[++i];
             }
             else if((arg == "--players" || arg == "-p") && i + 1 < argc)
             {
@@ -56,7 +56,7 @@ struct ServerConfig
             {
                 std::cout << "Usage: LogicServer [Options]\n"
                 << "    --match-id <id>         Match UUID\n"
-                << "    --api-key <key>         ApiKey for validate\n"
+                << "    --auth-token <token>    Auth Token for validate\n"
                 << "    --tcp-port <port>       TCP Listen Port\n"
                 << "    --udp-port <port>       UDP Listen Port\n"
                 << "    --players <p1, p2>      Allowed Players tokens (CSV)\n"
@@ -190,7 +190,7 @@ inline std::unique_ptr<std::string> InternalPacketSerializer(const Internal::Gam
     const std::uint16_t networkSize = htons(bodySize);
     auto payload = std::make_unique<std::string>(sizeof(std::uint16_t) + bodySize, '\0'); // header 2byte + body packet size + '\0'
 
-    std::memcpy(&(*payload)[0], &networkSize, 2); // header
+    std::memcpy(&(*payload)[0], &networkSize, 2);          // header
     if(!packet.SerializeToArray(&(*payload)[2], bodySize)) // body serialize after header
     {
         return nullptr;

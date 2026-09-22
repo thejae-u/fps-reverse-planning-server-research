@@ -47,5 +47,4 @@ public class GameResultReportDto
     public List<string> WinnerUserIds { get; set; } = new();
     public List<PlayerMatchStatDto> PlayerStats { get; set; } = new();
     public DateTime EndTimeUtc { get; set; }
-    public string ApiKey { get; set; } = string.Empty;
 }

@@ -33,17 +33,17 @@ public class InternalController : ControllerBase
         return NoContent();
     }
 
-    [AllowAnonymous]
     [HttpPost("finish")]
     public async Task<IActionResult> FinishGame([FromBody] GameResultReportDto report)
     {
-        var serverKey = _config["LogicServer:ApiKey"] ?? "default_secret_key";
-        if (report.ApiKey != serverKey)
+        var tokenMatchId = User.FindFirst("match_id")?.Value;
+        if (!string.IsNullOrEmpty(tokenMatchId) && tokenMatchId != report.MatchId)
         {
-            _logger.LogWarning("[FinishGame] Unauthorized attempt with invalid ApiKey for MatchId: {MatchId}", report.MatchId);
-            return Unauthorized("Invalid Internal ApiKey");
+            _logger.LogWarning("[FinishGame] Token match_id ({TokenMatchId}) does not match reported MatchId({ReportMatchId})",
+                tokenMatchId, report.MatchId);
+            return Forbid();
         }
-
+        
         var result = await _matchService.FinishMatchAsync(report);
 
         if (!result)

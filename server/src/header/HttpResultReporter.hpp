@@ -11,6 +11,7 @@ public:
         const std::string& authServerHost,
         std::uint16_t authServerPort,
         const std::string& jsonPayload,
+        const std::string& authToken,
         const std::string& path = "/internal/finish"
     )
     {
@@ -23,25 +24,30 @@ public:
             asio::ip::tcp::socket socket(ioContext);
             asio::connect(socket, endpoints);
 
+            std::string authHeader = "";
+            if(!authToken.empty())
+                authHeader = "Authorization: Bearer " + authToken + "\r\n";
+
             std::string request =
             "POST " + path + " HTTP/1.1\r\n"
             "Host: " + authServerHost + ":" + std::to_string(authServerPort) + "\r\n"
             "Content-Type: application/json\r\n"
             "Content-Length: " + std::to_string(jsonPayload.length()) + "\r\n"
+            + authHeader +
             "Connection: close\r\n\r\n" +
             jsonPayload;
-            
+
             std::error_code ec;
             asio::write(socket, asio::buffer(request), ec);
-            
+
             asio::streambuf response;
             asio::read_until(socket, response, "\r\n");
-            
+
             std::istream responseStream(&response);
             std::string httpVersion;
             unsigned int statusCode;
             responseStream >> httpVersion >> statusCode;
-            
+
             spdlog::info("[HttpReporter] response code: {}", statusCode);
             return (statusCode == 200 || statusCode == 204);
         }

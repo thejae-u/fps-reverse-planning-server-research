@@ -1,6 +1,5 @@
 param (
     [string]$baseUrl = "http://localhost:8080",
-    [string]$apiKey = "dev_logic_server_api_key_1234",
     [string]$mode = "QuickInject" # "QuickInject" or "FullMatchFlow"
 )
 
@@ -98,10 +97,25 @@ if ($mode -eq "QuickInject") {
 
     # 3. Launch Dedicated Server with redirected stdin
     Write-Host "[3/5] Starting Dedicated Server (main.exe) in TEST mode..." -ForegroundColor Yellow
+
+    # Authenticate internal user to obtain JWT auth token
+    Write-Host "  -> Authenticating internal account to obtain auth token..." -ForegroundColor Gray
+    try {
+        $internalCreds = @{
+            username = "internal"
+            password = "internalPassword1234!"
+        } | ConvertTo-Json
+        $loginRes = Invoke-RestMethod -Uri "$baseUrl/auth/login" -Method Post -ContentType "application/json" -Body $internalCreds
+        $serverToken = $loginRes.token
+        Write-Host "  -> Acquired JWT Server Token: $($serverToken.Substring(0, 15))..." -ForegroundColor Green
+    } catch {
+        Write-Host "  [ERROR] Failed to login as 'internal' account: $_" -ForegroundColor Red
+        exit 1
+    }
     
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $exePath.Path
-    $psi.Arguments = "--match-id $matchId --api-key $apiKey --tcp-port $tcpPort --udp-port $udpPort --players $playersCsv --test"
+    $psi.Arguments = "--match-id $matchId --auth-token $serverToken --tcp-port $tcpPort --udp-port $udpPort --players $playersCsv --test"
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $false

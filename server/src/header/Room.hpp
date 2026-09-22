@@ -24,12 +24,12 @@ private:
     };
 
 public:
-    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount);
+    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string& authToken, const std::size_t expectedPlayerCount);
     ~Room();
 
-    static auto Create(std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
+    static auto Create(std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string& authToken, const std::size_t expectedPlayerCount)
     {
-        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, matchId, apiKey, expectedPlayerCount);
+        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, matchId, authToken, expectedPlayerCount);
         return newRoom;
     }
     
@@ -57,7 +57,7 @@ private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<SessionManager> _sessionManager;
     uuids::uuid _matchId;
-    std::string _apiKey;
+    std::string _authToken;
     const std::string _serverHost = "127.0.0.1"; // 인증 서버 호스트
     const std::uint16_t _serverPort = 8080; // 인증 서버 포트
 

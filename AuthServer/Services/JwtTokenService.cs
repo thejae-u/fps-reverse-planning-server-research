@@ -44,4 +44,37 @@ public class JwtTokenService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public string GenerateInternalServerToken(string matchId, TimeSpan? lifetime = null)
+    {
+        var issuer = _configuration["Jwt:Issuer"]
+                     ?? throw new InvalidOperationException("Jwt:Issuer not configured");
+        var audience = _configuration["Jwt:Audience"]
+                       ?? throw new InvalidOperationException("Jwt:Audience not configured");
+        var secretKey = _configuration["Jwt:SecretKey"]
+                        ?? throw new InvalidOperationException("Jwt:SecretKey not configured");
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, $"server-{matchId}"),
+            new Claim(ClaimTypes.Name, "DedicatedServer"),
+            new Claim(ClaimTypes.Role, "Internal"),
+            new Claim("match_id", matchId)
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        DateTime expiryTime = DateTime.UtcNow.Add(lifetime ?? TimeSpan.FromHours(1));
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
+            claims: claims,
+            expires: expiryTime,
+            signingCredentials: credentials
+        );
+        
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 }

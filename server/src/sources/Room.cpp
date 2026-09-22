@@ -5,8 +5,8 @@
 #include "Session.hpp"
 #include "GameResult.hpp"
 
-Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string apiKey, std::size_t expectedPlayerCount)
-    : _ioManager(ioManager), _matchId(matchId), _apiKey(apiKey), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
+Room::Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string& authToken, const std::size_t expectedPlayerCount)
+    : _ioManager(ioManager), _matchId(matchId), _authToken(authToken), _expectedPlayerCount(expectedPlayerCount), _world(std::make_unique<World>(ioManager->GetIoContext(), matchId))
 {
 }
 
@@ -24,7 +24,6 @@ void Room::OnMatchFinished()
     auto winningTeam = static_cast<int>(gameResult->winningTeam);
 
     json j;
-    j["apiKey"] = _apiKey;
     j["matchId"] = uuids::to_string(_matchId);
     j["winningTeam"] = winningTeam;
     j["TeamAScore"] = gameResult->teamAInfo.kills;
@@ -56,7 +55,7 @@ void Room::OnMatchFinished()
 
     std::string jsonPayload = j.dump();
 
-    if(HttpResultReporter::SendMatchResult(_serverHost, _serverPort, jsonPayload))
+    if(HttpResultReporter::SendMatchResult(_serverHost, _serverPort, jsonPayload, _authToken))
         spdlog::info("room: match result successfully reported to auth server.");
     else
         spdlog::error("room: failed to report match result"); // TODO : Fail 시 재시도 및 예외 처리 로직 필요
