@@ -27,7 +27,6 @@ services:
       context: .
       dockerfile: .devcontainer/Dockerfile
     working_dir: /workspace
-    # 서버 자동 실행 대신 컨테이너만 유지 (사용자가 터미널에서 직접 dotnet run/watch 실행)
     command: ["tail", "-f", "/dev/null"]
     ports:
       - "5289:8080"
@@ -42,6 +41,7 @@ services:
       DOTNET_RUNNING_IN_CONTAINER: "true"
     volumes:
       - ./:/workspace
+      - ../proto:/proto
       - nuget-packages:/home/vscode/.nuget/packages
     depends_on:
       - redis
