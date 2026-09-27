@@ -5,19 +5,19 @@ namespace FPSGame.Player
     public class PlayerWeaponSway : MonoBehaviour
     {
         [Header("Sway Settings")]
-        [SerializeField] private float swayAmount = 1.5f;
+        [SerializeField] private float swayAmount = 0f;
         [SerializeField] private float maxSwayAmount = 4.0f;
         [SerializeField] private float swaySmooth = 8.0f;
 
         [Header("Bobbing Settings")]
-        [SerializeField] private float bobbingSpeed = 10f;
-        [SerializeField] private float bobbingAmount = 0.03f;
-        [SerializeField] private float sprintBobbingMultiplier = 1.4f;
+        [SerializeField] private float bobbingSpeed = 0f;
+        [SerializeField] private float bobbingAmount = 0f;
+        [SerializeField] private float sprintBobbingMultiplier = 0f;
 
         [Header("Recoil Animation")]
-        [SerializeField] private float recoilKickBack = 0.08f;
-        [SerializeField] private float recoilRotation = 3.0f;
-        [SerializeField] private float recoilRecoverySpeed = 12.0f;
+        [SerializeField] private float recoilKickBack = 0f;
+        [SerializeField] private float recoilRotation = 0f;
+        [SerializeField] private float recoilRecoverySpeed = 0f;
 
         private Vector3 initialPosition;
         private Quaternion initialRotation;

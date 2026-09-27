@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 #endif
 using FPSGame.Player;
 using FPSGame.UI;
+using Protocol;
 
 namespace FPSGame.Management
 {
@@ -22,6 +23,7 @@ namespace FPSGame.Management
         [SerializeField] private FPSUIController uiController;
 
         private readonly List<PlayerController> activePlayers = new List<PlayerController>();
+        private readonly Dictionary<string, PlayerController> networkPlayers = new Dictionary<string, PlayerController>();
         private PlayerController localPlayer;
 
         public PlayerController LocalPlayer => localPlayer;
@@ -30,6 +32,12 @@ namespace FPSGame.Management
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoInitialize()
         {
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "MenuScene" ||
+                FindAnyObjectByType<MenuUIController>() != null)
+            {
+                return;
+            }
+
             if (Instance == null && FindAnyObjectByType<GameManager>() == null)
             {
                 Debug.Log("[GameManager] Auto-initializing FPS GameManager on scene load...");
@@ -40,6 +48,13 @@ namespace FPSGame.Management
 
         private void Awake()
         {
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "MenuScene" ||
+                FindAnyObjectByType<MenuUIController>() != null)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             if (Instance == null) Instance = this;
             else Destroy(gameObject);
         }
@@ -168,8 +183,11 @@ namespace FPSGame.Management
             AudioSource audio = player.AddComponent<AudioSource>();
             audio.playOnAwake = false;
 
+            PlayerSO dynamicSO = ScriptableObject.CreateInstance<PlayerSO>();
             PlayerController pc = player.AddComponent<PlayerController>();
             PlayerShooter ps = player.AddComponent<PlayerShooter>();
+            pc.PlayerData = dynamicSO;
+            ps.PlayerData = dynamicSO;
 
             // Camera Holder
             GameObject camHolder = new GameObject("CameraHolder");
@@ -272,9 +290,160 @@ namespace FPSGame.Management
                 Destroy(activePlayers[i].gameObject);
                 activePlayers.RemoveAt(i);
             }
+            networkPlayers.Clear();
 
-            Debug.Log("[GameManager] Cleared all remote dummy players.");
+            Debug.Log("[GameManager] Cleared all remote players.");
             UpdatePlayerCountUI();
+        }
+
+        public void ProcessServerIngamePacket(IngamePacket packet, string localSessionId)
+        {
+            if (packet == null) return;
+
+            switch (packet.Method)
+            {
+                case IngameType.Move:
+                {
+                    var move = MovePacket.Parser.ParseFrom(packet.Data);
+                    string movePlayerId = move.PlayerId.ToStringUtf8();
+                    if (string.IsNullOrEmpty(movePlayerId)) break;
+
+                    Vector3 serverPos = new Vector3(move.OriginX, move.OriginY, move.OriginZ);
+                    Vector3 serverDir = new Vector3(move.DirX, move.DirY, move.DirZ);
+
+                    if (movePlayerId == localSessionId)
+                    {
+                        if (localPlayer != null)
+                        {
+                            // C++ Dedicated Server (World::Init) spawns players at (index * 5.0f, 0.0f, 0.0f)
+                            // and checks actualDist <= theoreticalDist + 2.0f for anti-cheat.
+                            // Sync local player on initial packet or if horizontal drift exceeds 2.0m.
+                            float horizontalDrift = Vector2.Distance(
+                                new Vector2(localPlayer.transform.position.x, localPlayer.transform.position.z),
+                                new Vector2(serverPos.x, serverPos.z));
+
+                            if (!localPlayer.HasSyncedServerSpawn || horizontalDrift > 2.0f)
+                            {
+                                Vector3 safeGroundPos = new Vector3(serverPos.x, Mathf.Max(serverPos.y, 0.05f), serverPos.z);
+                                localPlayer.SyncServerPosition(safeGroundPos);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        PlayerController remotePlayer = GetOrCreateNetworkPlayer(movePlayerId, serverPos);
+                        if (remotePlayer != null)
+                        {
+                            Quaternion targetRot = remotePlayer.transform.rotation;
+                            Vector3 flatDir = new Vector3(serverDir.x, 0f, serverDir.z);
+                            if (flatDir.sqrMagnitude > 0.0001f)
+                            {
+                                targetRot = Quaternion.LookRotation(flatDir.normalized);
+                            }
+                            remotePlayer.UpdateNetworkTransform(serverPos, targetRot);
+                        }
+                    }
+                    break;
+                }
+
+                case IngameType.Hit:
+                {
+                    var hit = HitPacket.Parser.ParseFrom(packet.Data);
+                    string hitPlayerId = hit.HitPlayerId.ToStringUtf8();
+                    string shooterId = hit.ShooterId.ToStringUtf8();
+
+                    if (hitPlayerId == localSessionId)
+                    {
+                        if (uiController != null)
+                        {
+                            uiController.SetHealth(hit.CurrentHp, 100f);
+                        }
+                        if (hit.IsDead)
+                        {
+                            Debug.Log($"[GameManager] Local player was eliminated by {shooterId} (Deaths: {hit.Deaths})");
+                        }
+                    }
+
+                    if (shooterId == localSessionId)
+                    {
+                        if (uiController != null)
+                        {
+                            uiController.ShowHitMarker(false);
+                        }
+                    }
+
+                    if (networkPlayers.TryGetValue(hitPlayerId, out PlayerController hitRemote) && hitRemote != null)
+                    {
+                        string shortId = hitPlayerId.Length > 6 ? hitPlayerId.Substring(0, 6) : hitPlayerId;
+                        hitRemote.SetPlayerName(hit.IsDead ? $"Player_{shortId} [DEAD]" : $"Player_{shortId} [{hit.CurrentHp} HP]");
+                    }
+                    break;
+                }
+
+                case IngameType.LagComp:
+                {
+                    var lagComp = LagCompPacket.Parser.ParseFrom(packet.Data);
+                    string shooterId = lagComp.ShooterId.ToStringUtf8();
+
+                    if (shooterId != localSessionId &&
+                        networkPlayers.TryGetValue(shooterId, out PlayerController remoteShooter) &&
+                        remoteShooter != null &&
+                        remoteShooter.Shooter != null)
+                    {
+                        Vector3 targetPoint = new Vector3(
+                            lagComp.OriginX + lagComp.DirX * 25f,
+                            lagComp.OriginY + lagComp.DirY * 25f,
+                            lagComp.OriginZ + lagComp.DirZ * 25f);
+                        remoteShooter.Shooter.PlayRemoteFireEffect(targetPoint);
+                    }
+                    break;
+                }
+
+                case IngameType.Score:
+                {
+                    var scoreboard = ScoreboardPacket.Parser.ParseFrom(packet.Data);
+                    foreach (var entry in scoreboard.Scores)
+                    {
+                        string scorePlayerId = entry.PlayerId.ToStringUtf8();
+                        if (scorePlayerId != localSessionId &&
+                            networkPlayers.TryGetValue(scorePlayerId, out PlayerController remotePlayer) &&
+                            remotePlayer != null)
+                        {
+                            string shortId = scorePlayerId.Length > 6 ? scorePlayerId.Substring(0, 6) : scorePlayerId;
+                            remotePlayer.SetPlayerName($"Player_{shortId} ({entry.Kill}K/{entry.Death}D)");
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        private PlayerController GetOrCreateNetworkPlayer(string remoteSessionId, Vector3 initialPos)
+        {
+            if (networkPlayers.TryGetValue(remoteSessionId, out PlayerController existing) && existing != null)
+            {
+                return existing;
+            }
+
+            int newId = activePlayers.Count;
+            GameObject remoteObj = playerPrefab != null
+                ? Instantiate(playerPrefab, initialPos, Quaternion.identity)
+                : CreateDynamicPlayerInstance(initialPos, Quaternion.identity);
+
+            remoteObj.name = $"NetworkPlayer_{remoteSessionId}";
+            PlayerController remotePlayer = remoteObj.GetComponent<PlayerController>();
+
+            if (remotePlayer != null)
+            {
+                string shortId = remoteSessionId.Length > 6 ? remoteSessionId.Substring(0, 6) : remoteSessionId;
+                remotePlayer.Initialize(newId, isLocal: false, $"Player_{shortId}");
+                activePlayers.Add(remotePlayer);
+                networkPlayers[remoteSessionId] = remotePlayer;
+                UpdatePlayerCountUI();
+                Debug.Log($"[GameManager] Spawned Network Player '{remoteSessionId}' at {initialPos}. Active players: {activePlayers.Count}/{maxPlayers}");
+            }
+
+            return remotePlayer;
         }
 
         private void UpdatePlayerCountUI()

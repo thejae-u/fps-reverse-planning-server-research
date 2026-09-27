@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -8,25 +9,35 @@ namespace FPSGame.Player
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
     {
+        public const string WeaponLayerName = "FirstPersonWeapon";
+        public const int FallbackWeaponLayer = 6;
+
         [Header("Identity & Networking (Up to 10 players)")]
         [SerializeField] private int playerId = 0;
         [SerializeField] private bool isLocalPlayer = true;
         [SerializeField] private string playerName = "Player";
 
-        [Header("Movement")]
-        [SerializeField] private float walkSpeed = 5.5f;
-        [SerializeField] private float sprintSpeed = 9.0f;
-        [SerializeField] private float jumpHeight = 1.3f;
-        [SerializeField] private float gravity = -22.0f;
+        [Header("Player Data SO")]
+        [SerializeField] private PlayerSO playerSO;
 
-        [Header("Mouse Look")]
-        [SerializeField] private float mouseSensitivity = 2.0f;
-        [SerializeField] private float maxPitchAngle = 85.0f;
-        [SerializeField] private float minPitchAngle = -85.0f;
+        public PlayerSO PlayerData
+        {
+            get => playerSO;
+            set => playerSO = value;
+        }
+
+        public float WalkSpeed => playerSO != null ? playerSO.walkSpeed : 5.5f;
+        public float SprintSpeed => playerSO != null ? playerSO.sprintSpeed : 9.0f;
+        public float JumpHeight => playerSO != null ? playerSO.jumpHeight : 1.3f;
+        public float Gravity => playerSO != null ? playerSO.gravity : -22.0f;
+        public float MouseSensitivity => playerSO != null ? playerSO.mouseSensitivity : 2.0f;
+        public float MaxPitchAngle => playerSO != null ? playerSO.maxPitchAngle : 85.0f;
+        public float MinPitchAngle => playerSO != null ? playerSO.minPitchAngle : -85.0f;
 
         [Header("Component References")]
         [SerializeField] private Transform cameraHolder;
         [SerializeField] private Camera localCamera;
+        [SerializeField] private Camera weaponCamera;
         [SerializeField] private AudioListener audioListener;
         [SerializeField] private GameObject firstPersonModel;
         [SerializeField] private GameObject thirdPersonModel;
@@ -46,12 +57,26 @@ namespace FPSGame.Player
         private Quaternion targetNetworkRotation;
         private float networkLerpSpeed = 15f;
 
+        // Local Player Network Sync
+        private float nextNetworkSendTime = 0f;
+        private const float NetworkSendInterval = 0.033f; // ~30Hz
+        private Vector3 currentMoveDirection = Vector3.zero;
+        private bool hasSyncedServerSpawn = false;
+
         // Properties
         public int PlayerId => playerId;
         public bool IsLocalPlayer => isLocalPlayer;
         public string PlayerName => playerName;
+        public bool HasSyncedServerSpawn => hasSyncedServerSpawn;
         public Camera LocalCamera => localCamera;
+        public Camera WeaponCamera => weaponCamera;
         public PlayerShooter Shooter => shooter;
+
+        public static int GetWeaponLayer()
+        {
+            int layer = LayerMask.NameToLayer(WeaponLayerName);
+            return layer >= 0 ? layer : FallbackWeaponLayer;
+        }
 
         private void Awake()
         {
@@ -95,6 +120,79 @@ namespace FPSGame.Player
             {
                 nameTagTextMesh = GetComponentInChildren<TextMesh>(true);
             }
+
+            if (playerSO == null && shooter != null && shooter.PlayerData != null)
+            {
+                playerSO = shooter.PlayerData;
+            }
+
+            SetupWeaponCameraStack();
+        }
+
+        private void SetupWeaponCameraStack()
+        {
+            if (localCamera == null) return;
+
+            int weaponLayer = GetWeaponLayer();
+            int weaponLayerMask = 1 << weaponLayer;
+
+            // 1. Assign weapon model hierarchy to FirstPersonWeapon layer
+            if (firstPersonModel != null)
+            {
+                SetLayerRecursively(firstPersonModel, weaponLayer);
+            }
+
+            // 2. Exclude FirstPersonWeapon layer from Base Camera culling mask
+            localCamera.cullingMask &= ~weaponLayerMask;
+
+            UniversalAdditionalCameraData baseCamData = localCamera.GetUniversalAdditionalCameraData();
+            baseCamData.renderType = CameraRenderType.Base;
+
+            // 3. Find or create Overlay WeaponCamera
+            if (weaponCamera == null)
+            {
+                Transform existingWeaponCam = localCamera.transform.Find("WeaponCamera");
+                if (existingWeaponCam != null)
+                {
+                    weaponCamera = existingWeaponCam.GetComponent<Camera>();
+                }
+            }
+
+            if (weaponCamera == null)
+            {
+                GameObject weaponCamObj = new GameObject("WeaponCamera");
+                weaponCamObj.transform.SetParent(localCamera.transform, false);
+                weaponCamObj.transform.localPosition = Vector3.zero;
+                weaponCamObj.transform.localRotation = Quaternion.identity;
+                weaponCamera = weaponCamObj.AddComponent<Camera>();
+            }
+
+            weaponCamera.cullingMask = weaponLayerMask;
+            weaponCamera.fieldOfView = localCamera.fieldOfView;
+            weaponCamera.nearClipPlane = 0.01f;
+            weaponCamera.farClipPlane = 10f;
+            weaponCamera.clearFlags = CameraClearFlags.Depth;
+
+            UniversalAdditionalCameraData weaponCamData = weaponCamera.GetUniversalAdditionalCameraData();
+            weaponCamData.renderType = CameraRenderType.Overlay;
+
+            if (!baseCamData.cameraStack.Contains(weaponCamera))
+            {
+                baseCamData.cameraStack.Add(weaponCamera);
+            }
+        }
+
+        private static void SetLayerRecursively(GameObject obj, int newLayer)
+        {
+            if (obj == null) return;
+            obj.layer = newLayer;
+            foreach (Transform child in obj.transform)
+            {
+                if (child != null)
+                {
+                    SetLayerRecursively(child.gameObject, newLayer);
+                }
+            }
         }
 
         private void Start()
@@ -104,6 +202,30 @@ namespace FPSGame.Player
             if (isLocalPlayer)
             {
                 SetCursorLock(true);
+                if (shooter != null)
+                {
+                    shooter.OnShoot += OnLocalPlayerShoot;
+                }
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (shooter != null)
+            {
+                shooter.OnShoot -= OnLocalPlayerShoot;
+            }
+        }
+
+        private void OnLocalPlayerShoot()
+        {
+            if (!isLocalPlayer) return;
+
+            var netClient = NetworkManager.Instance?.Client;
+            if (netClient != null && netClient.IsConnected)
+            {
+                Vector3 aimDir = localCamera != null ? localCamera.transform.forward : transform.forward;
+                _ = netClient.SendShootAsync(aimDir);
             }
         }
 
@@ -120,6 +242,7 @@ namespace FPSGame.Player
         {
             // First Person vs Third Person configuration
             if (localCamera != null) localCamera.enabled = isLocalPlayer;
+            if (weaponCamera != null) weaponCamera.enabled = isLocalPlayer;
             if (audioListener != null) audioListener.enabled = isLocalPlayer;
 
             if (firstPersonModel != null) firstPersonModel.SetActive(isLocalPlayer);
@@ -160,10 +283,19 @@ namespace FPSGame.Player
                 {
                     shooter.HandleShooting(isSprinting, ApplyCameraRecoil);
                 }
+
+                // Periodically send MovePacket to Dedicated Server after initial spawn position sync
+                var netClient = NetworkManager.Instance?.Client;
+                if (netClient != null && netClient.IsUdpAuthenticated && hasSyncedServerSpawn && Time.time >= nextNetworkSendTime)
+                {
+                    nextNetworkSendTime = Time.time + NetworkSendInterval;
+                    Vector3 lookOrMoveDir = currentMoveDirection.sqrMagnitude > 0.001f ? currentMoveDirection : transform.forward;
+                    _ = netClient.SendMoveAsync(transform.position, lookOrMoveDir);
+                }
             }
             else
             {
-                // Smooth interpolation for remote players (placeholder for network sync)
+                // Smooth interpolation for remote players
                 transform.position = Vector3.Lerp(transform.position, targetNetworkPosition, Time.deltaTime * networkLerpSpeed);
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetNetworkRotation, Time.deltaTime * networkLerpSpeed);
 
@@ -185,19 +317,25 @@ namespace FPSGame.Player
 
             Vector2 moveInput = ReadMoveInput();
             bool isSprinting = IsSprintPressed();
-            float currentSpeed = isSprinting ? sprintSpeed : walkSpeed;
+            float currentSpeed = isSprinting ? SprintSpeed : WalkSpeed;
 
             Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
+            currentMoveDirection = move.sqrMagnitude > 0.001f ? move.normalized : Vector3.zero;
             characterController.Move(move * (currentSpeed * Time.deltaTime));
 
             // Jump
             if (IsJumpPressed() && isGrounded)
             {
-                velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+                velocity.y = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+                var netClient = NetworkManager.Instance?.Client;
+                if (netClient != null && netClient.IsUdpAuthenticated)
+                {
+                    _ = netClient.SendJumpAsync();
+                }
             }
 
             // Gravity
-            velocity.y += gravity * Time.deltaTime;
+            velocity.y += Gravity * Time.deltaTime;
             characterController.Move(velocity * Time.deltaTime);
         }
 
@@ -206,15 +344,15 @@ namespace FPSGame.Player
             if (Cursor.lockState != CursorLockMode.Locked) return;
 
             Vector2 mouseDelta = ReadMouseDelta();
-            float mouseX = mouseDelta.x * mouseSensitivity * 0.1f;
-            float mouseY = mouseDelta.y * mouseSensitivity * 0.1f;
+            float mouseX = mouseDelta.x * MouseSensitivity * 0.1f;
+            float mouseY = mouseDelta.y * MouseSensitivity * 0.1f;
 
             // Horizontal Yaw
             transform.Rotate(Vector3.up * mouseX);
 
             // Vertical Pitch
             cameraPitch -= mouseY;
-            cameraPitch = Mathf.Clamp(cameraPitch, minPitchAngle, maxPitchAngle);
+            cameraPitch = Mathf.Clamp(cameraPitch, MinPitchAngle, MaxPitchAngle);
 
             // Smooth camera recoil recovery
             cameraRecoilPitch = Mathf.Lerp(cameraRecoilPitch, 0f, Time.deltaTime * 10f);
@@ -320,11 +458,36 @@ namespace FPSGame.Player
 #endif
         }
 
-        // For future network position synchronization from server
+        // Network position synchronization from server
         public void UpdateNetworkTransform(Vector3 position, Quaternion rotation)
         {
             targetNetworkPosition = position;
             targetNetworkRotation = rotation;
+        }
+
+        public void SyncServerPosition(Vector3 serverPosition)
+        {
+            hasSyncedServerSpawn = true;
+            if (characterController != null)
+            {
+                characterController.enabled = false;
+                transform.position = serverPosition;
+                velocity = Vector3.zero;
+                characterController.enabled = true;
+            }
+            else
+            {
+                transform.position = serverPosition;
+            }
+        }
+
+        public void SetPlayerName(string newName)
+        {
+            playerName = newName;
+            if (nameTagTextMesh != null)
+            {
+                nameTagTextMesh.text = playerName;
+            }
         }
     }
 }

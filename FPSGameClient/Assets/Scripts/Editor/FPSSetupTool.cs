@@ -1,5 +1,6 @@
 using System.IO;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.UI;
@@ -15,17 +16,23 @@ namespace FPSGame.Editor
         private const string PREFAB_DIR = "Assets/Prefabs";
         private const string MATERIAL_DIR = "Assets/Materials";
         private const string SCENE_PATH = "Assets/Scenes/SampleScene.unity";
+        private const string MENU_SCENE_PATH = "Assets/Scenes/MenuScene.unity";
 
         [InitializeOnLoadMethod]
         private static void OnEditorLoaded()
         {
-            // Auto run setup if player prefab is not created yet
+            // Auto run setup if player prefab or MenuScene is not created yet
             EditorApplication.delayCall += () =>
             {
                 if (!File.Exists(Path.Combine(Application.dataPath, "Prefabs/Player.prefab")))
                 {
                     Debug.Log("[FPSSetupTool] Player prefab not found. Auto running FPS Setup...");
                     SetupEverything(false);
+                }
+                else if (!File.Exists(Path.Combine(Application.dataPath, "Scenes/MenuScene.unity")))
+                {
+                    Debug.Log("[FPSSetupTool] MenuScene not found. Auto generating MenuScene & Build Settings...");
+                    SetupMenuSceneAndBuildSettings(false);
                 }
             };
         }
@@ -34,6 +41,12 @@ namespace FPSGame.Editor
         public static void SetupEverythingMenu()
         {
             SetupEverything(true);
+        }
+
+        [MenuItem("Tools/FPS Sample/2. Setup Menu Scene & Build Settings", false, 2)]
+        public static void SetupMenuSceneMenu()
+        {
+            SetupMenuSceneAndBuildSettings(true);
         }
 
         public static void SetupEverything(bool showDialog = true)
@@ -254,7 +267,10 @@ namespace FPSGame.Editor
             PlayerController pc = player.AddComponent<PlayerController>();
             PlayerShooter ps = player.AddComponent<PlayerShooter>();
 
-            // 1. Camera Holder & Camera
+            int weaponLayer = PlayerController.GetWeaponLayer();
+            int weaponLayerMask = 1 << weaponLayer;
+
+            // 1. Camera Holder & Camera (Base + Overlay Weapon Camera Stack)
             GameObject camHolder = new GameObject("CameraHolder");
             camHolder.transform.SetParent(player.transform);
             camHolder.transform.localPosition = new Vector3(0, 1.6f, 0);
@@ -266,10 +282,34 @@ namespace FPSGame.Editor
             Camera cam = camObj.AddComponent<Camera>();
             cam.nearClipPlane = 0.1f;
             cam.fieldOfView = 75f;
+            cam.cullingMask &= ~weaponLayerMask;
             AudioListener listener = camObj.AddComponent<AudioListener>();
+
+            UniversalAdditionalCameraData baseCamData = cam.GetUniversalAdditionalCameraData();
+            baseCamData.renderType = CameraRenderType.Base;
+
+            GameObject weaponCamObj = new GameObject("WeaponCamera");
+            weaponCamObj.transform.SetParent(camObj.transform);
+            weaponCamObj.transform.localPosition = Vector3.zero;
+            weaponCamObj.transform.localRotation = Quaternion.identity;
+            Camera weaponCam = weaponCamObj.AddComponent<Camera>();
+            weaponCam.nearClipPlane = 0.01f;
+            weaponCam.farClipPlane = 10f;
+            weaponCam.fieldOfView = 75f;
+            weaponCam.cullingMask = weaponLayerMask;
+            weaponCam.clearFlags = CameraClearFlags.Depth;
+
+            UniversalAdditionalCameraData weaponCamData = weaponCam.GetUniversalAdditionalCameraData();
+            weaponCamData.renderType = CameraRenderType.Overlay;
+            SerializedObject weaponCamDataSO = new SerializedObject(weaponCamData);
+            SerializedProperty clearDepthProp = weaponCamDataSO.FindProperty("m_ClearDepth");
+            if (clearDepthProp != null) clearDepthProp.boolValue = true;
+            weaponCamDataSO.ApplyModifiedProperties();
+            baseCamData.cameraStack.Add(weaponCam);
 
             // Weapon Root & Sway
             GameObject weaponRoot = new GameObject("WeaponRoot");
+            weaponRoot.layer = weaponLayer;
             weaponRoot.transform.SetParent(camHolder.transform);
             weaponRoot.transform.localPosition = new Vector3(0.24f, -0.2f, 0.45f);
             PlayerWeaponSway sway = weaponRoot.AddComponent<PlayerWeaponSway>();
@@ -277,6 +317,7 @@ namespace FPSGame.Editor
             // Gun Body
             GameObject gunBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
             gunBody.name = "GunBody";
+            gunBody.layer = weaponLayer;
             gunBody.transform.SetParent(weaponRoot.transform);
             gunBody.transform.localPosition = Vector3.zero;
             gunBody.transform.localScale = new Vector3(0.07f, 0.09f, 0.42f);
@@ -286,6 +327,7 @@ namespace FPSGame.Editor
             // Gun Barrel
             GameObject gunBarrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             gunBarrel.name = "GunBarrel";
+            gunBarrel.layer = weaponLayer;
             gunBarrel.transform.SetParent(weaponRoot.transform);
             gunBarrel.transform.localPosition = new Vector3(0, 0.015f, 0.28f);
             gunBarrel.transform.localRotation = Quaternion.Euler(90f, 0, 0);
@@ -296,6 +338,7 @@ namespace FPSGame.Editor
             // Gun Magazine
             GameObject gunMag = GameObject.CreatePrimitive(PrimitiveType.Cube);
             gunMag.name = "GunMagazine";
+            gunMag.layer = weaponLayer;
             gunMag.transform.SetParent(weaponRoot.transform);
             gunMag.transform.localPosition = new Vector3(0, -0.1f, 0.05f);
             gunMag.transform.localRotation = Quaternion.Euler(15f, 0, 0);
@@ -306,6 +349,7 @@ namespace FPSGame.Editor
             // Gun Sight
             GameObject gunSight = GameObject.CreatePrimitive(PrimitiveType.Cube);
             gunSight.name = "GunSight";
+            gunSight.layer = weaponLayer;
             gunSight.transform.SetParent(weaponRoot.transform);
             gunSight.transform.localPosition = new Vector3(0, 0.06f, 0.12f);
             gunSight.transform.localScale = new Vector3(0.02f, 0.03f, 0.04f);
@@ -314,10 +358,12 @@ namespace FPSGame.Editor
 
             // Muzzle Point & Light
             GameObject muzzlePoint = new GameObject("MuzzlePoint");
+            muzzlePoint.layer = weaponLayer;
             muzzlePoint.transform.SetParent(weaponRoot.transform);
             muzzlePoint.transform.localPosition = new Vector3(0, 0.015f, 0.42f);
 
             GameObject flashLightObj = new GameObject("MuzzleFlashLight");
+            flashLightObj.layer = weaponLayer;
             flashLightObj.transform.SetParent(muzzlePoint.transform);
             flashLightObj.transform.localPosition = Vector3.zero;
             Light flashLight = flashLightObj.AddComponent<Light>();
@@ -360,10 +406,14 @@ namespace FPSGame.Editor
             nameTextMesh.color = Color.yellow;
             nameTextMesh.text = "Player";
 
+            PlayerSO defaultPlayerSO = CreateOrGetPlayerSO();
+
             // Wire up Serialized Properties for PlayerController
             SerializedObject pcSO = new SerializedObject(pc);
+            pcSO.FindProperty("playerSO").objectReferenceValue = defaultPlayerSO;
             pcSO.FindProperty("cameraHolder").objectReferenceValue = camHolder.transform;
             pcSO.FindProperty("localCamera").objectReferenceValue = cam;
+            pcSO.FindProperty("weaponCamera").objectReferenceValue = weaponCam;
             pcSO.FindProperty("audioListener").objectReferenceValue = listener;
             pcSO.FindProperty("firstPersonModel").objectReferenceValue = weaponRoot;
             pcSO.FindProperty("thirdPersonModel").objectReferenceValue = tpModel;
@@ -374,6 +424,7 @@ namespace FPSGame.Editor
 
             // Wire up Serialized Properties for PlayerShooter
             SerializedObject psSO = new SerializedObject(ps);
+            psSO.FindProperty("_playerSO").objectReferenceValue = defaultPlayerSO;
             psSO.FindProperty("muzzlePoint").objectReferenceValue = muzzlePoint.transform;
             psSO.FindProperty("playerCamera").objectReferenceValue = cam;
             psSO.FindProperty("muzzleFlashLight").objectReferenceValue = flashLight;
@@ -386,6 +437,25 @@ namespace FPSGame.Editor
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(player, path);
             Object.DestroyImmediate(player);
             return prefab;
+        }
+
+        private static PlayerSO CreateOrGetPlayerSO()
+        {
+            string soDir = "Assets/Settings";
+            if (!AssetDatabase.IsValidFolder(soDir))
+            {
+                AssetDatabase.CreateFolder("Assets", "Settings");
+            }
+
+            string path = $"{soDir}/DefaultPlayerSO.asset";
+            PlayerSO so = AssetDatabase.LoadAssetAtPath<PlayerSO>(path);
+            if (so == null)
+            {
+                so = ScriptableObject.CreateInstance<PlayerSO>();
+                AssetDatabase.CreateAsset(so, path);
+            }
+            EditorUtility.SetDirty(so);
+            return so;
         }
 
         private static void SetupScene(GameObject playerPrefab, GameObject targetDummyPrefab, Material floorMat, Material wallMat, Material obstacleMat)
@@ -592,6 +662,76 @@ namespace FPSGame.Editor
             txt.alignment = anchor;
             txt.color = color;
             return txt;
+        }
+
+        public static void SetupMenuSceneAndBuildSettings(bool showDialog = true)
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
+            {
+                AssetDatabase.CreateFolder("Assets", "Scenes");
+            }
+
+            var menuScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // 1. Camera
+            GameObject camObj = new GameObject("Main Camera");
+            camObj.tag = "MainCamera";
+            Camera cam = camObj.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.08f, 0.1f, 0.14f, 1f);
+            camObj.AddComponent<AudioListener>();
+
+            // 2. EventSystem
+            GameObject esObj = new GameObject("EventSystem");
+            esObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+#if ENABLE_INPUT_SYSTEM
+            esObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
+            esObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+#endif
+
+            // 3. NetworkManager (DontDestroyOnLoad)
+            GameObject netMgrObj = new GameObject("NetworkManager");
+            netMgrObj.AddComponent<NetworkManager>();
+
+            // 4. Menu UI Canvas & MenuUIController
+            GameObject canvasObj = new GameObject("MenuCanvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            canvasObj.AddComponent<GraphicRaycaster>();
+
+            MenuUIController menuUI = canvasObj.AddComponent<MenuUIController>();
+
+            EditorSceneManager.SaveScene(menuScene, MENU_SCENE_PATH);
+            RegisterScenesInBuildSettings();
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            Debug.Log($"[FPSSetupTool] MenuScene 생성 및 Build Settings 등록 완료: {MENU_SCENE_PATH}");
+            if (showDialog)
+            {
+                EditorUtility.DisplayDialog("Menu Scene Setup Complete",
+                    "MenuScene.unity 생성 및 Build Settings(0: MenuScene, 1: SampleScene) 등록이 완료되었습니다!\nPlay 버튼을 눌러 회원가입/로그인/매칭을 진행할 수 있습니다.",
+                    "확인");
+            }
+        }
+
+        private static void RegisterScenesInBuildSettings()
+        {
+            var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>();
+            if (File.Exists(Path.Combine(Application.dataPath, "Scenes/MenuScene.unity")))
+            {
+                scenes.Add(new EditorBuildSettingsScene(MENU_SCENE_PATH, true));
+            }
+            if (File.Exists(Path.Combine(Application.dataPath, "Scenes/SampleScene.unity")))
+            {
+                scenes.Add(new EditorBuildSettingsScene(SCENE_PATH, true));
+            }
+            EditorBuildSettings.scenes = scenes.ToArray();
         }
     }
 }

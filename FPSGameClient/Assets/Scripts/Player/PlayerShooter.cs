@@ -10,23 +10,33 @@ namespace FPSGame.Player
 {
     public class PlayerShooter : MonoBehaviour
     {
-        [Header("Weapon Stats")]
-        [SerializeField] private float damage = 25f;
-        [SerializeField] private float fireRate = 0.12f; // Seconds between shots
-        [SerializeField] private float range = 100f;
-        [SerializeField] private int magazineSize = 30;
-        [SerializeField] private int maxReserveAmmo = 120;
-        [SerializeField] private float reloadTime = 1.5f;
+        [Header("Player Data SO")] 
+        [SerializeField] private PlayerSO _playerSO;
 
-        [Header("Spread & Recoil")]
-        [SerializeField] private float baseSpread = 0.005f;
-        [SerializeField] private float sprintSpread = 0.02f;
-        [SerializeField] private float cameraRecoilAmount = 1.2f;
+        public PlayerSO PlayerData
+        {
+            get => _playerSO;
+            set => _playerSO = value;
+        }
+
+        public float Damage => _playerSO != null ? _playerSO.damage : 25f;
+        public float FireRate => _playerSO != null ? _playerSO.fireRate : 0.12f;
+        public float Range => _playerSO != null ? _playerSO.range : 100f;
+        public int MagazineSize => _playerSO != null ? _playerSO.magazineSize : 30;
+        public int MaxReserveAmmo => _playerSO != null ? _playerSO.maxReserveAmmo : 120;
+        public bool IsUnlimitedAmmo => MaxReserveAmmo == -1;
+        public float ReloadTime => _playerSO != null ? _playerSO.reloadTime : 1.5f;
+
+        public float BaseSpread => _playerSO != null ? _playerSO.baseSpread : 0.005f;
+        public float SprintSpread => _playerSO != null ? _playerSO.sprintSpread : 0.02f;
+        public float CameraRecoilAmount => _playerSO != null ? _playerSO.cameraRecoilAmount : 1.2f;
 
         [Header("References")]
         [SerializeField] private Transform muzzlePoint;
         [SerializeField] private Camera playerCamera;
         [SerializeField] private Light muzzleFlashLight;
+        [SerializeField] private GameObject muzzleFlashVisual;
+        [SerializeField] private ParticleSystem muzzleFlashParticles;
         [SerializeField] private GameObject impactEffectPrefab;
         [SerializeField] private GameObject bulletTracerPrefab;
         [SerializeField] private PlayerWeaponSway weaponSway;
@@ -38,6 +48,7 @@ namespace FPSGame.Player
         private int reserveAmmo;
         private float nextFireTime = 0f;
         private bool isReloading = false;
+        private Coroutine muzzleFlashCoroutine;
 
         // Events for UI
         public event Action<int, int> OnAmmoChanged;
@@ -50,8 +61,17 @@ namespace FPSGame.Player
 
         private void Awake()
         {
-            currentAmmo = magazineSize;
-            reserveAmmo = maxReserveAmmo;
+            if (_playerSO == null)
+            {
+                PlayerController pc = GetComponent<PlayerController>();
+                if (pc != null && pc.PlayerData != null)
+                {
+                    _playerSO = pc.PlayerData;
+                }
+            }
+
+            currentAmmo = MagazineSize;
+            reserveAmmo = MaxReserveAmmo;
 
             if (audioSource == null)
             {
@@ -72,10 +92,12 @@ namespace FPSGame.Player
                 playerCamera = GetComponentInChildren<Camera>(true);
             }
 
+            /*
             if (weaponSway == null)
             {
                 weaponSway = GetComponentInChildren<PlayerWeaponSway>(true);
             }
+            */
 
             if (muzzlePoint == null)
             {
@@ -83,6 +105,8 @@ namespace FPSGame.Player
                 if (foundMuzzle != null) muzzlePoint = foundMuzzle;
                 else if (playerCamera != null) muzzlePoint = playerCamera.transform;
             }
+
+            EnsureMuzzleFlashEffect();
 
             // Create procedural gun shoot audio clip if none assigned
             if (shootSoundClip == null)
@@ -118,7 +142,7 @@ namespace FPSGame.Player
 #endif
 
             // Reload manual trigger
-            if (isReloadPressed && currentAmmo < magazineSize && reserveAmmo > 0)
+            if (isReloadPressed && currentAmmo < MagazineSize && (IsUnlimitedAmmo || reserveAmmo > 0))
             {
                 StartCoroutine(ReloadRoutine());
                 return;
@@ -129,10 +153,10 @@ namespace FPSGame.Player
             {
                 if (currentAmmo > 0)
                 {
-                    nextFireTime = Time.time + fireRate;
+                    nextFireTime = Time.time + FireRate;
                     Shoot(isSprinting, onApplyCameraRecoil);
                 }
-                else if (reserveAmmo > 0)
+                else if (IsUnlimitedAmmo || reserveAmmo > 0)
                 {
                     StartCoroutine(ReloadRoutine());
                 }
@@ -145,12 +169,14 @@ namespace FPSGame.Player
             OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
             OnShoot?.Invoke();
 
+            /*
             // 1. Recoil on weapon model and camera
             if (weaponSway != null)
             {
                 weaponSway.ApplyRecoil();
             }
-            onApplyCameraRecoil?.Invoke(cameraRecoilAmount);
+            onApplyCameraRecoil?.Invoke(CameraRecoilAmount);
+            */
 
             // 2. Audio & Muzzle Flash
             PlayShootEffects();
@@ -158,7 +184,7 @@ namespace FPSGame.Player
             // 3. Raycast shooting with spread
             if (playerCamera == null) return;
 
-            float currentSpread = isSprinting ? sprintSpread : baseSpread;
+            float currentSpread = isSprinting ? SprintSpread : BaseSpread;
             Vector3 shootDir = playerCamera.transform.forward;
             shootDir += playerCamera.transform.right * UnityEngine.Random.Range(-currentSpread, currentSpread);
             shootDir += playerCamera.transform.up * UnityEngine.Random.Range(-currentSpread, currentSpread);
@@ -166,9 +192,10 @@ namespace FPSGame.Player
 
             Vector3 origin = playerCamera.transform.position;
             Ray ray = new Ray(origin, shootDir);
-            Vector3 hitPoint = origin + shootDir * range;
+            Vector3 hitPoint = origin + shootDir * Range;
+            int shootLayerMask = ~(1 << PlayerController.GetWeaponLayer());
 
-            if (Physics.Raycast(ray, out RaycastHit hit, range))
+            if (Physics.Raycast(ray, out RaycastHit hit, Range, shootLayerMask))
             {
                 hitPoint = hit.point;
 
@@ -178,22 +205,19 @@ namespace FPSGame.Player
 
                 if (damageable != null)
                 {
-                    damageable.TakeDamage(damage, hit.point, hit.normal, isHeadshot);
+                    damageable.TakeDamage(Damage, hit.point, hit.normal, isHeadshot);
                     OnHitTarget?.Invoke(isHeadshot);
                 }
 
                 // Physics knockback on rigidbodies
                 if (hit.rigidbody != null && !hit.rigidbody.isKinematic)
                 {
-                    hit.rigidbody.AddForceAtPosition(shootDir * (damage * 10f), hit.point, ForceMode.Impulse);
+                    hit.rigidbody.AddForceAtPosition(shootDir * (Damage * 10f), hit.point, ForceMode.Impulse);
                 }
 
                 // Spawn Impact Effect
                 SpawnImpactEffect(hit.point, hit.normal);
             }
-
-            // Spawn Tracer
-            SpawnTracer(hitPoint);
         }
 
         private void PlayShootEffects()
@@ -204,17 +228,174 @@ namespace FPSGame.Player
                 audioSource.PlayOneShot(shootSoundClip, 0.8f);
             }
 
-            if (muzzleFlashLight != null)
+            if (muzzleFlashParticles != null)
             {
-                StartCoroutine(MuzzleFlashRoutine());
+                muzzleFlashParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                muzzleFlashParticles.Play(true);
             }
+
+            if (muzzleFlashCoroutine != null)
+            {
+                StopCoroutine(muzzleFlashCoroutine);
+            }
+            muzzleFlashCoroutine = StartCoroutine(MuzzleFlashRoutine());
         }
 
         private IEnumerator MuzzleFlashRoutine()
         {
-            muzzleFlashLight.enabled = true;
+            if (muzzleFlashLight != null)
+            {
+                muzzleFlashLight.enabled = true;
+            }
+
+            if (muzzleFlashVisual != null)
+            {
+                float randomZ = UnityEngine.Random.Range(0f, 360f);
+                float randomScale = UnityEngine.Random.Range(0.85f, 1.2f);
+                muzzleFlashVisual.transform.localRotation = Quaternion.Euler(0f, 0f, randomZ);
+                muzzleFlashVisual.transform.localScale = Vector3.one * randomScale;
+                muzzleFlashVisual.SetActive(true);
+            }
+
             yield return new WaitForSeconds(0.04f);
-            muzzleFlashLight.enabled = false;
+
+            if (muzzleFlashVisual != null)
+            {
+                muzzleFlashVisual.SetActive(false);
+            }
+
+            if (muzzleFlashLight != null)
+            {
+                muzzleFlashLight.enabled = false;
+            }
+
+            muzzleFlashCoroutine = null;
+        }
+
+        private void EnsureMuzzleFlashEffect()
+        {
+            if (muzzlePoint == null) return;
+
+            int weaponLayer = PlayerController.GetWeaponLayer();
+
+            if (muzzleFlashVisual == null)
+            {
+                Transform existing = muzzlePoint.Find("MuzzleFlashVisual");
+                if (existing != null)
+                {
+                    muzzleFlashVisual = existing.gameObject;
+                }
+            }
+
+            if (muzzleFlashVisual == null)
+            {
+                muzzleFlashVisual = new GameObject("MuzzleFlashVisual");
+                muzzleFlashVisual.layer = weaponLayer;
+                muzzleFlashVisual.transform.SetParent(muzzlePoint, false);
+                muzzleFlashVisual.transform.localPosition = Vector3.zero;
+                muzzleFlashVisual.transform.localRotation = Quaternion.identity;
+
+                Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit");
+                if (unlitShader == null) unlitShader = Shader.Find("Unlit/Color");
+                if (unlitShader == null) unlitShader = Shader.Find("Sprites/Default");
+
+                Material outerFlameMat = new Material(unlitShader);
+                Color outerColor = new Color(1f, 0.65f, 0.15f, 1f);
+                if (outerFlameMat.HasProperty("_BaseColor")) outerFlameMat.SetColor("_BaseColor", outerColor);
+                if (outerFlameMat.HasProperty("_Color")) outerFlameMat.color = outerColor;
+
+                Material innerCoreMat = new Material(unlitShader);
+                Color coreColor = new Color(1f, 0.95f, 0.7f, 1f);
+                if (innerCoreMat.HasProperty("_BaseColor")) innerCoreMat.SetColor("_BaseColor", coreColor);
+                if (innerCoreMat.HasProperty("_Color")) innerCoreMat.color = coreColor;
+
+                // Forward flame jet (crossed fins + core)
+                CreateMuzzleFlamePart("FlameFin_H", muzzleFlashVisual.transform, weaponLayer,
+                    new Vector3(0f, 0f, 0.06f), Quaternion.identity, new Vector3(0.11f, 0.015f, 0.14f), outerFlameMat);
+                CreateMuzzleFlamePart("FlameFin_V", muzzleFlashVisual.transform, weaponLayer,
+                    new Vector3(0f, 0f, 0.06f), Quaternion.Euler(0f, 0f, 90f), new Vector3(0.11f, 0.015f, 0.14f), outerFlameMat);
+                CreateMuzzleFlamePart("FlameStar_1", muzzleFlashVisual.transform, weaponLayer,
+                    new Vector3(0f, 0f, 0.02f), Quaternion.Euler(0f, 0f, 45f), new Vector3(0.14f, 0.02f, 0.02f), outerFlameMat);
+                CreateMuzzleFlamePart("FlameStar_2", muzzleFlashVisual.transform, weaponLayer,
+                    new Vector3(0f, 0f, 0.02f), Quaternion.Euler(0f, 0f, -45f), new Vector3(0.14f, 0.02f, 0.02f), outerFlameMat);
+                CreateMuzzleFlamePart("FlameCore", muzzleFlashVisual.transform, weaponLayer,
+                    new Vector3(0f, 0f, 0.035f), Quaternion.identity, new Vector3(0.045f, 0.045f, 0.08f), innerCoreMat);
+            }
+
+            if (muzzleFlashParticles == null)
+            {
+                Transform existingPs = muzzlePoint.Find("MuzzleFlashParticles");
+                if (existingPs != null)
+                {
+                    muzzleFlashParticles = existingPs.GetComponent<ParticleSystem>();
+                }
+            }
+
+            if (muzzleFlashParticles == null)
+            {
+                GameObject psObj = new GameObject("MuzzleFlashParticles");
+                psObj.layer = weaponLayer;
+                psObj.transform.SetParent(muzzlePoint, false);
+                psObj.transform.localPosition = Vector3.zero;
+                psObj.transform.localRotation = Quaternion.identity;
+
+                muzzleFlashParticles = psObj.AddComponent<ParticleSystem>();
+                muzzleFlashParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+                var main = muzzleFlashParticles.main;
+                main.playOnAwake = false;
+                main.loop = false;
+                main.duration = 0.05f;
+                main.startLifetime = new ParticleSystem.MinMaxCurve(0.03f, 0.06f);
+                main.startSpeed = new ParticleSystem.MinMaxCurve(2.5f, 6.0f);
+                main.startSize = new ParticleSystem.MinMaxCurve(0.015f, 0.035f);
+                main.startColor = new Color(1f, 0.8f, 0.25f, 1f);
+                main.simulationSpace = ParticleSystemSimulationSpace.Local;
+
+                var emission = muzzleFlashParticles.emission;
+                emission.rateOverTime = 0f;
+                emission.SetBursts(new ParticleSystem.Burst[] { new ParticleSystem.Burst(0f, 10) });
+
+                var shape = muzzleFlashParticles.shape;
+                shape.shapeType = ParticleSystemShapeType.Cone;
+                shape.angle = 25f;
+                shape.radius = 0.01f;
+
+                var psRenderer = psObj.GetComponent<ParticleSystemRenderer>();
+                Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+                if (particleShader == null) particleShader = Shader.Find("Particles/Standard Unlit");
+                if (particleShader == null) particleShader = Shader.Find("Sprites/Default");
+                if (particleShader != null)
+                {
+                    Material pMat = new Material(particleShader);
+                    if (pMat.HasProperty("_BaseColor")) pMat.SetColor("_BaseColor", new Color(1f, 0.8f, 0.3f, 1f));
+                    psRenderer.sharedMaterial = pMat;
+                }
+            }
+
+            muzzleFlashVisual.SetActive(false);
+        }
+
+        private static void CreateMuzzleFlamePart(string name, Transform parent, int layer, Vector3 localPos, Quaternion localRot, Vector3 localScale, Material mat)
+        {
+            GameObject part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            part.name = name;
+            part.layer = layer;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPos;
+            part.transform.localRotation = localRot;
+            part.transform.localScale = localScale;
+
+            Collider col = part.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+
+            Renderer rend = part.GetComponent<Renderer>();
+            if (rend != null)
+            {
+                rend.sharedMaterial = mat;
+                rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                rend.receiveShadows = false;
+            }
         }
 
         private void SpawnImpactEffect(Vector3 position, Vector3 normal)
@@ -230,31 +411,26 @@ namespace FPSGame.Player
             }
         }
 
-        private void SpawnTracer(Vector3 targetPoint)
-        {
-            if (bulletTracerPrefab != null && muzzlePoint != null)
-            {
-                GameObject tracerObj = Instantiate(bulletTracerPrefab);
-                BulletTracer tracer = tracerObj.GetComponent<BulletTracer>();
-                if (tracer != null)
-                {
-                    tracer.Initialize(muzzlePoint.position, targetPoint);
-                }
-            }
-        }
-
         private IEnumerator ReloadRoutine()
         {
-            if (isReloading || reserveAmmo <= 0 || currentAmmo >= magazineSize) yield break;
+            if (isReloading || (!IsUnlimitedAmmo && reserveAmmo <= 0) || currentAmmo >= MagazineSize) yield break;
 
             isReloading = true;
-            yield return new WaitForSeconds(reloadTime);
+            yield return new WaitForSeconds(ReloadTime);
 
-            int neededAmmo = magazineSize - currentAmmo;
-            int ammoToAdd = Mathf.Min(neededAmmo, reserveAmmo);
+            if (IsUnlimitedAmmo)
+            {
+                currentAmmo = MagazineSize;
+                reserveAmmo = -1;
+            }
+            else
+            {
+                int neededAmmo = MagazineSize - currentAmmo;
+                int ammoToAdd = Mathf.Min(neededAmmo, reserveAmmo);
 
-            currentAmmo += ammoToAdd;
-            reserveAmmo -= ammoToAdd;
+                currentAmmo += ammoToAdd;
+                reserveAmmo -= ammoToAdd;
+            }
 
             isReloading = false;
             OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
@@ -263,7 +439,6 @@ namespace FPSGame.Player
         public void PlayRemoteFireEffect(Vector3 targetPoint)
         {
             PlayShootEffects();
-            SpawnTracer(targetPoint);
         }
 
         private AudioClip CreateProceduralGunshotClip()

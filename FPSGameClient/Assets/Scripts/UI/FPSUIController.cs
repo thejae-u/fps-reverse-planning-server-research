@@ -55,7 +55,8 @@ namespace FPSGame.UI
         {
             if (ammoText != null)
             {
-                ammoText.text = $"{current} / {reserve}";
+                string reserveDisplay = reserve == -1 ? "∞" : reserve.ToString();
+                ammoText.text = $"{current} / {reserveDisplay}";
             }
         }
 
