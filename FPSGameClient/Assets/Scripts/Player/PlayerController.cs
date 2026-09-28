@@ -489,5 +489,45 @@ namespace FPSGame.Player
                 nameTagTextMesh.text = playerName;
             }
         }
+
+        public void ApplyServerConfig(Protocol.InfoHandshakePacket info)
+        {
+            if (info == null) return;
+
+            playerSO = playerSO != null ? Instantiate(playerSO) : ScriptableObject.CreateInstance<PlayerSO>();
+
+            if (info.MoveSpeed > 0f) playerSO.walkSpeed = info.MoveSpeed;
+            if (info.SprintSpeed > 0f) playerSO.sprintSpeed = info.SprintSpeed;
+
+            if (info.Gravity > 0f)
+            {
+                playerSO.gravity = -Mathf.Abs(info.Gravity);
+            }
+
+            if (info.JumpSpeed > 0f)
+            {
+                float absGravity = Mathf.Abs(playerSO.gravity);
+                if (absGravity > 0.001f)
+                {
+                    playerSO.jumpHeight = (info.JumpSpeed * info.JumpSpeed) / (2f * absGravity);
+                }
+            }
+
+            if (info.AttackPower > 0) playerSO.damage = info.AttackPower;
+            if (info.MaxAmmo > 0) playerSO.magazineSize = info.MaxAmmo;
+
+            if (shooter != null)
+            {
+                shooter.PlayerData = playerSO;
+                shooter.ApplyServerAmmoConfig(playerSO.magazineSize);
+            }
+
+            // World::Init에서 팀 배정(teamId > 0) 또는 스폰 위치가 지정되어 온 경우 즉시 위치 동기화
+            if (info.TeamId != 0 || Mathf.Abs(info.SpawnX) > 0.001f || Mathf.Abs(info.SpawnY) > 0.001f || Mathf.Abs(info.SpawnZ) > 0.001f)
+            {
+                Vector3 spawnPos = new Vector3(info.SpawnX, Mathf.Max(info.SpawnY, 0.05f), info.SpawnZ);
+                SyncServerPosition(spawnPos);
+            }
+        }
     }
 }

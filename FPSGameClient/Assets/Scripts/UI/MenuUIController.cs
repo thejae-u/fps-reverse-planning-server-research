@@ -375,22 +375,26 @@ namespace FPSGame.UI
                     return;
                 }
 
+                int tcpPort = matched.tcpPort > 0 ? matched.tcpPort : serverPort;
+                int udpPort = matched.udpPort > 0 ? matched.udpPort : tcpPort;
                 int botClientCount = _usedDevBotFill ? 9 : 0;
                 _isMatching = false;
                 _usedDevBotFill = false;
                 RefreshPanelState();
 
-                string matchInfo = $"매칭 성사! Dedicated Server ({serverIp}:{serverPort}) 접속 중...";
+                string matchInfo = $"매칭 성사! Dedicated Server ({serverIp} TCP:{tcpPort} / UDP:{udpPort}) 접속 중...";
                 SetStatus(matchInfo, new Color(0.3f, 1f, 0.5f));
                 if (matchStateText != null) matchStateText.text = matchInfo;
 
                 await _authClient.DisconnectMatchHubWebSocketAsync();
                 await NetworkManager.EnsureInstance().TransitionToGameAndConnectAsync(
                     serverIp,
-                    serverPort,
+                    tcpPort,
+                    udpPort,
                     matched.matchId,
                     gameSceneName,
-                    botClientCount);
+                    botClientCount,
+                    _authClient.LastCreatedBotUserIds);
             }
             catch (OperationCanceledException)
             {

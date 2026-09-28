@@ -22,14 +22,15 @@ public class NetworkClient
     public string RoomId { get; private set; }
     public int ServerUdpPort { get; private set; }
     public ulong LastServerTick { get; private set; }
+    public InfoHandshakePacket LastInfoHandshake { get; private set; }
 
     public event Action<NetworkPacket> OnTcpPacketReceived;
     public event Action<NetworkPacket> OnUdpPacketReceived;
     public event Action<string, int> OnHandshakeCompleted;
-    public event Action<Matchmaking> OnMatchmakingReceived;
+    public event Action<InfoHandshakePacket> OnInfoHandshakeReceived;
     public event Action<IngamePacket> OnIngamePacketReceived;
 
-    public void Init(string ip = "", int port = 0)
+    public void Init(string ip = "", int tcpPort = 0, int udpPort = 0, string userId = "")
     {
         if (string.IsNullOrEmpty(ip))
         {
@@ -37,13 +38,18 @@ public class NetworkClient
             return;
         }
 
-        if (port == 0)
+        if (tcpPort == 0)
         {
-            Debug.Assert(false, $"Invalid port: {port}");
+            Debug.Assert(false, $"Invalid port: {tcpPort}");
             return;
         }
 
-        _ep = new IPEndPoint(IPAddress.Parse(ip), port);
+        IPAddress address = IPAddress.Parse(ip);
+        _ep = new IPEndPoint(address, tcpPort);
+        ServerUdpPort = udpPort > 0 ? udpPort : tcpPort;
+        _udpServerEp = new IPEndPoint(address, ServerUdpPort);
+        SessionId = !string.IsNullOrEmpty(userId) ? userId : Guid.NewGuid().ToString();
+
         _client = new TcpClient(AddressFamily.InterNetwork);
         _udpClient = new UdpClient(0, AddressFamily.InterNetwork);
     }
@@ -78,10 +84,13 @@ public class NetworkClient
             await ConnectWithCancellationAsync(_client, _ep.Address, _ep.Port, sessionToken);
             _tcpStream = _client.GetStream();
 
-            Debug.Log($"[NetworkClient] Connected to {_ep}");
+            Debug.Log($"[NetworkClient] Connected to {_ep} (UserId/SessionId: {SessionId}, UDP Port: {ServerUdpPort})");
 
             _ = TcpReceiveLoopAsync(sessionToken);
             _ = UdpReceiveLoopAsync(sessionToken);
+
+            // PortHandshake 없이 TCP 연결 직후 클라이언트가 자신의 userId와 presetId를 담아 InfoHandshake 요청 전송
+            await SendInfoHandshakeAsync(0);
         }
         catch (OperationCanceledException)
         {
@@ -207,6 +216,19 @@ public class NetworkClient
         };
 
         await SendUdpPacketAsync(PacketType.Authentication, authPacket);
+    }
+
+    public async Task SendInfoHandshakeAsync(int presetId = 0)
+    {
+        if (string.IsNullOrEmpty(SessionId) || !IsConnected) return;
+
+        var infoReq = new InfoHandshakePacket
+        {
+            SessionId = ByteString.CopyFromUtf8(SessionId),
+            PresetId = presetId
+        };
+
+        await SendTcpPacketAsync(PacketType.InfoHandshake, infoReq);
     }
 
     public async Task SendIngamePacketAsync(IngameType method, IMessage innerData, ulong clientTick = 0)
@@ -346,36 +368,24 @@ public class NetworkClient
     {
         switch (packet.Type)
         {
-            case PacketType.PortHandshake:
+            case PacketType.InfoHandshake:
             {
-                string payload = packet.Data.ToStringUtf8();
-                int commaIdx = payload.IndexOf(',');
-                if (commaIdx > 0 && int.TryParse(payload.Substring(0, commaIdx), out int udpPort))
+                InfoHandshakePacket info = InfoHandshakePacket.Parser.ParseFrom(packet.Data);
+                if (!info.SessionId.IsEmpty)
                 {
-                    ServerUdpPort = udpPort;
-                    SessionId = payload.Substring(commaIdx + 1);
+                    SessionId = info.SessionId.ToStringUtf8();
                 }
-                else
+                LastInfoHandshake = info;
+                Debug.Log($"[NetworkClient] InfoHandshake Received - SessionId: {SessionId}, Team: {info.TeamId}, Spawn: ({info.SpawnX}, {info.SpawnY}, {info.SpawnZ}), Speed: {info.MoveSpeed}/{info.SprintSpeed}, Jump: {info.JumpSpeed}, Gravity: {info.Gravity}, HP: {info.MaxHp}, Ammo: {info.MaxAmmo}");
+
+                // 서버가 TCP InfoHandshake로 userId 세션을 등록 완료했으므로 즉시 UDP Hole Punching 수행
+                if (!IsUdpAuthenticated && ServerUdpPort > 0)
                 {
-                    PortHandshakePacket hs = PortHandshakePacket.Parser.ParseFrom(packet.Data);
-                    ServerUdpPort = (int)hs.ServerPort;
-                    SessionId = hs.SessionId.ToStringUtf8();
+                    _ = SendUdpHolePunchingAsync();
                 }
 
-                _udpServerEp = new IPEndPoint(_ep.Address, ServerUdpPort);
-                Debug.Log($"[NetworkClient] Handshake OK - SessionId: {SessionId}, UDP Port: {ServerUdpPort}");
                 OnHandshakeCompleted?.Invoke(SessionId, ServerUdpPort);
-                _ = SendUdpHolePunchingAsync();
-                break;
-            }
-            case PacketType.Match:
-            {
-                Matchmaking match = Matchmaking.Parser.ParseFrom(packet.Data);
-                if (match.HasRoomId)
-                {
-                    RoomId = match.RoomId.ToStringUtf8();
-                }
-                OnMatchmakingReceived?.Invoke(match);
+                OnInfoHandshakeReceived?.Invoke(info);
                 break;
             }
             case PacketType.Ingame:

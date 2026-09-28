@@ -436,6 +436,15 @@ namespace FPSGame.Player
             OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
         }
 
+        public void ApplyServerAmmoConfig(int magazineSize)
+        {
+            if (magazineSize > 0)
+            {
+                currentAmmo = magazineSize;
+                OnAmmoChanged?.Invoke(currentAmmo, reserveAmmo);
+            }
+        }
+
         public void PlayRemoteFireEffect(Vector3 targetPoint)
         {
             PlayShootEffects();

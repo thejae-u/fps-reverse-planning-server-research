@@ -357,12 +357,16 @@ namespace FPSGame.Network
             }
         }
 
+        private readonly System.Collections.Generic.List<string> _lastCreatedBotUserIds = new System.Collections.Generic.List<string>();
+        public System.Collections.Generic.IReadOnlyList<string> LastCreatedBotUserIds => _lastCreatedBotUserIds;
+
         /// <summary>
         /// C++ App::TriggerTenPlayerMatch와 동일하게 개발/단독 테스트 시
         /// 9명의 봇 계정을 생성 및 큐에 참가시켜 즉시 10인 매칭 및 Dedicated Server 스폰을 유도합니다.
         /// </summary>
         public async Task<ApiResult<bool>> TriggerTenPlayerBotFillAsync(Action<string> onProgress = null, CancellationToken ct = default)
         {
+            _lastCreatedBotUserIds.Clear();
             long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1000000;
 
             for (int i = 1; i <= 9; i++)
@@ -379,6 +383,7 @@ namespace FPSGame.Network
                 }
 
                 string botToken = null;
+                string botUserId = null;
                 using (UnityWebRequest loginReq = CreateJsonRequest($"{BaseUrl}/auth/login", UnityWebRequest.kHttpVerbPOST, botJson, null))
                 {
                     var (ok, code, text, _) = await SendRequestWithCancellationAsync(loginReq, ct);
@@ -386,12 +391,18 @@ namespace FPSGame.Network
                     {
                         var loginRes = JsonUtility.FromJson<LoginResponseDto>(text);
                         botToken = loginRes?.token;
+                        botUserId = loginRes?.userId;
                     }
                 }
 
                 if (string.IsNullOrEmpty(botToken))
                 {
                     return ApiResult<bool>.Fail($"봇 #{i} 로그인에 실패했습니다.", "BOT_LOGIN_FAIL");
+                }
+
+                if (!string.IsNullOrEmpty(botUserId))
+                {
+                    _lastCreatedBotUserIds.Add(botUserId);
                 }
 
                 using (UnityWebRequest joinReq = CreateJsonRequest($"{BaseUrl}/match/join", UnityWebRequest.kHttpVerbPOST, "{}", botToken))

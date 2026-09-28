@@ -14,17 +14,20 @@ public class NetworkManager : MonoBehaviour
     [Header("Dedicated Server Target")]
     [SerializeField] private string serverIp = "127.0.0.1";
     [SerializeField] private int serverPort = 7777;
+    [SerializeField] private int serverUdpPort = 7778;
     [SerializeField] private string gameSceneName = "SampleScene";
     [SerializeField] private bool autoConnectOnStart = false;
 
     private NetworkClient _client;
     private readonly List<NetworkClient> _botClients = new List<NetworkClient>();
     private readonly ConcurrentQueue<IngamePacket> _incomingPackets = new ConcurrentQueue<IngamePacket>();
+    private readonly ConcurrentQueue<InfoHandshakePacket> _incomingInfoPackets = new ConcurrentQueue<InfoHandshakePacket>();
 
     public NetworkClient Client => _client;
     public IReadOnlyList<NetworkClient> BotClients => _botClients;
     public string ServerIp => serverIp;
     public int ServerPort => serverPort;
+    public int ServerUdpPort => serverUdpPort;
     public string UserId { get; private set; }
     public string Username { get; private set; }
     public string JwtToken { get; private set; }
@@ -64,13 +67,18 @@ public class NetworkManager : MonoBehaviour
     {
         if (autoConnectOnStart && !string.IsNullOrEmpty(serverIp) && serverPort > 0)
         {
-            await ConnectToDedicatedServerAsync(serverIp, serverPort, 0, destroyCancellationToken);
+            await ConnectToDedicatedServerAsync(serverIp, serverPort, serverUdpPort, 0, null, destroyCancellationToken);
         }
     }
 
     private void Update()
     {
         if (GameManager.Instance == null || _client == null) return;
+
+        while (_incomingInfoPackets.TryDequeue(out InfoHandshakePacket info))
+        {
+            GameManager.Instance.ApplyServerInfoHandshake(info);
+        }
 
         string localSessionId = _client.SessionId;
         while (_incomingPackets.TryDequeue(out IngamePacket packet))
@@ -88,22 +96,27 @@ public class NetworkManager : MonoBehaviour
 
     public async Task ConnectToDedicatedServerAsync(
         string ip,
-        int port,
+        int tcpPort,
+        int udpPort = 0,
         int dummyBotClientCount = 0,
+        IReadOnlyList<string> botUserIds = null,
         CancellationToken ct = default)
     {
         serverIp = ip;
-        serverPort = port;
+        serverPort = tcpPort;
+        serverUdpPort = udpPort > 0 ? udpPort : tcpPort;
 
         DisconnectAll();
 
         while (_incomingPackets.TryDequeue(out _)) { }
+        while (_incomingInfoPackets.TryDequeue(out _)) { }
 
         _client = new NetworkClient();
-        _client.Init(serverIp, serverPort);
+        _client.Init(serverIp, serverPort, serverUdpPort, UserId);
+        _client.OnInfoHandshakeReceived += OnClientInfoHandshakeReceived;
         _client.OnIngamePacketReceived += OnClientIngamePacketReceived;
 
-        Debug.Log($"[NetworkManager] Connecting Local Client to Dedicated Server {serverIp}:{serverPort}...");
+        Debug.Log($"[NetworkManager] Connecting Local Client (UserId: {UserId}) to Dedicated Server {serverIp} (TCP:{serverPort}, UDP:{serverUdpPort})...");
         await _client.ConnectAsync(ct);
 
         if (dummyBotClientCount > 0)
@@ -113,14 +126,23 @@ public class NetworkManager : MonoBehaviour
 
             for (int i = 0; i < dummyBotClientCount; i++)
             {
+                string botId = (botUserIds != null && i < botUserIds.Count) ? botUserIds[i] : string.Empty;
                 var botClient = new NetworkClient();
-                botClient.Init(serverIp, serverPort);
+                botClient.Init(serverIp, serverPort, serverUdpPort, botId);
                 _botClients.Add(botClient);
                 connectTasks.Add(botClient.ConnectAsync(ct));
             }
 
             await Task.WhenAll(connectTasks);
             Debug.Log($"[NetworkManager] All {dummyBotClientCount} Bot Clients connected (Total sessions: {1 + _botClients.Count}).");
+        }
+    }
+
+    private void OnClientInfoHandshakeReceived(InfoHandshakePacket info)
+    {
+        if (info != null)
+        {
+            _incomingInfoPackets.Enqueue(info);
         }
     }
 
@@ -133,22 +155,25 @@ public class NetworkManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 매칭 완료 후 전달받은 Dedicated Server IP/Port 정보를 저장하고,
+    /// 매칭 완료 후 전달받은 Dedicated Server IP/TCP Port/UDP Port 정보를 저장하고,
     /// 게임 씬(SampleScene)으로 이동한 뒤 로컬 클라이언트(및 Dev 봇 클라이언트들)의 네트워크 연결을 수행합니다.
     /// </summary>
     public async Task TransitionToGameAndConnectAsync(
         string ip,
-        int port,
+        int tcpPort,
+        int udpPort,
         string matchId,
         string targetScene = null,
-        int dummyBotClientCount = 0)
+        int dummyBotClientCount = 0,
+        IReadOnlyList<string> botUserIds = null)
     {
         serverIp = ip;
-        serverPort = port;
+        serverPort = tcpPort;
+        serverUdpPort = udpPort > 0 ? udpPort : tcpPort;
         MatchId = matchId;
 
         string sceneToLoad = string.IsNullOrEmpty(targetScene) ? gameSceneName : targetScene;
-        Debug.Log($"[NetworkManager] Match Ready ({matchId}) -> Loading scene '{sceneToLoad}' and connecting to {ip}:{port} (Bots: {dummyBotClientCount})...");
+        Debug.Log($"[NetworkManager] Match Ready ({matchId}) -> Loading scene '{sceneToLoad}' and connecting to {ip} (TCP:{serverPort}, UDP:{serverUdpPort}, Bots:{dummyBotClientCount})...");
 
         AsyncOperation loadOp = SceneManager.LoadSceneAsync(sceneToLoad);
         if (loadOp != null)
@@ -160,13 +185,14 @@ public class NetworkManager : MonoBehaviour
             }
         }
 
-        await ConnectToDedicatedServerAsync(serverIp, serverPort, dummyBotClientCount, destroyCancellationToken);
+        await ConnectToDedicatedServerAsync(serverIp, serverPort, serverUdpPort, dummyBotClientCount, botUserIds, destroyCancellationToken);
     }
 
     public void DisconnectAll()
     {
         if (_client != null)
         {
+            _client.OnInfoHandshakeReceived -= OnClientInfoHandshakeReceived;
             _client.OnIngamePacketReceived -= OnClientIngamePacketReceived;
             _client.Disconnect();
         }

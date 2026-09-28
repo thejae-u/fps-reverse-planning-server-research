@@ -132,6 +132,12 @@ namespace FPSGame.Management
                 {
                     uiController.BindPlayer(localPlayer);
                 }
+
+                var cachedInfo = NetworkManager.Instance?.Client?.LastInfoHandshake;
+                if (cachedInfo != null)
+                {
+                    ApplyServerInfoHandshake(cachedInfo);
+                }
             }
         }
 
@@ -294,6 +300,23 @@ namespace FPSGame.Management
 
             Debug.Log("[GameManager] Cleared all remote players.");
             UpdatePlayerCountUI();
+        }
+
+        public void ApplyServerInfoHandshake(InfoHandshakePacket info)
+        {
+            if (info == null) return;
+
+            if (localPlayer != null)
+            {
+                localPlayer.ApplyServerConfig(info);
+            }
+
+            if (uiController != null && info.MaxHp > 0)
+            {
+                uiController.SetHealth(info.MaxHp, info.MaxHp);
+            }
+
+            Debug.Log($"[GameManager] Applied Server InfoHandshake -> MoveSpeed: {info.MoveSpeed}, SprintSpeed: {info.SprintSpeed}, JumpSpeed: {info.JumpSpeed}, Gravity: {info.Gravity}, HP: {info.MaxHp}, Damage: {info.AttackPower}, Ammo: {info.MaxAmmo}, Team: {info.TeamId}, Spawn: ({info.SpawnX}, {info.SpawnY}, {info.SpawnZ})");
         }
 
         public void ProcessServerIngamePacket(IngamePacket packet, string localSessionId)
