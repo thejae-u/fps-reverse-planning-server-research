@@ -162,11 +162,9 @@ void CombatSystem::OnHit(
 
     const auto& shooter = shooterIt->second;
     const auto shooterTeam = static_cast<int>(shooter->teamType);
-
     const auto& targetPlayer = hitIt->second;
-    const auto targetPlayerTeam = static_cast<int>(targetPlayer->teamType);
 
-    // damage 처리 (Player 내부 상태 갱신)
+    // 1. Damage 처리 (Player 내부 상태 및 팀 대미지 누적)
     DamageResult damageResult = targetPlayer->TakeDamage(damage);
     shooter->AddDamageDealt(damage);
 
@@ -175,28 +173,15 @@ void CombatSystem::OnHit(
         teamInfos[shooterTeam].damages += damage;
     }
 
-    // 플레이어 사망 시 통계 갱신
+    // 2. 사망 시 Kill 처리 위임
     if(damageResult.isDead)
     {
-        if(targetPlayerTeam >= 0 && targetPlayerTeam < static_cast<int>(teamInfos.size()))
-        {
-            teamInfos[targetPlayerTeam].deaths++;
-        }
-
-        shooter->AddKill();
-        if(shooterTeam >= 0 && shooterTeam < static_cast<int>(teamInfos.size()))
-        {
-            teamInfos[shooterTeam].kills++;
-        }
-
-        spdlog::info("world {}: player {} killed player {}",
-                     uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(hitId));
+        OnKill(shooterId, *shooter, hitId, *targetPlayer, teamInfos);
     }
 
-    // Broadcast Hit Packet
+    // 3. Broadcast Hit Packet
     if(auto room = weakRoom.lock())
     {
-        // 1. Create and populate HitPacket protobuf message
         Protocol::HitPacket hitPacket;
         hitPacket.set_hitplayerid(uuids::to_string(hitId));
         hitPacket.set_shooterid(uuids::to_string(shooterId));
@@ -205,7 +190,6 @@ void CombatSystem::OnHit(
         hitPacket.set_isdead(damageResult.isDead);
         hitPacket.set_damage(damage);
 
-        // 2. Serialize HitPacket
         std::string serializedData;
         if(hitPacket.SerializeToString(&serializedData))
         {
@@ -215,7 +199,6 @@ void CombatSystem::OnHit(
             ingamePacket->set_method(Protocol::IngameType::Hit);
             ingamePacket->set_data(serializedData);
 
-            // 3. Serialize outer IngamePacket and broadcast
             std::string serializedIngame;
             if(ingamePacket->SerializeToString(&serializedIngame))
             {
@@ -225,16 +208,30 @@ void CombatSystem::OnHit(
                 room->Broadcast(std::move(sendPacket));
             }
         }
-
-        // 4. Check target kills win condition
-        if(damageResult.isDead && shooterTeam >= 0 && shooterTeam < static_cast<int>(teamInfos.size()))
-        {
-            if(teamInfos[shooterTeam].kills >= TARGET_KILLS)
-            {
-                spdlog::info("world {}: team {} reached target kills ({})! finishing match...",
-                             uuids::to_string(_roomId), shooterTeam, TARGET_KILLS);
-                room->OnMatchFinished();
-            }
-        }
     }
+}
+
+void CombatSystem::OnKill(
+    uuids::uuid shooterId,
+    Player& shooter,
+    uuids::uuid victimId,
+    const Player& victim,
+    std::vector<TeamInfo>& teamInfos)
+{
+    const auto shooterTeam = static_cast<int>(shooter.teamType);
+    const auto victimTeam = static_cast<int>(victim.teamType);
+
+    if(victimTeam >= 0 && victimTeam < static_cast<int>(teamInfos.size()))
+    {
+        teamInfos[victimTeam].deaths++;
+    }
+
+    shooter.AddKill();
+    if(shooterTeam >= 0 && shooterTeam < static_cast<int>(teamInfos.size()))
+    {
+        teamInfos[shooterTeam].kills++;
+    }
+
+    spdlog::info("world {}: player {} killed player {}",
+                 uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(victimId));
 }

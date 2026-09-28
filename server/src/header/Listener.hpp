@@ -16,8 +16,6 @@
 using namespace Protocol;
 
 class IOManager;
-class SessionManager;
-class Matching;
 class Room;
 class Session;
 
@@ -51,6 +49,9 @@ public:
     void SetDedicatedRoom(std::shared_ptr<Room> room) { _dedicatedRoom = room; }
     std::shared_ptr<Room> GetDedicatedRoom() const { return _dedicatedRoom; }
 
+    // TCP InfoHandshake 시 클라이언트가 전달한 userId(AuthServer 발급) 검증 및 세션 등록
+    bool RegisterAuthenticatedSession(const std::string& userId, const std::shared_ptr<Session>& session);
+
 private:
     using Raw = std::vector<unsigned char>;
     void EnqueueSendData(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> networkBuffer);
@@ -72,14 +73,12 @@ private:
     asio::ip::udp::socket _udpSocket;
     asio::ip::udp::endpoint _udpEndpoint;
 
-    uuids::uuid_system_generator _uuidGen;
-    std::mutex _uuidMutex;
-
     // 단일 룸 정보
     std::shared_ptr<Room> _dedicatedRoom;
     std::unordered_set<std::string> _allowedPlayers;
 
-    // 룸에 연결 된 세션 정보
+    // 인증 전 임시 연결 세션 및 인증 완료된 세션 정보
+    std::unordered_set<std::shared_ptr<Session>> _pendingSessions;
     std::unordered_map<uuids::uuid, std::shared_ptr<Session>> _sessions;
     std::mutex _sessionsMutex;
 

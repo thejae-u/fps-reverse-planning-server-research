@@ -16,11 +16,46 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
         _players.insert({ id, std::move(newPlayer) });
         _sessions.insert({ id, session });
         index++;
-
-        DivideTeam();
     }
 
-    spdlog::info("world(room id) {}: created", uuids::to_string(_roomId));
+    DivideTeam();
+
+    // 각 세션에 배정된 팀, 초기 스폰 위치, 서버 권위 물리/전투 스탯을 InfoHandshake(TCP)로 전송
+    for(const auto& [id, weakSession] : _sessions)
+    {
+        auto session = weakSession.lock();
+        auto playerIt = _players.find(id);
+        if(!session || playerIt == _players.end() || !playerIt->second)
+            continue;
+
+        const auto& player = playerIt->second;
+
+        Protocol::InfoHandshakePacket infoPacket;
+        infoPacket.set_sessionid(uuids::to_string(id));
+        infoPacket.set_presetid(session->GetPresetId());
+        infoPacket.set_teamid(static_cast<std::int32_t>(player->teamType));
+        infoPacket.set_spawnx(player->position.x);
+        infoPacket.set_spawny(player->position.y);
+        infoPacket.set_spawnz(player->position.z);
+        infoPacket.set_movespeed(BASE_MOVE_SPEED);
+        infoPacket.set_sprintspeed(static_cast<float>(MAX_SPEED));
+        infoPacket.set_jumpspeed(JUMP_SPEED);
+        infoPacket.set_gravity(GRAVITY);
+        infoPacket.set_maxhp(player->hp);
+        infoPacket.set_attackpower(player->attackPower);
+        infoPacket.set_maxammo(player->ammo);
+
+        std::string serializedInfo;
+        if(infoPacket.SerializeToString(&serializedInfo))
+        {
+            auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
+            sendPacket->set_type(Protocol::PacketType::InfoHandshake);
+            sendPacket->set_data(serializedInfo);
+            session->EnqueueTcpSendPacket(std::move(sendPacket));
+        }
+    }
+
+    spdlog::info("world(room id) {}: created and sent InfoHandshake to {} players", uuids::to_string(_roomId), _playerSize);
 }
 
 void World::DivideTeam()
@@ -75,99 +110,8 @@ void World::Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId)
 
 std::unique_ptr<GameResult> World::GetResult()
 {
+    std::lock_guard lock(_playerMutex);
     return std::make_unique<GameResult>(_teamInfos);
-}
-
-void World::InitMockPlayers(const std::vector<std::string>& allowedPlayers)
-{
-    std::lock_guard playerLock(_playerMutex);
-    _playerSize = allowedPlayers.size();
-
-    int index = 0;
-    for(const auto& token : allowedPlayers)
-    {
-        auto idOpt = uuids::uuid::from_string(token);
-        auto id = idOpt.value_or(uuids::uuid_system_generator{}());
-
-        auto newPlayer = std::make_unique<Player>();
-        newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f);
-        _players.insert({ id, std::move(newPlayer) });
-        index++;
-    }
-
-    DivideTeam();
-    spdlog::info("world(room id) {}: initialized {} mock players for test mode", uuids::to_string(_roomId), _players.size());
-}
-
-void World::SimulateKill(TeamType scoringTeam)
-{
-    std::lock_guard lock(_playerMutex);
-    TeamType victimTeam = (scoringTeam == TeamType::TeamA) ? TeamType::TeamB : TeamType::TeamA;
-
-    // 1. Scoring player 찾기
-    for(auto& [id, player] : _players)
-    {
-        if(player && player->teamType == scoringTeam)
-        {
-            player->kill++;
-            player->damage += 100;
-            break;
-        }
-    }
-
-    // 2. Victim player 찾기
-    for(auto& [id, player] : _players)
-    {
-        if(player && player->teamType == victimTeam)
-        {
-            player->death++;
-            break;
-        }
-    }
-
-    // 3. TeamInfo 갱신
-    std::int16_t currentKills = 0;
-    for(auto& info : _teamInfos)
-    {
-        if(info.teamType == scoringTeam)
-        {
-            info.kills++;
-            info.damages += 100;
-            currentKills = info.kills;
-        }
-        else if(info.teamType == victimTeam)
-        {
-            info.deaths++;
-        }
-    }
-
-    spdlog::info("[Simulation] Team {} scored! Total kills: {}",
-                 (scoringTeam == TeamType::TeamA ? "A" : "B"), currentKills);
-
-    // TARGET_KILLS 도달 시 자동 종료
-    constexpr std::int16_t TARGET_KILLS = 5;
-    if(currentKills >= TARGET_KILLS)
-    {
-        spdlog::info("[Simulation] Team {} reached target kills ({})! Finishing match...",
-                     (scoringTeam == TeamType::TeamA ? "A" : "B"), TARGET_KILLS);
-        if(const auto room = _weakRoom.lock())
-        {
-            room->OnMatchFinished();
-        }
-    }
-}
-
-void World::SetTestScores(int aKills, int bKills)
-{
-    std::lock_guard lock(_playerMutex);
-    for(auto& info : _teamInfos)
-    {
-        if(info.teamType == TeamType::TeamA)
-            info.kills = static_cast<std::int16_t>(aKills);
-        else if(info.teamType == TeamType::TeamB)
-            info.kills = static_cast<std::int16_t>(bKills);
-    }
-    spdlog::info("[Test] Test scores directly set: TeamA={}, TeamB={}", aKills, bKills);
 }
 
 void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microseconds interval)
@@ -290,10 +234,41 @@ void World::Update()
 
     ++_tickCount;
 
-    /*if(_tickCount % 60 == 0)
+    if(_tickCount % 60 == 0)
     {
-        PrintScoreboard();
-    }*/
+        BroadcastScoreboard();
+    }
+
+    // 4. Check match end condition after all tick updates and broadcasts complete
+    CheckMatchEnd();
+}
+
+void World::CheckMatchEnd()
+{
+    bool isMatchFinished = false;
+    int winningTeam = -1;
+    {
+        std::lock_guard lock(_playerMutex);
+        for(const auto& info : _teamInfos)
+        {
+            if(info.kills >= TARGET_KILLS)
+            {
+                isMatchFinished = true;
+                winningTeam = static_cast<int>(info.teamType);
+                break;
+            }
+        }
+    }
+
+    if(isMatchFinished)
+    {
+        spdlog::info("world {}: team {} reached target kills ({})! finishing match...",
+                     uuids::to_string(_roomId), winningTeam, TARGET_KILLS);
+        if(const auto room = _weakRoom.lock())
+        {
+            room->OnMatchFinished();
+        }
+    }
 }
 
 void World::ProcessQueue()
@@ -437,32 +412,24 @@ bool World::GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition)
     return true;
 }
 
-void World::PrintScoreboard()
+void World::BroadcastScoreboard()
 {
-    std::lock_guard lock(_playerMutex);
-    spdlog::info("=========================================");
-    spdlog::info("              SCOREBOARD                 ");
-    spdlog::info("-----------------------------------------");
-
     Protocol::ScoreboardPacket scorePacket;
     scorePacket.set_roomid(uuids::to_string(_roomId));
-    for(const auto& [id, player] : _players)
     {
-        if(player)
+        std::lock_guard lock(_playerMutex);
+        for(const auto& [id, player] : _players)
         {
-            spdlog::info("Player {}: Pos: ({:.2f}, {:.2f}, {:.2f}) | HP: {} | Kills: {} | Deaths: {}",
-                         uuids::to_string(id).substr(0, 8), player->position.x, player->position.y, player->position.z,
-                         player->hp, player->kill, player->death);
-
-            auto* score = scorePacket.add_scores();
-            score->set_playerid(uuids::to_string(id));
-            score->set_kill(player->kill);
-            score->set_death(player->death);
-            score->set_heal(player->heal);
+            if(player)
+            {
+                auto* score = scorePacket.add_scores();
+                score->set_playerid(uuids::to_string(id));
+                score->set_kill(player->kill);
+                score->set_death(player->death);
+                score->set_heal(player->heal);
+            }
         }
     }
-
-    spdlog::info("=========================================");
 
     std::string serializedScoreboard;
     if(!scorePacket.SerializeToString(&serializedScoreboard))

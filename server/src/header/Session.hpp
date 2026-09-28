@@ -10,7 +10,6 @@
 #include <condition_variable>
 #include <spdlog/spdlog.h>
 #include <uuid.h>
-#include <asio.hpp>
 
 #include "Base.hpp"
 #include "IOManager.hpp"
@@ -31,18 +30,18 @@ private:
     };
 
 public:
-    explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener, uuids::uuid sessionId, std::uint16_t udpPort)
+    explicit Session(SecretKey, std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener)
         : _ioManager(ioManager), _socketPtr(std::make_shared<asio::ip::tcp::socket>(ioManager->GetIoContext())), _strand(ioManager->GetIoContext()),
-          _serverUdpPort(udpPort), _clientUdpPort(0), _weakListener(listener), _isValid(false), _state(SessionState::Initializing),
-          _id(sessionId), _readSize(0), _readNetSize(0), _isWriting(false), _isProcessing(false)
+          _weakListener(listener), _isValid(false), _state(SessionState::Initializing),
+          _id{}, _readNetSize(0), _isWriting(false), _isProcessing(false)
     {
     }
 
     ~Session() override { spdlog::info("session destroyed: {}", uuids::to_string(_id)); }
 
-    static std::shared_ptr<Session> Create(std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener, uuids::uuid sessionId, std::uint16_t udpPort)
+    static std::shared_ptr<Session> Create(std::shared_ptr<IOManager> ioManager, std::weak_ptr<Listener> listener)
     {
-        auto newSession = std::make_shared<Session>(SecretKey{}, ioManager, listener, sessionId, udpPort);
+        auto newSession = std::make_shared<Session>(SecretKey{}, ioManager, listener);
         return newSession;
     }
 
@@ -59,14 +58,13 @@ public:
 
     bool IsValid() const { return _isValid; }
 
-    void SetRoom(const uuids::uuid& roomId);
-
     uuids::uuid GetId() const { return _id; }
-    uuids::uuid GetRoomId() const { return _roomId; }
+    void SetId(const uuids::uuid& id) { _id = id; }
+    std::int32_t GetPresetId() const { return _presetId.load(); }
+    void SetPresetId(std::int32_t presetId) { _presetId.store(presetId); }
 
     using NotifyDisconnectCallback = std::function<void(const std::shared_ptr<Session>&)>;
     void AddDisconnectCallback(NotifyDisconnectCallback callback);
-    void RemoveDisconnectCallback(CallbackHandle handle);
 
     using SendToHandler = std::function<void(asio::ip::udp::endpoint, std::shared_ptr<Raw>)>;
     void SetSendToHandler(SendToHandler handler);
@@ -75,8 +73,6 @@ private:
     std::shared_ptr<IOManager> _ioManager;
     std::shared_ptr<asio::ip::tcp::socket> _socketPtr;
     asio::io_context::strand _strand;
-    std::uint16_t _serverUdpPort;
-    std::uint16_t _clientUdpPort;
 
     std::weak_ptr<Listener> _weakListener;
 
@@ -85,20 +81,14 @@ private:
 
     std::atomic<SessionState> _state;
 
-    // Set by first handshaking
+    // Set by InfoHandshake authentication
     uuids::uuid _id;
-    uuids::uuid _roomId;
+    std::atomic<std::int32_t> _presetId{ 0 };
 
-    std::uint16_t _readSize;
     std::uint16_t _readNetSize;
-    const std::uint16_t _maxBufSize = 65535;
-    std::vector<unsigned char> _readBuffer;
 
     NotifyDisconnectCallback _disconnectCallback;
     SendToHandler _sendTo;
-
-    std::queue<std::shared_ptr<Raw>> _sendUdpQueue;
-    std::mutex _sendUdpQueueMutex;
 
     std::queue<std::shared_ptr<Raw>> _sendTcpQueue;
     std::mutex _sendTcpQueueMutex;
@@ -123,7 +113,4 @@ private:
     // Process Tcp Data
     void EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::uint16_t size);
     void ProcessPacketAsync();
-
-    // Init Functions
-    void SendSessionInfo();
 };

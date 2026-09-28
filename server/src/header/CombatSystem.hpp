@@ -37,6 +37,13 @@ public:
         std::vector<TeamInfo>& teamInfos,
         std::weak_ptr<Room> weakRoom);
 
+    void OnKill(
+        uuids::uuid shooterId,
+        Player& shooter,
+        uuids::uuid victimId,
+        const Player& victim,
+        std::vector<TeamInfo>& teamInfos);
+
     LagCompensator& GetLagCompensator() { return _lagCompensator; }
     const LagCompensator& GetLagCompensator() const { return _lagCompensator; }
 

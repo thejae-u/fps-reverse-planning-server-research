@@ -1,13 +1,8 @@
-#include <iostream>
-#include <thread>
-#include <vector>
-
 #include "Base.hpp"
 #include "IOManager.hpp"
 #include "Listener.hpp"
 #include "PacketPool.hpp"
 #include "Room.hpp"
-#include "TestMode.h"
 
 int main(const int argc, char** argv)
 {
@@ -15,28 +10,6 @@ int main(const int argc, char** argv)
     if(argc == 1)
     {
         spdlog::error("no options");
-        exit(0);
-    }
-    
-    if(argc <= 3 && !std::strcmp(argv[1], "--test"))
-    {
-        std::uint16_t testClientCount = 10;
-        if(argc > 2)
-        {
-            try
-            {
-                testClientCount = std::stoi(argv[2]);
-            }
-            catch(const std::exception& e)
-            {
-                spdlog::error(e.what());
-                exit(0);
-            }
-        }
-            
-        spdlog::info("running test");
-        const auto testMode = std::make_unique<TestMode>(testClientCount);
-        testMode->RunTestMode();
         exit(0);
     }
 
@@ -81,10 +54,32 @@ int main(const int argc, char** argv)
     IngamePacketPool::Init(ingamePacketPoolSize);
     NetworkPacketPool::Init(networkPacketPoolSize);
     ByteBufferPool::Init(byteBufferPoolSize);
-    
+
+    // Main Thread와 detach된 consoleThread 간에 안전하게 수명을 공유하는 종료 동기화 상태
+    struct ShutdownState
+    {
+        std::mutex mutex;
+        std::condition_variable cv;
+        std::atomic<bool> isShuttingDown{ false };
+
+        void RequestShutdown()
+        {
+            if(!isShuttingDown.exchange(true))
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                cv.notify_all();
+            }
+        }
+    };
+    const auto shutdownState = std::make_shared<ShutdownState>();
+
     // broadcast용 room
     auto matchId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
     const auto dedicatedRoom = Room::Create(ioManager, matchId, config.authToken, config.allowedPlayers.size());
+    dedicatedRoom->SetShutdownCallback([shutdownState]() {
+        shutdownState->RequestShutdown();
+    });
+
     const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort, config.allowedPlayers);
     listener->SetDedicatedRoom(dedicatedRoom);
 
@@ -95,55 +90,29 @@ int main(const int argc, char** argv)
     for(const auto& component : components)
         component->Start();
 
-    if(config.isTestMode)
-    {
-        spdlog::info("[Main] Test mode active: initializing mock players and starting World loop");
-        dedicatedRoom->StartTestMode(config.allowedPlayers);
-    }
-
-    std::string tmp;
-    while(std::cin >> tmp)
-    {
-        // Strip UTF-8 BOM if present
-        if (tmp.size() >= 3 && static_cast<unsigned char>(tmp[0]) == 0xEF && static_cast<unsigned char>(tmp[1]) == 0xBB && static_cast<unsigned char>(tmp[2]) == 0xBF)
+    // 콘솔 입력 스레드는 shared_ptr<ShutdownState>만 값으로 캡처하여
+    // Main Thread 종료 후에도 스택 댕글링 참조가 발생하지 않도록 보장
+    std::thread consoleThread([shutdownState]() {
+        std::string tmp;
+        while(std::cin >> tmp)
         {
-            tmp = tmp.substr(3);
-        }
-
-        spdlog::info("[Main] Received console input: '{}'", tmp);
-        if(tmp == "quit")
-            break;
-        if(tmp == "finish")
-        {
-            spdlog::info("received finish command. reporting results and exiting...");
-            dedicatedRoom->OnMatchFinished();
-            break;
-        }
-        if(tmp == "kill")
-        {
-            std::string teamStr;
-            if(std::cin >> teamStr)
+            spdlog::info("[Main] Received console input: '{}'", tmp);
+            if(tmp == "quit")
             {
-                if(teamStr == "A" || teamStr == "a" || teamStr == "1")
-                {
-                    dedicatedRoom->SimulateKill(TeamType::TeamA);
-                }
-                else if(teamStr == "B" || teamStr == "b" || teamStr == "2")
-                {
-                    dedicatedRoom->SimulateKill(TeamType::TeamB);
-                }
+                shutdownState->RequestShutdown();
+                break;
             }
         }
-        if(tmp == "score")
-        {
-            int a = 0, b = 0;
-            if(std::cin >> a >> b)
-            {
-                dedicatedRoom->SetTestScores(a, b);
-            }
-        }
+    });
+    consoleThread.detach();
+
+    // Main Thread: 매치 종료(OnMatchFinished) 또는 콘솔 종료(quit) 신호 대기
+    {
+        std::unique_lock<std::mutex> lock(shutdownState->mutex);
+        shutdownState->cv.wait(lock, [&]() { return shutdownState->isShuttingDown.load(); });
     }
 
+    spdlog::info("[Main] Shutting down server components on Main Thread...");
     for(auto it = components.rbegin(); it != components.rend(); ++it)
         (*it)->Stop();
 
@@ -153,5 +122,6 @@ int main(const int argc, char** argv)
     NetworkPacketPool::Release();
     ByteBufferPool::Release();
 
+    spdlog::info("[Main] Server shutdown complete.");
     return 0;
 }

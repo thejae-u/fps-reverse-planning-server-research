@@ -17,6 +17,11 @@ Room::~Room()
 
 void Room::OnMatchFinished()
 {
+    if(_isMatchFinished.exchange(true))
+        return;
+
+    _world->StopUpdate();
+
     spdlog::info("room: match finished. reporting results to auth server...");
 
     const auto playerStats = _world->GetPlayerStats();
@@ -60,8 +65,11 @@ void Room::OnMatchFinished()
     else
         spdlog::error("room: failed to report match result"); // TODO : Fail 시 재시도 및 예외 처리 로직 필요
 
-    // 프로세스 종료
-    std::exit(0);
+    // Main Thread에 종료 신호 전달 (Graceful Shutdown)
+    if(_shutdownCallback)
+    {
+        _shutdownCallback();
+    }
 }
 
 void Room::TryStartGameNoLock()
@@ -85,26 +93,6 @@ void Room::WorldInitNoLock()
     spdlog::info("room: world create complete", uuids::to_string(_matchId));
 
     _world->StartUpdate(weak_from_this()); // 게임 시작
-}
-
-void Room::StartTestMode(const std::vector<std::string>& allowedPlayers)
-{
-    spdlog::info("room: starting in TEST MODE with {} mock players", allowedPlayers.size());
-    _world->InitMockPlayers(allowedPlayers);
-    _world->StartUpdate(weak_from_this());
-    _isWorldStarted = true;
-}
-
-void Room::SimulateKill(TeamType scoringTeam)
-{
-    if(_world)
-        _world->SimulateKill(scoringTeam);
-}
-
-void Room::SetTestScores(int aKills, int bKills)
-{
-    if(_world)
-        _world->SetTestScores(aKills, bKills);
 }
 
 void Room::Stop()
@@ -134,21 +122,26 @@ void Room::AddSession(uuids::uuid sessionId, std::weak_ptr<Session> weakSession)
 
 void Room::RemoveSession(std::weak_ptr<Session> weakRemoveSession)
 {
-    std::lock_guard<std::mutex> lock(_sessionsMutex);
+    bool isRoomEmpty = false;
     if(const auto removeSession = weakRemoveSession.lock())
     {
-        if(_sessions.erase(removeSession->GetId()) == 0)
         {
-            return;
+            std::lock_guard<std::mutex> lock(_sessionsMutex);
+            if(_sessions.erase(removeSession->GetId()) == 0)
+            {
+                return;
+            }
+
+            spdlog::info("room: remove session {}", uuids::to_string(_matchId), uuids::to_string(removeSession->GetId()));
+            isRoomEmpty = _sessions.empty();
         }
 
-        spdlog::info("room: remove session {}", uuids::to_string(_matchId), uuids::to_string(removeSession->GetId()));
-
-        if(!_sessions.empty())
-            return;
-
-        spdlog::info("room: all session removed", uuids::to_string(_matchId));
-        _world->StopUpdate();
+        if(isRoomEmpty)
+        {
+            spdlog::info("room: all session removed", uuids::to_string(_matchId));
+            _world->StopUpdate();
+            OnMatchFinished();
+        }
     }
 }
 

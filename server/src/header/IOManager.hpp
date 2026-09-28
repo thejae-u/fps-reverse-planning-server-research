@@ -75,9 +75,17 @@ public:
         for (auto& w : _workers)
         {
             if (w.joinable())
-                w.join();
+            {
+                if (w.get_id() == std::this_thread::get_id())
+                    w.detach();
+                else
+                    w.join();
+            }
         }
         _workers.clear();
+
+        _blockingPool.stop();
+        _blockingPool.join();
 
         spdlog::info("io manager {} stop complete", _name);
     }

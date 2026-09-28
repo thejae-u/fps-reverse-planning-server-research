@@ -19,6 +19,7 @@
 #include <type_traits>
 #include <utility>
 #include <random>
+#include <condition_variable>
 
 // 2. Third-Party Library Headers
 #include <asio.hpp>

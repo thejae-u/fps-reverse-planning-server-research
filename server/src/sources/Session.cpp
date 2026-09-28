@@ -5,6 +5,7 @@
 #include "Listener.hpp"
 #include "CustomUtility.hpp"
 #include "Room.hpp"
+#include "Player.hpp"
 
 void Session::StartTcpRead()
 {
@@ -31,12 +32,12 @@ void Session::Stop()
 
 void Session::Init()
 {
-    spdlog::info("session{}: Init", uuids::to_string(_id));
+    spdlog::info("session{}: Init (waiting for client InfoHandshake)", uuids::to_string(_id));
     asio::post(_strand, [weakSelf = GetWeak<Session>()]() {
         if(auto self = weakSelf.lock())
         {
             self->_state = SessionState::Initializing;
-            self->SendSessionInfo();
+            self->StartTcpRead();
         }
     });
 }
@@ -85,37 +86,9 @@ void Session::PunchUdpHole(const asio::ip::udp::endpoint& ep)
     });
 }
 
-void Session::SetRoom(const uuids::uuid& roomId)
-{
-    _roomId = roomId;
-
-    Matchmaking matchmakingPacket;
-    matchmakingPacket.set_type(MatchmakingType::Matched);
-    matchmakingPacket.set_sessionid(uuids::to_string(_id));
-    matchmakingPacket.set_roomid(uuids::to_string(roomId));
-
-    std::string serializedData;
-    if(!matchmakingPacket.SerializeToString(&serializedData))
-    {
-        spdlog::error("session {}: serialize match making packet error in set_room()", uuids::to_string(_id));
-        return;
-    }
-
-    auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
-    sendPacket->set_type(PacketType::Match);
-    sendPacket->set_data(serializedData);
-
-    EnqueueTcpSendPacket(std::move(sendPacket));
-}
-
 void Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
 {
     _disconnectCallback = std::move(callback);
-}
-
-void Session::RemoveDisconnectCallback(CallbackHandle handle)
-{
-    _disconnectCallback = nullptr;
 }
 
 void Session::SetSendToHandler(SendToHandler handler)
@@ -197,7 +170,7 @@ void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::
     std::lock_guard<std::mutex> processQueueLock(_processQueueMutex);
     _processQueue.push(packet);
 
-    if(_isProcessing)
+    if(_isProcessing.exchange(true))
         return;
 
     _ioManager->PostOnBlockingPool([weakSelf = GetWeak<Session>()]() {
@@ -208,6 +181,70 @@ void Session::EnqueueProcessPacket(const std::shared_ptr<Raw>& data, const std::
 
 void Session::ProcessPacketAsync()
 {
+    while(true)
+    {
+        std::shared_ptr<NetworkPacket> packet;
+        {
+            std::lock_guard<std::mutex> processQueueLock(_processQueueMutex);
+            if(_processQueue.empty())
+            {
+                _isProcessing = false;
+                return;
+            }
+            packet = std::move(_processQueue.front());
+            _processQueue.pop();
+        }
+
+        if(!packet)
+            continue;
+
+        if(packet->type() == PacketType::InfoHandshake)
+        {
+            InfoHandshakePacket req;
+            if(!req.ParseFromString(packet->data()) || req.sessionid().empty())
+            {
+                spdlog::error("session {}: invalid InfoHandshake request payload", uuids::to_string(_id));
+                Stop();
+                return;
+            }
+
+            const std::string requestedUserId = req.sessionid();
+            const auto listener = _weakListener.lock();
+            if(!listener || !listener->RegisterAuthenticatedSession(requestedUserId, GetShared<Session>()))
+            {
+                spdlog::warn("session {}: failed to authenticate userId '{}'. closing session.", uuids::to_string(_id), requestedUserId);
+                Stop();
+                return;
+            }
+
+            _presetId.store(req.presetid());
+            spdlog::info("session {}: InfoHandshake authenticated (userId={}, presetId={})", uuids::to_string(_id), uuids::to_string(_id), req.presetid());
+
+            InfoHandshakePacket resp;
+            resp.set_sessionid(uuids::to_string(_id));
+            resp.set_presetid(_presetId.load());
+            resp.set_teamid(0);
+            resp.set_spawnx(0.0f);
+            resp.set_spawny(0.0f);
+            resp.set_spawnz(0.0f);
+            resp.set_movespeed(BASE_MOVE_SPEED);
+            resp.set_sprintspeed(static_cast<float>(MAX_SPEED));
+            resp.set_jumpspeed(JUMP_SPEED);
+            resp.set_gravity(GRAVITY);
+            resp.set_maxhp(100);
+            resp.set_attackpower(10);
+            resp.set_maxammo(30);
+
+            std::string serializedResp;
+            if(resp.SerializeToString(&serializedResp))
+            {
+                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
+                sendPacket->set_type(PacketType::InfoHandshake);
+                sendPacket->set_data(serializedResp);
+                EnqueueTcpSendPacket(std::move(sendPacket));
+            }
+        }
+    }
 }
 
 void Session::EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket>& data)
@@ -254,10 +291,9 @@ void Session::EnqueueTcpSendPacket(const std::shared_ptr<NetworkPacket>& data)
         _sendTcpQueue.push(payload);
     }
 
-    if(_isWriting)
+    if(_isWriting.exchange(true))
         return;
 
-    _isWriting = true;
     DoSendAsyncTcpLoop();
 }
 
@@ -267,6 +303,11 @@ void Session::DoSendAsyncTcpLoop()
     std::shared_ptr<Raw> payload;
     {
         std::lock_guard<std::mutex> sendQueueLock(_sendTcpQueueMutex);
+        if(_sendTcpQueue.empty())
+        {
+            _isWriting = false;
+            return;
+        }
         payload = std::move(_sendTcpQueue.front());
         _sendTcpQueue.pop();
     }
@@ -292,26 +333,16 @@ void Session::DoSendAsyncTcpLoop()
                 return;
             }
 
-            std::lock_guard<std::mutex> sendQueueMutex(self->_sendTcpQueueMutex);
-            if(self->_sendTcpQueue.empty())
             {
-                self->_isWriting = false;
-                return;
+                std::lock_guard<std::mutex> sendQueueMutex(self->_sendTcpQueueMutex);
+                if(self->_sendTcpQueue.empty())
+                {
+                    self->_isWriting = false;
+                    return;
+                }
             }
 
             self->DoSendAsyncTcpLoop();
         }
     }));
-}
-
-void Session::SendSessionInfo()
-{
-    auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
-    sendPacket->set_type(PacketType::PortHandshake);
-    sendPacket->set_data(std::format("{},{}", std::to_string(_serverUdpPort), uuids::to_string(GetId())));
-
-    spdlog::info("session {} sending handshake info asynchronously", uuids::to_string(GetId()));
-    EnqueueTcpSendPacket(std::move(sendPacket));
-
-    StartTcpRead();
 }

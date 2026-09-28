@@ -37,29 +37,15 @@ void Listener::Stop()
 
 void Listener::AcceptAsync()
 {
-    uuids::uuid sessionId;
-    {
-        std::lock_guard<std::mutex> lock(_uuidMutex);
-        sessionId = _uuidGen(); // TODO : 인증 서버로부터 받은 player uuid를 사용할것인지 고민 -> 데이터 저장을 위한 조치 혹은 플레이어 아이디의 관리
-    }
+    auto newSession = Session::Create(_ioManager, GetWeak<Listener>());
 
-    auto newSession = Session::Create(_ioManager, GetWeak<Listener>(), sessionId, _udpEndpoint.port());
-    {
-        std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
-        if(_sessions.contains(sessionId))
-        {
-            spdlog::error("listener: create duplicate session, create again");
-            AcceptAsync();
-            return;
-        }
-    }
-
-    newSession->AddDisconnectCallback([weakSelf = GetWeak<Listener>(), sessionId](const std::shared_ptr<Session>& session) {
+    newSession->AddDisconnectCallback([weakSelf = GetWeak<Listener>()](const std::shared_ptr<Session>& session) {
         if(const auto self = weakSelf.lock())
         {
             std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
-            self->_sessions.erase(sessionId);
-            spdlog::info("listener: session {} removed from listener", uuids::to_string(sessionId));
+            self->_pendingSessions.erase(session);
+            self->_sessions.erase(session->GetId());
+            spdlog::info("listener: session {} removed from listener", uuids::to_string(session->GetId()));
         }
     });
 
@@ -69,12 +55,21 @@ void Listener::AcceptAsync()
             self->EnqueueSendData(ep, std::move(networkBuffer));
     });
 
-    _sessions[sessionId] = newSession;
+    {
+        std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+        _pendingSessions.insert(newSession);
+    }
 
     // async accept new client
-    _acceptor.async_accept(*newSession->GetSocket(), [weakSelf = GetWeak<Listener>(), newSession, sessionId](const std::error_code& ec) {
+    _acceptor.async_accept(*newSession->GetSocket(), [weakSelf = GetWeak<Listener>(), newSession](const std::error_code& ec) {
         if(ec)
         {
+            if(const auto self = weakSelf.lock())
+            {
+                std::lock_guard<std::mutex> sessionsLock(self->_sessionsMutex);
+                self->_pendingSessions.erase(newSession);
+            }
+
             if(ec == asio::error::connection_aborted ||
                ec == asio::error::operation_aborted)
             {
@@ -94,6 +89,36 @@ void Listener::AcceptAsync()
             self->AcceptAsync();
         }
     });
+}
+
+bool Listener::RegisterAuthenticatedSession(const std::string& userId, const std::shared_ptr<Session>& session)
+{
+    if(!session)
+        return false;
+
+    const auto userUuid = uuids::uuid::from_string(userId);
+    if(!userUuid.has_value())
+    {
+        spdlog::error("listener: invalid UUID format in InfoHandshake userId '{}'", userId);
+        return false;
+    }
+
+    const std::string normalizedId = uuids::to_string(userUuid.value());
+    if(!_allowedPlayers.empty() && !IsPlayerAllowed(userId) && !IsPlayerAllowed(normalizedId))
+    {
+        spdlog::warn("listener: unauthorized userId '{}' rejected (not in allowedPlayers)", userId);
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> sessionsLock(_sessionsMutex);
+        _pendingSessions.erase(session);
+        session->SetId(userUuid.value());
+        _sessions[userUuid.value()] = session;
+    }
+
+    spdlog::info("listener: session authenticated and bound to userId {}", normalizedId);
+    return true;
 }
 
 void Listener::EnqueueSendData(asio::ip::udp::endpoint ep, std::shared_ptr<Raw> networkBuffer)
