@@ -9,10 +9,8 @@ enum PacketType {
   ErrorOccured = 2;
 
   // Tcp
-  PortHandshake = 100;
   InfoHandshake = 101;
   Ping = 102;
-  Match = 103;
 
   // Udp
   Ingame = 200;
@@ -29,16 +27,6 @@ enum IngameType {
   Score = 6;
 }
 
-enum MatchmakingType {
-  MatchmakingOk = 0;
-  Request = 1;
-  Success = 2;
-  Failed = 3;
-
-  Waiting = 4;
-  Matched = 5;
-}
-
 enum AuthenticationType {
   AuthenticationOk = 0;
   UdpHolePunching = 1;
@@ -49,15 +37,20 @@ message NetworkPacket {
   bytes data = 2;
 }
 
-message PortHandshakePacket {
-  uint32 serverPort = 1;
-  bytes sessionId = 2;
-}
-
-message Matchmaking {
-  MatchmakingType type = 1;
-  bytes sessionId = 2;
-  optional bytes roomId = 3;
+message InfoHandshakePacket {
+  bytes sessionId = 1;
+  int32 presetId = 2;
+  int32 teamId = 3;
+  float spawnX = 4;
+  float spawnY = 5;
+  float spawnZ = 6;
+  float moveSpeed = 7;
+  float sprintSpeed = 8;
+  float jumpSpeed = 9;
+  float gravity = 10;
+  int32 maxHp = 11;
+  int32 attackPower = 12;
+  int32 maxAmmo = 13;
 }
 
 message IngamePacket {
