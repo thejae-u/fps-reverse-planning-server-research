@@ -86,6 +86,18 @@ void Session::PunchUdpHole(const asio::ip::udp::endpoint& ep)
     });
 }
 
+void Session::ProcessEndGame()
+{
+    if(!_isValid)
+        return;
+
+    auto endPacket = NetworkPacketPool::GetInstance()->Rent();
+    endPacket->set_type(PacketType::EndGame);
+    EnqueueTcpSendPacket(endPacket);
+    EnqueueUdpSendPacket(endPacket);
+    spdlog::info("session {}: sent EndGame packet to client", uuids::to_string(_id));
+}
+
 void Session::AddDisconnectCallback(NotifyDisconnectCallback callback)
 {
     _disconnectCallback = std::move(callback);

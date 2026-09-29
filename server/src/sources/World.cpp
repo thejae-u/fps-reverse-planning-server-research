@@ -20,7 +20,7 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
 
     DivideTeam();
 
-    // 각 세션에 배정된 팀, 초기 스폰 위치, 서버 권위 물리/전투 스탯을 InfoHandshake(TCP)로 전송
+    // 각 세션에 배정된 팀, 초기 스폰 위치, 서버 권위 물리/전투 스탯 및 전체 플레이어 초기 정보를 InfoHandshake(TCP)로 전송
     for(const auto& [id, weakSession] : _sessions)
     {
         auto session = weakSession.lock();
@@ -45,6 +45,19 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
         infoPacket.set_attackpower(player->attackPower);
         infoPacket.set_maxammo(player->ammo);
 
+        for(const auto& [otherId, otherPlayer] : _players)
+        {
+            if(!otherPlayer)
+                continue;
+
+            auto* pInfo = infoPacket.add_players();
+            pInfo->set_playerid(uuids::to_string(otherId));
+            pInfo->set_teamid(static_cast<std::int32_t>(otherPlayer->teamType));
+            pInfo->set_spawnx(otherPlayer->position.x);
+            pInfo->set_spawny(otherPlayer->position.y);
+            pInfo->set_spawnz(otherPlayer->position.z);
+        }
+
         std::string serializedInfo;
         if(infoPacket.SerializeToString(&serializedInfo))
         {
@@ -61,12 +74,31 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
 void World::DivideTeam()
 {
     // sample team divide (TODO: include role, rating ...)
+    std::vector<Player*> playersTemp;
+    playersTemp.reserve(_players.size());
     for(const auto& [id, player] : _players)
     {
-        if(const auto team = static_cast<TeamType>(_dis(_gen)); team == TeamType::TeamA && _teamACount < 5)
+        playersTemp.emplace_back(player.get());
+
+        /*if(const auto team = static_cast<TeamType>(_dis(_gen)); team == TeamType::TeamA && _teamACount < 5)
             player->teamType = TeamType::TeamA;
         else
-            player->teamType = TeamType::TeamB;
+            player->teamType = TeamType::TeamB;*/
+    }
+
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::shuffle(playersTemp.begin(), playersTemp.end(), gen);
+
+    int i = 0;
+    for(i; i < playersTemp.size() / 2; ++i)
+    {
+        playersTemp[i]->teamType = TeamType::TeamA;
+    }
+
+    for(i; i < playersTemp.size(); ++i)
+    {
+        playersTemp[i]->teamType = TeamType::TeamB;
     }
 }
 
@@ -325,21 +357,23 @@ void World::ProcessQueue()
 
                 const auto packetNow = std::chrono::steady_clock::now();
                 constexpr float defaultDt = 0.016666f;
-                
+
                 bool isValid = true;
-                
+
                 {
                     std::lock_guard playerLock(_playerMutex);
                     if(_players.contains(playerId) && _players[playerId])
                     {
                         auto& player = _players[playerId];
-                        
+
                         float packetDt = defaultDt;
                         if(player->hasReceivedMovePacket)
                         {
                             packetDt = std::chrono::duration<float>(packetNow - player->lastMovePacketTime).count();
-                            if(packetDt < defaultDt) packetDt = defaultDt;
-                            else if(packetDt > 0.5f) packetDt = 0.5f;
+                            if(packetDt < defaultDt)
+                                packetDt = defaultDt;
+                            else if(packetDt > 0.5f)
+                                packetDt = 0.5f;
                         }
                         player->lastMovePacketTime = packetNow;
                         player->hasReceivedMovePacket = true;
@@ -347,15 +381,15 @@ void World::ProcessQueue()
                         // 패킷 간 실제 경과 시간(packetDt) 기준 최대 이동 가능 거리 계산 (스프린트 속도 포함)
                         float maxSpeed = static_cast<float>(MAX_SPEED);
                         float theoreticalDist = maxSpeed * packetDt;
-                        
+
                         float tolerance = 2.5f; // 네트워크 지터 및 프레임 간격 완충 거리
                         float maxAllowedDist = theoreticalDist + tolerance;
-                        
+
                         // 서버 위치와 클라이언트 신규 위치 간 수평 거리 측정 (수직 Y축은 점프/중력 및 CharacterController 높이 오프셋 분리)
                         float dx = player->position.x - origin.x;
                         float dz = player->position.z - origin.z;
                         float actualDist = std::sqrt(dx * dx + dz * dz);
-                        
+
                         // 차이가 허용된 수치를 넘음
                         if(actualDist > maxAllowedDist)
                         {
@@ -363,7 +397,7 @@ void World::ProcessQueue()
                             player->velocity.x = 0.0f;
                             player->velocity.z = 0.0f;
                             spdlog::warn("world(room id) {}: player {} teleport suspected. Dist: {}m, Allowed: {}m (packetDt: {:.4f}s)",
-                                uuids::to_string(_roomId), uuids::to_string(playerId), actualDist, maxAllowedDist, packetDt);
+                                         uuids::to_string(_roomId), uuids::to_string(playerId), actualDist, maxAllowedDist, packetDt);
                         }
                         else
                         {
@@ -373,7 +407,7 @@ void World::ProcessQueue()
                         }
                     }
                 }
-                
+
                 if(isValid)
                 {
                     float magnitude = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
@@ -458,7 +492,21 @@ void World::BroadcastScoreboard()
                 score->set_kill(player->kill);
                 score->set_death(player->death);
                 score->set_heal(player->heal);
+                score->set_teamid(static_cast<std::int32_t>(player->teamType));
+                score->set_damage(player->damage);
             }
+        }
+
+        if(_teamInfos.size() >= 2)
+        {
+            scorePacket.set_teamascore(_teamInfos[0].kills);
+            scorePacket.set_teambscore(_teamInfos[1].kills);
+            if(_teamInfos[0].kills > _teamInfos[1].kills)
+                scorePacket.set_winningteam(static_cast<std::int32_t>(TeamType::TeamA));
+            else if(_teamInfos[1].kills > _teamInfos[0].kills)
+                scorePacket.set_winningteam(static_cast<std::int32_t>(TeamType::TeamB));
+            else
+                scorePacket.set_winningteam(static_cast<std::int32_t>(TeamType::Draw));
         }
     }
 

@@ -55,6 +55,7 @@ public:
 
     void Init();
     void PunchUdpHole(const asio::ip::udp::endpoint& ep);
+    void ProcessEndGame();
 
     bool IsValid() const { return _isValid; }
 

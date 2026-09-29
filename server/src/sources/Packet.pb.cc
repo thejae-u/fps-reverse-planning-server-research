@@ -56,6 +56,37 @@ struct ScoreboardDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ScoreboardDefaultTypeInternal _Scoreboard_default_instance_;
 
+inline constexpr PlayerInitInfo::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : playerid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        teamid_{0},
+        spawnx_{0},
+        spawny_{0},
+        spawnz_{0},
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR PlayerInitInfo::PlayerInitInfo(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct PlayerInitInfoDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR PlayerInitInfoDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~PlayerInitInfoDefaultTypeInternal() {}
+  union {
+    PlayerInitInfo _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PlayerInitInfoDefaultTypeInternal _PlayerInitInfo_default_instance_;
+
 inline constexpr NetworkPacket::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : data_(
@@ -186,45 +217,6 @@ struct IngamePacketDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 IngamePacketDefaultTypeInternal _IngamePacket_default_instance_;
 
-inline constexpr InfoHandshakePacket::Impl_::Impl_(
-    ::_pbi::ConstantInitialized) noexcept
-      : sessionid_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        presetid_{0},
-        teamid_{0},
-        spawnx_{0},
-        spawny_{0},
-        spawnz_{0},
-        movespeed_{0},
-        sprintspeed_{0},
-        jumpspeed_{0},
-        gravity_{0},
-        maxhp_{0},
-        attackpower_{0},
-        maxammo_{0},
-        _cached_size_{0} {}
-
-template <typename>
-PROTOBUF_CONSTEXPR InfoHandshakePacket::InfoHandshakePacket(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(::_pbi::ConstantInitialized()) {
-}
-struct InfoHandshakePacketDefaultTypeInternal {
-  PROTOBUF_CONSTEXPR InfoHandshakePacketDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~InfoHandshakePacketDefaultTypeInternal() {}
-  union {
-    InfoHandshakePacket _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 InfoHandshakePacketDefaultTypeInternal _InfoHandshakePacket_default_instance_;
-
 inline constexpr HitPacket::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : hitplayerid_(
@@ -354,6 +346,46 @@ struct LagCompPacketDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 LagCompPacketDefaultTypeInternal _LagCompPacket_default_instance_;
+
+inline constexpr InfoHandshakePacket::Impl_::Impl_(
+    ::_pbi::ConstantInitialized) noexcept
+      : players_{},
+        sessionid_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        presetid_{0},
+        teamid_{0},
+        spawnx_{0},
+        spawny_{0},
+        spawnz_{0},
+        movespeed_{0},
+        sprintspeed_{0},
+        jumpspeed_{0},
+        gravity_{0},
+        maxhp_{0},
+        attackpower_{0},
+        maxammo_{0},
+        _cached_size_{0} {}
+
+template <typename>
+PROTOBUF_CONSTEXPR InfoHandshakePacket::InfoHandshakePacket(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(::_pbi::ConstantInitialized()) {
+}
+struct InfoHandshakePacketDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR InfoHandshakePacketDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~InfoHandshakePacketDefaultTypeInternal() {}
+  union {
+    InfoHandshakePacket _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 InfoHandshakePacketDefaultTypeInternal _InfoHandshakePacket_default_instance_;
 }  // namespace Protocol
 static const ::_pb::EnumDescriptor* file_level_enum_descriptors_Packet_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor**
@@ -371,6 +403,19 @@ const ::uint32_t
         ~0u,  // no sizeof(Split)
         PROTOBUF_FIELD_OFFSET(::Protocol::NetworkPacket, _impl_.type_),
         PROTOBUF_FIELD_OFFSET(::Protocol::NetworkPacket, _impl_.data_),
+        ~0u,  // no _has_bits_
+        PROTOBUF_FIELD_OFFSET(::Protocol::PlayerInitInfo, _internal_metadata_),
+        ~0u,  // no _extensions_
+        ~0u,  // no _oneof_case_
+        ~0u,  // no _weak_field_map_
+        ~0u,  // no _inlined_string_donated_
+        ~0u,  // no _split_
+        ~0u,  // no sizeof(Split)
+        PROTOBUF_FIELD_OFFSET(::Protocol::PlayerInitInfo, _impl_.playerid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::PlayerInitInfo, _impl_.teamid_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::PlayerInitInfo, _impl_.spawnx_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::PlayerInitInfo, _impl_.spawny_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::PlayerInitInfo, _impl_.spawnz_),
         ~0u,  // no _has_bits_
         PROTOBUF_FIELD_OFFSET(::Protocol::InfoHandshakePacket, _internal_metadata_),
         ~0u,  // no _extensions_
@@ -392,6 +437,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::Protocol::InfoHandshakePacket, _impl_.maxhp_),
         PROTOBUF_FIELD_OFFSET(::Protocol::InfoHandshakePacket, _impl_.attackpower_),
         PROTOBUF_FIELD_OFFSET(::Protocol::InfoHandshakePacket, _impl_.maxammo_),
+        PROTOBUF_FIELD_OFFSET(::Protocol::InfoHandshakePacket, _impl_.players_),
         ~0u,  // no _has_bits_
         PROTOBUF_FIELD_OFFSET(::Protocol::IngamePacket, _internal_metadata_),
         ~0u,  // no _extensions_
@@ -505,18 +551,20 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, -1, -1, sizeof(::Protocol::NetworkPacket)},
-        {10, -1, -1, sizeof(::Protocol::InfoHandshakePacket)},
-        {31, -1, -1, sizeof(::Protocol::IngamePacket)},
-        {44, -1, -1, sizeof(::Protocol::AuthenticationPacket)},
-        {56, -1, -1, sizeof(::Protocol::HitPacket)},
-        {70, -1, -1, sizeof(::Protocol::LagCompTarget)},
-        {86, -1, -1, sizeof(::Protocol::LagCompPacket)},
-        {102, -1, -1, sizeof(::Protocol::MovePacket)},
-        {117, -1, -1, sizeof(::Protocol::Scoreboard)},
-        {129, -1, -1, sizeof(::Protocol::ScoreboardPacket)},
+        {10, -1, -1, sizeof(::Protocol::PlayerInitInfo)},
+        {23, -1, -1, sizeof(::Protocol::InfoHandshakePacket)},
+        {45, -1, -1, sizeof(::Protocol::IngamePacket)},
+        {58, -1, -1, sizeof(::Protocol::AuthenticationPacket)},
+        {70, -1, -1, sizeof(::Protocol::HitPacket)},
+        {84, -1, -1, sizeof(::Protocol::LagCompTarget)},
+        {100, -1, -1, sizeof(::Protocol::LagCompPacket)},
+        {116, -1, -1, sizeof(::Protocol::MovePacket)},
+        {131, -1, -1, sizeof(::Protocol::Scoreboard)},
+        {143, -1, -1, sizeof(::Protocol::ScoreboardPacket)},
 };
 static const ::_pb::Message* const file_default_instances[] = {
     &::Protocol::_NetworkPacket_default_instance_._instance,
+    &::Protocol::_PlayerInitInfo_default_instance_._instance,
     &::Protocol::_InfoHandshakePacket_default_instance_._instance,
     &::Protocol::_IngamePacket_default_instance_._instance,
     &::Protocol::_AuthenticationPacket_default_instance_._instance,
@@ -531,57 +579,60 @@ const char descriptor_table_protodef_Packet_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     protodesc_cold) = {
     "\n\014Packet.proto\022\010Protocol\"A\n\rNetworkPacke"
     "t\022\"\n\004type\030\001 \001(\0162\024.Protocol.PacketType\022\014\n"
-    "\004data\030\002 \001(\014\"\373\001\n\023InfoHandshakePacket\022\021\n\ts"
-    "essionId\030\001 \001(\014\022\020\n\010presetId\030\002 \001(\005\022\016\n\006team"
-    "Id\030\003 \001(\005\022\016\n\006spawnX\030\004 \001(\002\022\016\n\006spawnY\030\005 \001(\002"
-    "\022\016\n\006spawnZ\030\006 \001(\002\022\021\n\tmoveSpeed\030\007 \001(\002\022\023\n\013s"
-    "printSpeed\030\010 \001(\002\022\021\n\tjumpSpeed\030\t \001(\002\022\017\n\007g"
-    "ravity\030\n \001(\002\022\r\n\005maxHp\030\013 \001(\005\022\023\n\013attackPow"
-    "er\030\014 \001(\005\022\017\n\007maxAmmo\030\r \001(\005\"y\n\014IngamePacke"
-    "t\022\021\n\tsessionId\030\001 \001(\014\022\016\n\006roomId\030\002 \001(\014\022$\n\006"
-    "method\030\003 \001(\0162\024.Protocol.IngameType\022\014\n\004da"
-    "ta\030\004 \001(\014\022\022\n\nclientTick\030\005 \001(\004\"u\n\024Authenti"
-    "cationPacket\022\021\n\tsessionId\030\001 \001(\014\022\016\n\006roomI"
-    "d\030\002 \001(\014\022,\n\006method\030\003 \001(\0162\034.Protocol.Authe"
-    "nticationType\022\014\n\004data\030\004 \001(\014\"v\n\tHitPacket"
-    "\022\023\n\013hitPlayerId\030\001 \001(\014\022\021\n\tshooterId\030\002 \001(\014"
-    "\022\021\n\tcurrentHp\030\003 \001(\005\022\016\n\006deaths\030\004 \001(\005\022\016\n\006i"
-    "sDead\030\005 \001(\010\022\016\n\006damage\030\006 \001(\005\"\234\001\n\rLagCompT"
-    "arget\022\020\n\010targetId\030\001 \001(\014\022\020\n\010presentX\030\002 \001("
-    "\002\022\020\n\010presentY\030\003 \001(\002\022\020\n\010presentZ\030\004 \001(\002\022\020\n"
-    "\010rewoundX\030\005 \001(\002\022\020\n\010rewoundY\030\006 \001(\002\022\020\n\010rew"
-    "oundZ\030\007 \001(\002\022\r\n\005isHit\030\010 \001(\010\"\251\001\n\rLagCompPa"
-    "cket\022\021\n\tshooterId\030\001 \001(\014\022\017\n\007originX\030\002 \001(\002"
-    "\022\017\n\007originY\030\003 \001(\002\022\017\n\007originZ\030\004 \001(\002\022\014\n\004di"
-    "rX\030\005 \001(\002\022\014\n\004dirY\030\006 \001(\002\022\014\n\004dirZ\030\007 \001(\002\022(\n\007"
-    "targets\030\010 \003(\0132\027.Protocol.LagCompTarget\"{"
-    "\n\nMovePacket\022\020\n\010playerId\030\001 \001(\014\022\017\n\007origin"
-    "X\030\002 \001(\002\022\017\n\007originY\030\003 \001(\002\022\017\n\007originZ\030\004 \001("
-    "\002\022\014\n\004dirX\030\005 \001(\002\022\014\n\004dirY\030\006 \001(\002\022\014\n\004dirZ\030\007 "
-    "\001(\002\"I\n\nScoreboard\022\020\n\010playerId\030\001 \001(\014\022\014\n\004k"
-    "ill\030\002 \001(\005\022\r\n\005death\030\003 \001(\005\022\014\n\004heal\030\004 \001(\005\"H"
-    "\n\020ScoreboardPacket\022\016\n\006roomId\030\001 \001(\014\022$\n\006sc"
-    "ores\030\002 \003(\0132\024.Protocol.Scoreboard*|\n\nPack"
-    "etType\022\014\n\010PacketOk\020\000\022\017\n\013InvalidData\020\001\022\020\n"
-    "\014ErrorOccured\020\002\022\021\n\rInfoHandshake\020e\022\010\n\004Pi"
-    "ng\020f\022\013\n\006Ingame\020\310\001\022\023\n\016Authentication\020\311\001*Z"
-    "\n\nIngameType\022\014\n\010IngameOk\020\000\022\010\n\004Move\020\001\022\010\n\004"
-    "Jump\020\002\022\t\n\005Shoot\020\003\022\007\n\003Hit\020\004\022\013\n\007LagComp\020\005\022"
-    "\t\n\005Score\020\006*\?\n\022AuthenticationType\022\024\n\020Auth"
-    "enticationOk\020\000\022\023\n\017UdpHolePunching\020\001b\006pro"
-    "to3"
+    "\004data\030\002 \001(\014\"b\n\016PlayerInitInfo\022\020\n\010playerI"
+    "d\030\001 \001(\014\022\016\n\006teamId\030\002 \001(\005\022\016\n\006spawnX\030\003 \001(\002\022"
+    "\016\n\006spawnY\030\004 \001(\002\022\016\n\006spawnZ\030\005 \001(\002\"\246\002\n\023Info"
+    "HandshakePacket\022\021\n\tsessionId\030\001 \001(\014\022\020\n\010pr"
+    "esetId\030\002 \001(\005\022\016\n\006teamId\030\003 \001(\005\022\016\n\006spawnX\030\004"
+    " \001(\002\022\016\n\006spawnY\030\005 \001(\002\022\016\n\006spawnZ\030\006 \001(\002\022\021\n\t"
+    "moveSpeed\030\007 \001(\002\022\023\n\013sprintSpeed\030\010 \001(\002\022\021\n\t"
+    "jumpSpeed\030\t \001(\002\022\017\n\007gravity\030\n \001(\002\022\r\n\005maxH"
+    "p\030\013 \001(\005\022\023\n\013attackPower\030\014 \001(\005\022\017\n\007maxAmmo\030"
+    "\r \001(\005\022)\n\007players\030\016 \003(\0132\030.Protocol.Player"
+    "InitInfo\"y\n\014IngamePacket\022\021\n\tsessionId\030\001 "
+    "\001(\014\022\016\n\006roomId\030\002 \001(\014\022$\n\006method\030\003 \001(\0162\024.Pr"
+    "otocol.IngameType\022\014\n\004data\030\004 \001(\014\022\022\n\nclien"
+    "tTick\030\005 \001(\004\"u\n\024AuthenticationPacket\022\021\n\ts"
+    "essionId\030\001 \001(\014\022\016\n\006roomId\030\002 \001(\014\022,\n\006method"
+    "\030\003 \001(\0162\034.Protocol.AuthenticationType\022\014\n\004"
+    "data\030\004 \001(\014\"v\n\tHitPacket\022\023\n\013hitPlayerId\030\001"
+    " \001(\014\022\021\n\tshooterId\030\002 \001(\014\022\021\n\tcurrentHp\030\003 \001"
+    "(\005\022\016\n\006deaths\030\004 \001(\005\022\016\n\006isDead\030\005 \001(\010\022\016\n\006da"
+    "mage\030\006 \001(\005\"\234\001\n\rLagCompTarget\022\020\n\010targetId"
+    "\030\001 \001(\014\022\020\n\010presentX\030\002 \001(\002\022\020\n\010presentY\030\003 \001"
+    "(\002\022\020\n\010presentZ\030\004 \001(\002\022\020\n\010rewoundX\030\005 \001(\002\022\020"
+    "\n\010rewoundY\030\006 \001(\002\022\020\n\010rewoundZ\030\007 \001(\002\022\r\n\005is"
+    "Hit\030\010 \001(\010\"\251\001\n\rLagCompPacket\022\021\n\tshooterId"
+    "\030\001 \001(\014\022\017\n\007originX\030\002 \001(\002\022\017\n\007originY\030\003 \001(\002"
+    "\022\017\n\007originZ\030\004 \001(\002\022\014\n\004dirX\030\005 \001(\002\022\014\n\004dirY\030"
+    "\006 \001(\002\022\014\n\004dirZ\030\007 \001(\002\022(\n\007targets\030\010 \003(\0132\027.P"
+    "rotocol.LagCompTarget\"{\n\nMovePacket\022\020\n\010p"
+    "layerId\030\001 \001(\014\022\017\n\007originX\030\002 \001(\002\022\017\n\007origin"
+    "Y\030\003 \001(\002\022\017\n\007originZ\030\004 \001(\002\022\014\n\004dirX\030\005 \001(\002\022\014"
+    "\n\004dirY\030\006 \001(\002\022\014\n\004dirZ\030\007 \001(\002\"I\n\nScoreboard"
+    "\022\020\n\010playerId\030\001 \001(\014\022\014\n\004kill\030\002 \001(\005\022\r\n\005deat"
+    "h\030\003 \001(\005\022\014\n\004heal\030\004 \001(\005\"H\n\020ScoreboardPacke"
+    "t\022\016\n\006roomId\030\001 \001(\014\022$\n\006scores\030\002 \003(\0132\024.Prot"
+    "ocol.Scoreboard*|\n\nPacketType\022\014\n\010PacketO"
+    "k\020\000\022\017\n\013InvalidData\020\001\022\020\n\014ErrorOccured\020\002\022\021"
+    "\n\rInfoHandshake\020e\022\010\n\004Ping\020f\022\013\n\006Ingame\020\310\001"
+    "\022\023\n\016Authentication\020\311\001*Z\n\nIngameType\022\014\n\010I"
+    "ngameOk\020\000\022\010\n\004Move\020\001\022\010\n\004Jump\020\002\022\t\n\005Shoot\020\003"
+    "\022\007\n\003Hit\020\004\022\013\n\007LagComp\020\005\022\t\n\005Score\020\006*\?\n\022Aut"
+    "henticationType\022\024\n\020AuthenticationOk\020\000\022\023\n"
+    "\017UdpHolePunching\020\001b\006proto3"
 };
 static ::absl::once_flag descriptor_table_Packet_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_Packet_2eproto = {
     false,
     false,
-    1603,
+    1746,
     descriptor_table_protodef_Packet_2eproto,
     "Packet.proto",
     &descriptor_table_Packet_2eproto_once,
     nullptr,
     0,
-    10,
+    11,
     schemas,
     file_default_instances,
     TableStruct_Packet_2eproto::offsets,
@@ -870,6 +921,339 @@ void NetworkPacket::InternalSwap(NetworkPacket* PROTOBUF_RESTRICT other) {
 }
 // ===================================================================
 
+class PlayerInitInfo::_Internal {
+ public:
+};
+
+PlayerInitInfo::PlayerInitInfo(::google::protobuf::Arena* arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:Protocol.PlayerInitInfo)
+}
+inline PROTOBUF_NDEBUG_INLINE PlayerInitInfo::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
+    const Impl_& from, const ::Protocol::PlayerInitInfo& from_msg)
+      : playerid_(arena, from.playerid_),
+        _cached_size_{0} {}
+
+PlayerInitInfo::PlayerInitInfo(
+    ::google::protobuf::Arena* arena,
+    const PlayerInitInfo& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, _class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  PlayerInitInfo* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, teamid_),
+           reinterpret_cast<const char *>(&from._impl_) +
+               offsetof(Impl_, teamid_),
+           offsetof(Impl_, spawnz_) -
+               offsetof(Impl_, teamid_) +
+               sizeof(Impl_::spawnz_));
+
+  // @@protoc_insertion_point(copy_constructor:Protocol.PlayerInitInfo)
+}
+inline PROTOBUF_NDEBUG_INLINE PlayerInitInfo::Impl_::Impl_(
+    ::google::protobuf::internal::InternalVisibility visibility,
+    ::google::protobuf::Arena* arena)
+      : playerid_(arena),
+        _cached_size_{0} {}
+
+inline void PlayerInitInfo::SharedCtor(::_pb::Arena* arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char *>(&_impl_) +
+               offsetof(Impl_, teamid_),
+           0,
+           offsetof(Impl_, spawnz_) -
+               offsetof(Impl_, teamid_) +
+               sizeof(Impl_::spawnz_));
+}
+PlayerInitInfo::~PlayerInitInfo() {
+  // @@protoc_insertion_point(destructor:Protocol.PlayerInitInfo)
+  SharedDtor(*this);
+}
+inline void PlayerInitInfo::SharedDtor(MessageLite& self) {
+  PlayerInitInfo& this_ = static_cast<PlayerInitInfo&>(self);
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.playerid_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PlayerInitInfo::PlacementNew_(const void*, void* mem,
+                                        ::google::protobuf::Arena* arena) {
+  return ::new (mem) PlayerInitInfo(arena);
+}
+constexpr auto PlayerInitInfo::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(PlayerInitInfo),
+                                            alignof(PlayerInitInfo));
+}
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::google::protobuf::internal::ClassDataFull PlayerInitInfo::_class_data_ = {
+    ::google::protobuf::internal::ClassData{
+        &_PlayerInitInfo_default_instance_._instance,
+        &_table_.header,
+        nullptr,  // OnDemandRegisterArenaDtor
+        nullptr,  // IsInitialized
+        &PlayerInitInfo::MergeImpl,
+        ::google::protobuf::Message::GetNewImpl<PlayerInitInfo>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        &PlayerInitInfo::SharedDtor,
+        ::google::protobuf::Message::GetClearImpl<PlayerInitInfo>(), &PlayerInitInfo::ByteSizeLong,
+            &PlayerInitInfo::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+        PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_._cached_size_),
+        false,
+    },
+    &PlayerInitInfo::kDescriptorMethods,
+    &descriptor_table_Packet_2eproto,
+    nullptr,  // tracker
+};
+const ::google::protobuf::internal::ClassData* PlayerInitInfo::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(_class_data_.tc_table);
+  return _class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 5, 0, 0, 2> PlayerInitInfo::_table_ = {
+  {
+    0,  // no _has_bits_
+    0, // no _extensions_
+    5, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967264,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    5,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    _class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::Protocol::PlayerInitInfo>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // bytes playerId = 1;
+    {::_pbi::TcParser::FastBS1,
+     {10, 63, 0, PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.playerid_)}},
+    // int32 teamId = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PlayerInitInfo, _impl_.teamid_), 63>(),
+     {16, 63, 0, PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.teamid_)}},
+    // float spawnX = 3;
+    {::_pbi::TcParser::FastF32S1,
+     {29, 63, 0, PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawnx_)}},
+    // float spawnY = 4;
+    {::_pbi::TcParser::FastF32S1,
+     {37, 63, 0, PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawny_)}},
+    // float spawnZ = 5;
+    {::_pbi::TcParser::FastF32S1,
+     {45, 63, 0, PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawnz_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bytes playerId = 1;
+    {PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.playerid_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kBytes | ::_fl::kRepAString)},
+    // int32 teamId = 2;
+    {PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.teamid_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kInt32)},
+    // float spawnX = 3;
+    {PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawnx_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kFloat)},
+    // float spawnY = 4;
+    {PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawny_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kFloat)},
+    // float spawnZ = 5;
+    {PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawnz_), 0, 0,
+    (0 | ::_fl::kFcSingular | ::_fl::kFloat)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+
+PROTOBUF_NOINLINE void PlayerInitInfo::Clear() {
+// @@protoc_insertion_point(message_clear_start:Protocol.PlayerInitInfo)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.playerid_.ClearToEmpty();
+  ::memset(&_impl_.teamid_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.spawnz_) -
+      reinterpret_cast<char*>(&_impl_.teamid_)) + sizeof(_impl_.spawnz_));
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::uint8_t* PlayerInitInfo::_InternalSerialize(
+            const MessageLite& base, ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) {
+          const PlayerInitInfo& this_ = static_cast<const PlayerInitInfo&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::uint8_t* PlayerInitInfo::_InternalSerialize(
+            ::uint8_t* target,
+            ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+          const PlayerInitInfo& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(serialize_to_array_start:Protocol.PlayerInitInfo)
+          ::uint32_t cached_has_bits = 0;
+          (void)cached_has_bits;
+
+          // bytes playerId = 1;
+          if (!this_._internal_playerid().empty()) {
+            const std::string& _s = this_._internal_playerid();
+            target = stream->WriteBytesMaybeAliased(1, _s, target);
+          }
+
+          // int32 teamId = 2;
+          if (this_._internal_teamid() != 0) {
+            target = ::google::protobuf::internal::WireFormatLite::
+                WriteInt32ToArrayWithField<2>(
+                    stream, this_._internal_teamid(), target);
+          }
+
+          // float spawnX = 3;
+          if (::absl::bit_cast<::uint32_t>(this_._internal_spawnx()) != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteFloatToArray(
+                3, this_._internal_spawnx(), target);
+          }
+
+          // float spawnY = 4;
+          if (::absl::bit_cast<::uint32_t>(this_._internal_spawny()) != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteFloatToArray(
+                4, this_._internal_spawny(), target);
+          }
+
+          // float spawnZ = 5;
+          if (::absl::bit_cast<::uint32_t>(this_._internal_spawnz()) != 0) {
+            target = stream->EnsureSpace(target);
+            target = ::_pbi::WireFormatLite::WriteFloatToArray(
+                5, this_._internal_spawnz(), target);
+          }
+
+          if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+            target =
+                ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+                    this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+          }
+          // @@protoc_insertion_point(serialize_to_array_end:Protocol.PlayerInitInfo)
+          return target;
+        }
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+        ::size_t PlayerInitInfo::ByteSizeLong(const MessageLite& base) {
+          const PlayerInitInfo& this_ = static_cast<const PlayerInitInfo&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+        ::size_t PlayerInitInfo::ByteSizeLong() const {
+          const PlayerInitInfo& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          // @@protoc_insertion_point(message_byte_size_start:Protocol.PlayerInitInfo)
+          ::size_t total_size = 0;
+
+          ::uint32_t cached_has_bits = 0;
+          // Prevent compiler warnings about cached_has_bits being unused
+          (void)cached_has_bits;
+
+          ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+           {
+            // bytes playerId = 1;
+            if (!this_._internal_playerid().empty()) {
+              total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                              this_._internal_playerid());
+            }
+            // int32 teamId = 2;
+            if (this_._internal_teamid() != 0) {
+              total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+                  this_._internal_teamid());
+            }
+            // float spawnX = 3;
+            if (::absl::bit_cast<::uint32_t>(this_._internal_spawnx()) != 0) {
+              total_size += 5;
+            }
+            // float spawnY = 4;
+            if (::absl::bit_cast<::uint32_t>(this_._internal_spawny()) != 0) {
+              total_size += 5;
+            }
+            // float spawnZ = 5;
+            if (::absl::bit_cast<::uint32_t>(this_._internal_spawnz()) != 0) {
+              total_size += 5;
+            }
+          }
+          return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                                     &this_._impl_._cached_size_);
+        }
+
+void PlayerInitInfo::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
+  auto* const _this = static_cast<PlayerInitInfo*>(&to_msg);
+  auto& from = static_cast<const PlayerInitInfo&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:Protocol.PlayerInitInfo)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_playerid().empty()) {
+    _this->_internal_set_playerid(from._internal_playerid());
+  }
+  if (from._internal_teamid() != 0) {
+    _this->_impl_.teamid_ = from._impl_.teamid_;
+  }
+  if (::absl::bit_cast<::uint32_t>(from._internal_spawnx()) != 0) {
+    _this->_impl_.spawnx_ = from._impl_.spawnx_;
+  }
+  if (::absl::bit_cast<::uint32_t>(from._internal_spawny()) != 0) {
+    _this->_impl_.spawny_ = from._impl_.spawny_;
+  }
+  if (::absl::bit_cast<::uint32_t>(from._internal_spawnz()) != 0) {
+    _this->_impl_.spawnz_ = from._impl_.spawnz_;
+  }
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void PlayerInitInfo::CopyFrom(const PlayerInitInfo& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:Protocol.PlayerInitInfo)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void PlayerInitInfo::InternalSwap(PlayerInitInfo* PROTOBUF_RESTRICT other) {
+  using std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.playerid_, &other->_impl_.playerid_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.spawnz_)
+      + sizeof(PlayerInitInfo::_impl_.spawnz_)
+      - PROTOBUF_FIELD_OFFSET(PlayerInitInfo, _impl_.teamid_)>(
+          reinterpret_cast<char*>(&_impl_.teamid_),
+          reinterpret_cast<char*>(&other->_impl_.teamid_));
+}
+
+::google::protobuf::Metadata PlayerInitInfo::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
 class InfoHandshakePacket::_Internal {
  public:
 };
@@ -886,7 +1270,8 @@ InfoHandshakePacket::InfoHandshakePacket(::google::protobuf::Arena* arena)
 inline PROTOBUF_NDEBUG_INLINE InfoHandshakePacket::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility, ::google::protobuf::Arena* arena,
     const Impl_& from, const ::Protocol::InfoHandshakePacket& from_msg)
-      : sessionid_(arena, from.sessionid_),
+      : players_{visibility, arena, from.players_},
+        sessionid_(arena, from.sessionid_),
         _cached_size_{0} {}
 
 InfoHandshakePacket::InfoHandshakePacket(
@@ -915,7 +1300,8 @@ InfoHandshakePacket::InfoHandshakePacket(
 inline PROTOBUF_NDEBUG_INLINE InfoHandshakePacket::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* arena)
-      : sessionid_(arena),
+      : players_{visibility, arena},
+        sessionid_(arena),
         _cached_size_{0} {}
 
 inline void InfoHandshakePacket::SharedCtor(::_pb::Arena* arena) {
@@ -944,8 +1330,20 @@ inline void* InfoHandshakePacket::PlacementNew_(const void*, void* mem,
   return ::new (mem) InfoHandshakePacket(arena);
 }
 constexpr auto InfoHandshakePacket::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(InfoHandshakePacket),
-                                            alignof(InfoHandshakePacket));
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(InfoHandshakePacket, _impl_.players_) +
+          decltype(InfoHandshakePacket::_impl_.players_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(InfoHandshakePacket), alignof(InfoHandshakePacket), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&InfoHandshakePacket::PlacementNew_,
+                                 sizeof(InfoHandshakePacket),
+                                 alignof(InfoHandshakePacket));
+  }
 }
 PROTOBUF_CONSTINIT
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
@@ -975,17 +1373,17 @@ const ::google::protobuf::internal::ClassData* InfoHandshakePacket::GetClassData
   return _class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<4, 13, 0, 0, 2> InfoHandshakePacket::_table_ = {
+const ::_pbi::TcParseTable<4, 14, 1, 0, 2> InfoHandshakePacket::_table_ = {
   {
     0,  // no _has_bits_
     0, // no _extensions_
-    13, 120,  // max_field_number, fast_idx_mask
+    14, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294959104,  // skipmap
+    4294950912,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    13,  // num_field_entries
-    0,  // num_aux_entries
-    offsetof(decltype(_table_), field_names),  // no aux_entries
+    14,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
     _class_data_.base(),
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
@@ -1033,7 +1431,9 @@ const ::_pbi::TcParseTable<4, 13, 0, 0, 2> InfoHandshakePacket::_table_ = {
     // int32 maxAmmo = 13;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(InfoHandshakePacket, _impl_.maxammo_), 63>(),
      {104, 63, 0, PROTOBUF_FIELD_OFFSET(InfoHandshakePacket, _impl_.maxammo_)}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // repeated .Protocol.PlayerInitInfo players = 14;
+    {::_pbi::TcParser::FastMtR1,
+     {114, 63, 0, PROTOBUF_FIELD_OFFSET(InfoHandshakePacket, _impl_.players_)}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
@@ -1077,9 +1477,12 @@ const ::_pbi::TcParseTable<4, 13, 0, 0, 2> InfoHandshakePacket::_table_ = {
     // int32 maxAmmo = 13;
     {PROTOBUF_FIELD_OFFSET(InfoHandshakePacket, _impl_.maxammo_), 0, 0,
     (0 | ::_fl::kFcSingular | ::_fl::kInt32)},
-  }},
-  // no aux_entries
-  {{
+    // repeated .Protocol.PlayerInitInfo players = 14;
+    {PROTOBUF_FIELD_OFFSET(InfoHandshakePacket, _impl_.players_), 0, 0,
+    (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+  }}, {{
+    {::_pbi::TcParser::GetTable<::Protocol::PlayerInitInfo>()},
+  }}, {{
   }},
 };
 
@@ -1090,6 +1493,7 @@ PROTOBUF_NOINLINE void InfoHandshakePacket::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  _impl_.players_.Clear();
   _impl_.sessionid_.ClearToEmpty();
   ::memset(&_impl_.presetid_, 0, static_cast<::size_t>(
       reinterpret_cast<char*>(&_impl_.maxammo_) -
@@ -1202,6 +1606,17 @@ PROTOBUF_NOINLINE void InfoHandshakePacket::Clear() {
                     stream, this_._internal_maxammo(), target);
           }
 
+          // repeated .Protocol.PlayerInitInfo players = 14;
+          for (unsigned i = 0, n = static_cast<unsigned>(
+                                   this_._internal_players_size());
+               i < n; i++) {
+            const auto& repfield = this_._internal_players().Get(i);
+            target =
+                ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+                    14, repfield, repfield.GetCachedSize(),
+                    target, stream);
+          }
+
           if (PROTOBUF_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
             target =
                 ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1226,6 +1641,15 @@ PROTOBUF_NOINLINE void InfoHandshakePacket::Clear() {
           (void)cached_has_bits;
 
           ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+           {
+            // repeated .Protocol.PlayerInitInfo players = 14;
+            {
+              total_size += 1UL * this_._internal_players_size();
+              for (const auto& msg : this_._internal_players()) {
+                total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
+              }
+            }
+          }
            {
             // bytes sessionId = 1;
             if (!this_._internal_sessionid().empty()) {
@@ -1298,6 +1722,8 @@ void InfoHandshakePacket::MergeImpl(::google::protobuf::MessageLite& to_msg, con
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  _this->_internal_mutable_players()->MergeFrom(
+      from._internal_players());
   if (!from._internal_sessionid().empty()) {
     _this->_internal_set_sessionid(from._internal_sessionid());
   }
@@ -1353,6 +1779,7 @@ void InfoHandshakePacket::InternalSwap(InfoHandshakePacket* PROTOBUF_RESTRICT ot
   auto* arena = GetArena();
   ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  _impl_.players_.InternalSwap(&other->_impl_.players_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.sessionid_, &other->_impl_.sessionid_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(InfoHandshakePacket, _impl_.maxammo_)

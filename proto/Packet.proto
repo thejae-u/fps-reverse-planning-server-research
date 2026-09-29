@@ -11,6 +11,7 @@ enum PacketType {
   // Tcp
   InfoHandshake = 101;
   Ping = 102;
+  EndGame = 103;
 
   // Udp
   Ingame = 200;
@@ -25,6 +26,7 @@ enum IngameType {
   Hit = 4;
   LagComp = 5;
   Score = 6;
+  MatchEnd = 7;
 }
 
 enum AuthenticationType {
@@ -35,6 +37,14 @@ enum AuthenticationType {
 message NetworkPacket {
   PacketType type = 1;
   bytes data = 2;
+}
+
+message PlayerInitInfo {
+  bytes playerId = 1;
+  int32 teamId = 2;
+  float spawnX = 3;
+  float spawnY = 4;
+  float spawnZ = 5;
 }
 
 message InfoHandshakePacket {
@@ -51,6 +61,7 @@ message InfoHandshakePacket {
   int32 maxHp = 11;
   int32 attackPower = 12;
   int32 maxAmmo = 13;
+  repeated PlayerInitInfo players = 14;
 }
 
 message IngamePacket {
@@ -114,9 +125,14 @@ message Scoreboard {
   int32 kill = 2;
   int32 death = 3;
   int32 heal = 4;
+  int32 teamId = 5;
+  int32 damage = 6;
 }
 
 message ScoreboardPacket {
   bytes roomId = 1;
   repeated Scoreboard scores = 2;
+  int32 winningTeam = 3;
+  int32 teamAScore = 4;
+  int32 teamBScore = 5;
 }

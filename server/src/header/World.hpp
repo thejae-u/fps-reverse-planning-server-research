@@ -64,10 +64,10 @@ private:
     void Update();
     void ProcessQueue();
     void UpdateState(float dt);
-    void BroadcastScoreboard();
     void CheckMatchEnd();
     
 public:
+    void BroadcastScoreboard();
     void Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
     std::unique_ptr<GameResult> GetResult();
     

@@ -22,6 +22,20 @@ void Room::OnMatchFinished()
 
     _world->StopUpdate();
 
+    // 게임 종료 시점의 최종 스코어보드를 먼저 전송
+    _world->BroadcastScoreboard();
+
+    // Send Finish State to Client
+    for(const auto& [id, weakSession] : _sessions)
+    {
+        if(const auto session = weakSession.lock())
+        {
+            if(!session->IsValid())
+                continue;
+            session->ProcessEndGame();
+        }
+    }
+
     spdlog::info("room: match finished. reporting results to auth server...");
 
     const auto playerStats = _world->GetPlayerStats();
@@ -70,6 +84,9 @@ void Room::OnMatchFinished()
         spdlog::info("room: match result successfully reported to auth server.");
     else
         spdlog::error("room: failed to report match result"); // TODO : Fail 시 재시도 및 예외 처리 로직 필요
+
+    // 비동기 TCP/UDP 송신 버퍼(BroadcastScoreboard, ProcessEndGame)가 클라이언트로 완전히 전송되도록 잠시 대기
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
     // Main Thread에 종료 신호 전달 (Graceful Shutdown)
     if(_shutdownCallback)

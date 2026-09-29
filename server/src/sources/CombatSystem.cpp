@@ -24,9 +24,9 @@ void CombatSystem::Shoot(
 
     // Rewind All Players
     auto rewinds = _lagCompensator.Rewind(players, id, targetTick);
-    Vector3 shootOrigin = shooter->position;
+    Vector3 shootOrigin = shooter->position + Vector3(0.0f, SHOOT_EYE_HEIGHT, 0.0f);
 
-    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS; // 충돌 구체 범위
+    constexpr float HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS; // 충돌 캡슐 반지름(0.45m) 제곱
     Vector3 normalizedDirection = direction.normalized();    // 방향 벡터 정규화
 
     // shooter 미포함 rewind 데이터
@@ -37,8 +37,8 @@ void CombatSystem::Shoot(
             continue;
 
         /*
-         *  O = shootOrigin : 발사 중심
-         *  C = rewindPosition : 적 중심 위치
+         *  O = shootOrigin : 발사 중심 (눈높이 보정)
+         *  C = targetCenter : 적 중심 위치 (초기값 몸통 중심 y + 0.9, 이후 캡슐 선분 [y+0.4, y+1.4]로 y클램핑)
          *  V = C - O : shooter 로부터 적의 방향 벡터
          *  D = normalized(shootDirection) : 정규화 된 발사선 방향 벡터
          *  t = V dot D : 적과 발사선의 내적 값 (Scalar, 음수면 체크 안함)
@@ -46,8 +46,10 @@ void CombatSystem::Shoot(
          *  ||P - C||^2 : P와 C의 최단거리 제곱
          */
 
+        Vector3 targetCenter = rewindPosition + Vector3(0.0f, 0.9f, 0.0f);
+
         // V = enemy - shooter (shooter로부터 적의 방향 벡터)
-        Vector3 v = rewindPosition - shootOrigin;
+        Vector3 v = targetCenter - shootOrigin;
 
         // t = V dot D (shooter로부터 방향 벡터와 Shoot 방향 벡터 내적)
         float t = v.dot(normalizedDirection);
@@ -59,8 +61,11 @@ void CombatSystem::Shoot(
         // P = O + t * D
         Vector3 p = normalizedDirection * t + shootOrigin;
 
+        // 구(Sphere)를 수직 캡슐(Capsule)로 확장: C의 y좌표를 캡슐 중심축 선분 [y+0.4, y+1.4] 범위 내 P.y로 클램핑
+        targetCenter.y = std::clamp(p.y, rewindPosition.y + CAPSULE_BOTTOM_OFFSET, rewindPosition.y + CAPSULE_TOP_OFFSET);
+
         // ||P - C||^2
-        Vector3 diff = p - rewindPosition;   // P - C
+        Vector3 diff = p - targetCenter;     // P - C
         const float distSq = diff.dot(diff); // ||PC||^2 = PC dot PC (자기 자신의 내적 값은 제곱 크기)
 
         // Collide Check
@@ -161,16 +166,16 @@ void CombatSystem::OnHit(
     }
 
     const auto& shooter = shooterIt->second;
-    const auto shooterTeam = static_cast<int>(shooter->teamType);
+    const int shooterTeamIdx = static_cast<int>(shooter->teamType) - 1;
     const auto& targetPlayer = hitIt->second;
 
     // 1. Damage 처리 (Player 내부 상태 및 팀 대미지 누적)
     DamageResult damageResult = targetPlayer->TakeDamage(damage);
     shooter->AddDamageDealt(damage);
 
-    if(shooterTeam >= 0 && shooterTeam < static_cast<int>(teamInfos.size()))
+    if(shooterTeamIdx >= 0 && shooterTeamIdx < static_cast<int>(teamInfos.size()))
     {
-        teamInfos[shooterTeam].damages += damage;
+        teamInfos[shooterTeamIdx].damages += damage;
     }
 
     // 2. 사망 시 Kill 처리 위임
@@ -218,18 +223,18 @@ void CombatSystem::OnKill(
     const Player& victim,
     std::vector<TeamInfo>& teamInfos)
 {
-    const auto shooterTeam = static_cast<int>(shooter.teamType);
-    const auto victimTeam = static_cast<int>(victim.teamType);
+    const int shooterTeamIdx = static_cast<int>(shooter.teamType) - 1;
+    const int victimTeamIdx = static_cast<int>(victim.teamType) - 1;
 
-    if(victimTeam >= 0 && victimTeam < static_cast<int>(teamInfos.size()))
+    if(victimTeamIdx >= 0 && victimTeamIdx < static_cast<int>(teamInfos.size()))
     {
-        teamInfos[victimTeam].deaths++;
+        teamInfos[victimTeamIdx].deaths++;
     }
 
     shooter.AddKill();
-    if(shooterTeam >= 0 && shooterTeam < static_cast<int>(teamInfos.size()))
+    if(shooterTeamIdx >= 0 && shooterTeamIdx < static_cast<int>(teamInfos.size()))
     {
-        teamInfos[shooterTeam].kills++;
+        teamInfos[shooterTeamIdx].kills++;
     }
 
     spdlog::info("world {}: player {} killed player {}",

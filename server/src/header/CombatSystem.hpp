@@ -11,7 +11,7 @@
 #include "GameResult.hpp"
 #include "LagCompensator.hpp"
 
-constexpr std::int16_t TARGET_KILLS = 5;
+constexpr std::int16_t TARGET_KILLS = 100;
 
 class Room;
 
@@ -50,5 +50,8 @@ public:
 private:
     uuids::uuid _roomId;
     LagCompensator _lagCompensator;
-    static constexpr float HIT_RADIUS = 3.0f;
+    static constexpr float HIT_RADIUS = 0.45f;          // 클라이언트 CharacterController 반지름(0.4m) + 스킨 여유(0.05m)
+    static constexpr float CAPSULE_BOTTOM_OFFSET = 0.4f; // 캡슐 하단 구 중심 높이 (0.4 - 0.45 ≈ 0.0m 발끝)
+    static constexpr float CAPSULE_TOP_OFFSET = 1.4f;    // 캡슐 상단 구 중심 높이 (1.4 + 0.45 = 1.85m 머리끝)
+    static constexpr float SHOOT_EYE_HEIGHT = 1.6f;      // 클라이언트 CameraHolder 눈높이 (1.6m)
 };

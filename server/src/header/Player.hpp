@@ -39,7 +39,7 @@ class Player
 public:
     Player()
         : teamType(TeamType::None), position(), velocity(), isGrounded(true),
-          hp(100), ammo(30), attackPower(10), kill(0), death(0), assist(0), damage(0), heal(0), guard(0), lastRecordedTick(0)
+          hp(100), ammo(30), attackPower(50), kill(0), death(0), assist(0), damage(0), heal(0), guard(0), lastRecordedTick(0)
     {
     }
     
