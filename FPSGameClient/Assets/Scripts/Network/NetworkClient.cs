@@ -48,7 +48,14 @@ public class NetworkClient
         _ep = new IPEndPoint(address, tcpPort);
         ServerUdpPort = udpPort > 0 ? udpPort : tcpPort;
         _udpServerEp = new IPEndPoint(address, ServerUdpPort);
-        SessionId = !string.IsNullOrEmpty(userId) ? userId : Guid.NewGuid().ToString();
+        if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out Guid parsedGuid))
+        {
+            SessionId = parsedGuid.ToString("D");
+        }
+        else
+        {
+            SessionId = !string.IsNullOrEmpty(userId) ? userId : Guid.NewGuid().ToString("D");
+        }
 
         _client = new TcpClient(AddressFamily.InterNetwork);
         _udpClient = new UdpClient(0, AddressFamily.InterNetwork);

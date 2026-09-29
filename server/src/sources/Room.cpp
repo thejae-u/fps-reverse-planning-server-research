@@ -28,8 +28,14 @@ void Room::OnMatchFinished()
     const auto gameResult = _world->GetResult();
     auto winningTeam = static_cast<int>(gameResult->winningTeam);
 
+    auto toCompactUuid = [](const uuids::uuid& id) {
+        std::string s = uuids::to_string(id);
+        std::erase(s, '-');
+        return s;
+    };
+
     json j;
-    j["matchId"] = uuids::to_string(_matchId);
+    j["matchId"] = toCompactUuid(_matchId);
     j["winningTeam"] = winningTeam;
     j["TeamAScore"] = gameResult->teamAInfo.kills;
     j["TeamBScore"] = gameResult->teamBInfo.kills;
@@ -44,11 +50,11 @@ void Room::OnMatchFinished()
     for(const auto& stat : *playerStats)
     {
         if(static_cast<int>(stat.teamType) == winningTeam)
-            j["winnerUserIds"].push_back(uuids::to_string(stat.id));
+            j["winnerUserIds"].push_back(toCompactUuid(stat.id));
 
         j["playerStats"].push_back({
             { "team", static_cast<int>(stat.teamType) },
-            { "userId", uuids::to_string(stat.id) },
+            { "userId", toCompactUuid(stat.id) },
             { "kills", stat.kill },
             { "deaths", stat.death },
             { "assists", stat.assist },

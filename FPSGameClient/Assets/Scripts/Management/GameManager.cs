@@ -149,7 +149,7 @@ namespace FPSGame.Management
                 GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 floor.name = "Floor";
                 floor.transform.position = new Vector3(0, -0.5f, 0);
-                floor.transform.localScale = new Vector3(50f, 1f, 50f);
+                floor.transform.localScale = new Vector3(100f, 1f, 100f);
 
                 // Spawn a few sample targets
                 for (int i = 0; i < 4; i++)
@@ -319,6 +319,17 @@ namespace FPSGame.Management
             Debug.Log($"[GameManager] Applied Server InfoHandshake -> MoveSpeed: {info.MoveSpeed}, SprintSpeed: {info.SprintSpeed}, JumpSpeed: {info.JumpSpeed}, Gravity: {info.Gravity}, HP: {info.MaxHp}, Damage: {info.AttackPower}, Ammo: {info.MaxAmmo}, Team: {info.TeamId}, Spawn: ({info.SpawnX}, {info.SpawnY}, {info.SpawnZ})");
         }
 
+        private static bool IsSamePlayerId(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+            if (string.Equals(a, b, System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (System.Guid.TryParse(a, out System.Guid guidA) && System.Guid.TryParse(b, out System.Guid guidB))
+            {
+                return guidA == guidB;
+            }
+            return false;
+        }
+
         public void ProcessServerIngamePacket(IngamePacket packet, string localSessionId)
         {
             if (packet == null) return;
@@ -334,22 +345,12 @@ namespace FPSGame.Management
                     Vector3 serverPos = new Vector3(move.OriginX, move.OriginY, move.OriginZ);
                     Vector3 serverDir = new Vector3(move.DirX, move.DirY, move.DirZ);
 
-                    if (movePlayerId == localSessionId)
+                    if (IsSamePlayerId(movePlayerId, localSessionId))
                     {
-                        if (localPlayer != null)
+                        if (localPlayer != null && !localPlayer.HasSyncedServerSpawn)
                         {
-                            // C++ Dedicated Server (World::Init) spawns players at (index * 5.0f, 0.0f, 0.0f)
-                            // and checks actualDist <= theoreticalDist + 2.0f for anti-cheat.
-                            // Sync local player on initial packet or if horizontal drift exceeds 2.0m.
-                            float horizontalDrift = Vector2.Distance(
-                                new Vector2(localPlayer.transform.position.x, localPlayer.transform.position.z),
-                                new Vector2(serverPos.x, serverPos.z));
-
-                            if (!localPlayer.HasSyncedServerSpawn || horizontalDrift > 2.0f)
-                            {
-                                Vector3 safeGroundPos = new Vector3(serverPos.x, Mathf.Max(serverPos.y, 0.05f), serverPos.z);
-                                localPlayer.SyncServerPosition(safeGroundPos);
-                            }
+                            Vector3 safeGroundPos = new Vector3(serverPos.x, Mathf.Max(serverPos.y, 0.05f), serverPos.z);
+                            localPlayer.SyncServerPosition(safeGroundPos);
                         }
                     }
                     else
@@ -375,7 +376,7 @@ namespace FPSGame.Management
                     string hitPlayerId = hit.HitPlayerId.ToStringUtf8();
                     string shooterId = hit.ShooterId.ToStringUtf8();
 
-                    if (hitPlayerId == localSessionId)
+                    if (IsSamePlayerId(hitPlayerId, localSessionId))
                     {
                         if (uiController != null)
                         {
@@ -387,7 +388,7 @@ namespace FPSGame.Management
                         }
                     }
 
-                    if (shooterId == localSessionId)
+                    if (IsSamePlayerId(shooterId, localSessionId))
                     {
                         if (uiController != null)
                         {

@@ -1,6 +1,7 @@
 #pragma once
 #include "Vector3.hpp"
 #include <array>
+#include <chrono>
 #include <cstdint>
 
 constexpr std::size_t SNAPSHOT_BUFFER_SIZE = 64;
@@ -74,7 +75,11 @@ public:
 
     std::size_t lastRecordedTick = 0;
     std::array<PlayerSnapshot, SNAPSHOT_BUFFER_SIZE> positionHistory{};
-    
+
+    bool hasReceivedMovePacket = false;
+    bool updatedByPacketThisTick = false;
+    bool needsStateBroadcast = true;
+    std::chrono::steady_clock::time_point lastMovePacketTime{};
 };
 
 struct PlayerStat

@@ -12,7 +12,7 @@ void World::Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& 
     for(const auto& [id, session] : sessions)
     {
         auto newPlayer = std::make_unique<Player>();
-        newPlayer->position = Vector3(static_cast<float>(index) * 5.0f, 0.0f, 0.0f); // 임시 위치 지정
+        newPlayer->position = Vector3((static_cast<float>(index) - 4.5f) * 2.0f, 0.0f, 0.0f); // 중앙 기준 스폰 위치 지정
         _players.insert({ id, std::move(newPlayer) });
         _sessions.insert({ id, session });
         index++;
@@ -94,6 +94,7 @@ void World::Jump(uuids::uuid player)
     }
 
     it->second->Jump();
+    it->second->needsStateBroadcast = true;
 }
 
 void World::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick)
@@ -121,7 +122,8 @@ void World::StartUpdate(std::weak_ptr<Room> weakRoom, const std::chrono::microse
 
     _weakRoom = weakRoom;
     _tickInterval = interval;
-    _timer.expires_at(std::chrono::steady_clock::now());
+    _lastTickTime = std::chrono::steady_clock::now();
+    _timer.expires_at(_lastTickTime);
     ScheduleNextTick();
 }
 
@@ -184,20 +186,39 @@ void World::ScheduleNextTick()
 
 void World::Update()
 {
+    const auto now = std::chrono::steady_clock::now();
+    float actualDt = std::chrono::duration<float>(now - _lastTickTime).count();
+    _lastTickTime = now;
+
+    constexpr float defaultDt = 0.016666f;
+    if(actualDt <= 0.0001f)
+        actualDt = defaultDt;
+    else if(actualDt > 0.1f)
+        actualDt = 0.1f;
+
     // 1. Process queued inputs from clients
     ProcessQueue();
 
-    // 2. Update world/physics state
-    UpdateState();
+    // 2. Update world/physics state using actual elapsed delta time
+    UpdateState(actualDt);
 
     // 3. Broadcast updated player states to all clients in the room
     if(const auto room = _weakRoom.lock())
     {
         std::lock_guard playerLock(_playerMutex);
-        for(const auto& [id, player] : _players)
+        for(auto& [id, player] : _players)
         {
             if(!player)
                 continue;
+
+            const bool isMovingOrAirborne = (player->velocity.magnitude() > 0.0001f) || !player->isGrounded;
+            if(!isMovingOrAirborne && !player->needsStateBroadcast)
+                continue;
+
+            if(!isMovingOrAirborne)
+            {
+                player->needsStateBroadcast = false;
+            }
 
             auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
             ingamePacket->set_sessionid(uuids::to_string(id));
@@ -302,9 +323,8 @@ void World::ProcessQueue()
                 Vector3 origin(movePacket.originx(), movePacket.originy(), movePacket.originz());
                 Vector3 direction(movePacket.dirx(), movePacket.diry(), movePacket.dirz());
 
-                // 서버 틱 기준 dt (16.6ms at 60fps)
-                constexpr float div = 1'000'000.0f;
-                const float dt = static_cast<float>(_tickInterval.count()) / div;
+                const auto packetNow = std::chrono::steady_clock::now();
+                constexpr float defaultDt = 0.016666f;
                 
                 bool isValid = true;
                 
@@ -314,29 +334,42 @@ void World::ProcessQueue()
                     {
                         auto& player = _players[playerId];
                         
-                        // 이론 최대 이동 거리 계산
-                        float maxSpeed = BASE_MOVE_SPEED;
-                        float theoreticalDist = maxSpeed * dt;
+                        float packetDt = defaultDt;
+                        if(player->hasReceivedMovePacket)
+                        {
+                            packetDt = std::chrono::duration<float>(packetNow - player->lastMovePacketTime).count();
+                            if(packetDt < defaultDt) packetDt = defaultDt;
+                            else if(packetDt > 0.5f) packetDt = 0.5f;
+                        }
+                        player->lastMovePacketTime = packetNow;
+                        player->hasReceivedMovePacket = true;
+
+                        // 패킷 간 실제 경과 시간(packetDt) 기준 최대 이동 가능 거리 계산 (스프린트 속도 포함)
+                        float maxSpeed = static_cast<float>(MAX_SPEED);
+                        float theoreticalDist = maxSpeed * packetDt;
                         
-                        float tolerance = 2.0f; // 레이턴시 극복용 완충 거리
+                        float tolerance = 2.5f; // 네트워크 지터 및 프레임 간격 완충 거리
                         float maxAllowedDist = theoreticalDist + tolerance;
                         
-                        // 서버 위치와 클라이언트 신규 위치 간 실제 거리 측정
+                        // 서버 위치와 클라이언트 신규 위치 간 수평 거리 측정 (수직 Y축은 점프/중력 및 CharacterController 높이 오프셋 분리)
                         float dx = player->position.x - origin.x;
-                        float dy = player->position.y - origin.y;
                         float dz = player->position.z - origin.z;
-                        float actualDist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                        float actualDist = std::sqrt(dx * dx + dz * dz);
                         
                         // 차이가 허용된 수치를 넘음
                         if(actualDist > maxAllowedDist)
                         {
                             isValid = false;
-                            spdlog::warn("world(room id) {}: player {} teleport suspected. Dist: {}m, Allowed: {}m",
-                                uuids::to_string(_roomId), uuids::to_string(playerId), actualDist, maxAllowedDist);
+                            player->velocity.x = 0.0f;
+                            player->velocity.z = 0.0f;
+                            spdlog::warn("world(room id) {}: player {} teleport suspected. Dist: {}m, Allowed: {}m (packetDt: {:.4f}s)",
+                                uuids::to_string(_roomId), uuids::to_string(playerId), actualDist, maxAllowedDist, packetDt);
                         }
                         else
                         {
                             player->position = origin;
+                            player->updatedByPacketThisTick = true;
+                            player->needsStateBroadcast = true;
                         }
                     }
                 }
@@ -345,15 +378,17 @@ void World::ProcessQueue()
                 {
                     float magnitude = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
                     Vector3 normDirection(0.0f, 0.0f, 0.0f);
+                    std::int32_t moveSpeed = 0;
 
                     if(magnitude > 0.0001f)
                     {
                         normDirection.x = direction.x / magnitude;
                         normDirection.y = direction.y / magnitude;
                         normDirection.z = direction.z / magnitude;
+                        moveSpeed = (magnitude > 1.5f) ? MAX_SPEED : static_cast<std::int32_t>(BASE_MOVE_SPEED);
                     }
 
-                    Move(playerId, normDirection, static_cast<std::int32_t>(BASE_MOVE_SPEED));
+                    Move(playerId, normDirection, moveSpeed);
                 }
             }
             break;
@@ -382,13 +417,9 @@ void World::ProcessQueue()
     }
 }
 
-void World::UpdateState()
+void World::UpdateState(float dt)
 {
     std::lock_guard playerLock(_playerMutex);
-
-    // 60fps 고정 틱에 맞춰 초 단위의 dt(델타 타임)를 산출하고 물리 적용
-    constexpr float div = 1'000'000.0f;
-    const float dt = static_cast<float>(_tickInterval.count()) / div;
 
     for(auto& [id, player] : _players)
     {

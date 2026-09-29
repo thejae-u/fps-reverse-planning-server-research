@@ -11,6 +11,11 @@ Listener::Listener(SecretKey, std::shared_ptr<IOManager> ioManager, std::uint16_
       _allowedPlayers(allowedPlayers.begin(), allowedPlayers.end())
 {
     _udpEndpoint = _udpSocket.local_endpoint();
+#ifdef _WIN32
+    BOOL bNewBehavior = FALSE;
+    DWORD dwBytesReturned = 0;
+    WSAIoctl(_udpSocket.native_handle(), _WSAIOW(IOC_VENDOR, 12), &bNewBehavior, sizeof(bNewBehavior), nullptr, 0, &dwBytesReturned, nullptr, nullptr);
+#endif
     spdlog::info("listener object created: tcp port {}, udp port {}", _tcpEndpoint.port(), _udpEndpoint.port());
 }
 
@@ -185,7 +190,11 @@ void Listener::ReceiveAsyncByUdp()
                     return;
                 }
 
-                spdlog::warn("listener: udp error occurred({})", ec.message());
+                if(ec != asio::error::connection_reset && ec != asio::error::connection_refused)
+                {
+                    spdlog::warn("listener: udp error occurred({})", ec.message());
+                }
+
                 if(auto self = weakSelf.lock())
                 {
                     self->ReceiveAsyncByUdp();

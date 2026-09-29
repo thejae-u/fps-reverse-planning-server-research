@@ -36,8 +36,13 @@ public class InternalController : ControllerBase
     [HttpPost("finish")]
     public async Task<IActionResult> FinishGame([FromBody] GameResultReportDto report)
     {
-        var tokenMatchId = User.FindFirst("match_id")?.Value;
-        if (!string.IsNullOrEmpty(tokenMatchId) && tokenMatchId != report.MatchId)
+        if (!string.IsNullOrEmpty(report.MatchId))
+        {
+            report.MatchId = report.MatchId.Replace("-", "");
+        }
+
+        var tokenMatchId = User.FindFirst("match_id")?.Value?.Replace("-", "");
+        if (!string.IsNullOrEmpty(tokenMatchId) && !string.Equals(tokenMatchId, report.MatchId, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("[FinishGame] Token match_id ({TokenMatchId}) does not match reported MatchId({ReportMatchId})",
                 tokenMatchId, report.MatchId);

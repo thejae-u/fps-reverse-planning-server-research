@@ -63,7 +63,7 @@ private:
     void ScheduleNextTick();
     void Update();
     void ProcessQueue();
-    void UpdateState();
+    void UpdateState(float dt);
     void BroadcastScoreboard();
     void CheckMatchEnd();
     
@@ -94,6 +94,7 @@ private:
     // Tick update details
     asio::steady_timer _timer;
     std::chrono::microseconds _tickInterval;
+    std::chrono::steady_clock::time_point _lastTickTime;
     std::weak_ptr<Room> _weakRoom;
     std::atomic<bool> _isUpdating;
 

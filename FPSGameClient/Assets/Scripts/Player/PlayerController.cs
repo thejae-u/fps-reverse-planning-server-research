@@ -59,8 +59,9 @@ namespace FPSGame.Player
 
         // Local Player Network Sync
         private float nextNetworkSendTime = 0f;
-        private const float NetworkSendInterval = 0.033f; // ~30Hz
+        private const float NetworkSendInterval = 0.0166f; // ~60Hz (서버 틱과 동기화)
         private Vector3 currentMoveDirection = Vector3.zero;
+        private Vector3 lastSentMoveDir = Vector3.zero;
         private bool hasSyncedServerSpawn = false;
 
         // Properties
@@ -286,11 +287,22 @@ namespace FPSGame.Player
 
                 // Periodically send MovePacket to Dedicated Server after initial spawn position sync
                 var netClient = NetworkManager.Instance?.Client;
-                if (netClient != null && netClient.IsUdpAuthenticated && hasSyncedServerSpawn && Time.time >= nextNetworkSendTime)
+                if (netClient != null && netClient.IsUdpAuthenticated && hasSyncedServerSpawn)
                 {
-                    nextNetworkSendTime = Time.time + NetworkSendInterval;
-                    Vector3 lookOrMoveDir = currentMoveDirection.sqrMagnitude > 0.001f ? currentMoveDirection : transform.forward;
-                    _ = netClient.SendMoveAsync(transform.position, lookOrMoveDir);
+                    Vector3 netMoveDir = currentMoveDirection.sqrMagnitude > 0.001f
+                        ? (currentMoveDirection * (isSprinting ? 2.0f : 1.0f))
+                        : Vector3.zero;
+
+                    bool isCurrentlyMoving = netMoveDir.sqrMagnitude > 0.001f;
+                    bool wasMoving = lastSentMoveDir.sqrMagnitude > 0.001f;
+
+                    // 이동 중일 때는 주기적(60Hz) 전송, 이동->정지 전환 순간에는 정지(Zero) 패킷 1회 전송, 계속 정지 중이면 전송 생략
+                    if ((isCurrentlyMoving && (!wasMoving || Time.time >= nextNetworkSendTime)) || (!isCurrentlyMoving && wasMoving))
+                    {
+                        nextNetworkSendTime = Time.time + NetworkSendInterval;
+                        lastSentMoveDir = netMoveDir;
+                        _ = netClient.SendMoveAsync(transform.position, netMoveDir);
+                    }
                 }
             }
             else
@@ -522,8 +534,8 @@ namespace FPSGame.Player
                 shooter.ApplyServerAmmoConfig(playerSO.magazineSize);
             }
 
-            // World::Init에서 팀 배정(teamId > 0) 또는 스폰 위치가 지정되어 온 경우 즉시 위치 동기화
-            if (info.TeamId != 0 || Mathf.Abs(info.SpawnX) > 0.001f || Mathf.Abs(info.SpawnY) > 0.001f || Mathf.Abs(info.SpawnZ) > 0.001f)
+            // World::Init에서 팀 배정(teamId > 0) 및 스폰 위치가 확정되어 온 경우 위치 동기화
+            if (info.TeamId != 0)
             {
                 Vector3 spawnPos = new Vector3(info.SpawnX, Mathf.Max(info.SpawnY, 0.05f), info.SpawnZ);
                 SyncServerPosition(spawnPos);

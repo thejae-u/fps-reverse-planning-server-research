@@ -249,6 +249,9 @@ void Session::ProcessPacketAsync()
 
 void Session::EnqueueUdpSendPacket(const std::shared_ptr<NetworkPacket>& data)
 {
+    if(_clientUdpEp.port() == 0)
+        return;
+
     // serialize NetworkPacket into payload (body)
     auto size = static_cast<int>(data->ByteSizeLong());
     const auto payload = std::make_shared<Raw>(size);

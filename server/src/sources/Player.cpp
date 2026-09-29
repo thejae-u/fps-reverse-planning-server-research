@@ -20,7 +20,8 @@ void Player::Move(Vector3 direction, std::int32_t speed)
         return;
     }
 
-    velocity = direction * speed;
+    velocity.x = direction.x * speed;
+    velocity.z = direction.z * speed;
 }
 
 void Player::Jump()
@@ -39,7 +40,20 @@ void Player::SimulatePhysics(float dt, float gravity)
         velocity.y -= gravity * dt;
     }
 
-    position += velocity * dt;
+    if(updatedByPacketThisTick)
+    {
+        // 이번 틱에 클라이언트의 MovePacket(origin)으로 이미 수평 좌표가 반영되었으므로
+        // 동일 틱 내 중복 수평 적분(origin + velocity * dt)을 방지하고 수직 물리만 반영
+        updatedByPacketThisTick = false;
+        if(!isGrounded)
+        {
+            position.y += velocity.y * dt;
+        }
+    }
+    else
+    {
+        position += velocity * dt;
+    }
 
     if(position.y <= 0.0f)
     {
