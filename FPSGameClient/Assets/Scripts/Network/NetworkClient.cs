@@ -29,6 +29,7 @@ public class NetworkClient
     public event Action<string, int> OnHandshakeCompleted;
     public event Action<InfoHandshakePacket> OnInfoHandshakeReceived;
     public event Action<IngamePacket> OnIngamePacketReceived;
+    public event Action OnEndGameReceived;
 
     public void Init(string ip = "", int tcpPort = 0, int udpPort = 0, string userId = "")
     {
@@ -401,6 +402,16 @@ public class NetworkClient
                 IngamePacket ingame = IngamePacket.Parser.ParseFrom(packet.Data);
                 if (ingame.ClientTick > 0) LastServerTick = ingame.ClientTick;
                 OnIngamePacketReceived?.Invoke(ingame);
+                if (ingame.Method == IngameType.MatchEnd)
+                {
+                    OnEndGameReceived?.Invoke();
+                }
+                break;
+            }
+            case PacketType.EndGame:
+            {
+                Debug.Log($"[NetworkClient] EndGame (TCP) Received! (SessionId: {SessionId})");
+                OnEndGameReceived?.Invoke();
                 break;
             }
         }
@@ -431,6 +442,16 @@ public class NetworkClient
                     RoomId = ingame.RoomId.ToStringUtf8();
                 }
                 OnIngamePacketReceived?.Invoke(ingame);
+                if (ingame.Method == IngameType.MatchEnd)
+                {
+                    OnEndGameReceived?.Invoke();
+                }
+                break;
+            }
+            case PacketType.EndGame:
+            {
+                Debug.Log($"[NetworkClient] EndGame (UDP) Received! (SessionId: {SessionId})");
+                OnEndGameReceived?.Invoke();
                 break;
             }
         }

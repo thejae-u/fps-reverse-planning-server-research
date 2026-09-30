@@ -24,10 +24,17 @@ namespace FPSGame.Management
 
         private readonly List<PlayerController> activePlayers = new List<PlayerController>();
         private readonly Dictionary<string, PlayerController> networkPlayers = new Dictionary<string, PlayerController>();
+        private readonly Dictionary<string, ScoreboardRowViewData> playerScoreMap = new Dictionary<string, ScoreboardRowViewData>();
         private PlayerController localPlayer;
+        private int localTeamId = 0;
+        private int lastWinningTeam = 0;
+        private int lastTeamAScore = 0;
+        private int lastTeamBScore = 0;
+        private bool isMatchEnded = false;
 
         public PlayerController LocalPlayer => localPlayer;
         public IReadOnlyList<PlayerController> ActivePlayers => activePlayers;
+        public bool IsMatchEnded => isMatchEnded;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoInitialize()
@@ -306,17 +313,73 @@ namespace FPSGame.Management
         {
             if (info == null) return;
 
+            localTeamId = info.TeamId;
+
             if (localPlayer != null)
             {
                 localPlayer.ApplyServerConfig(info);
             }
 
-            if (uiController != null && info.MaxHp > 0)
+            string mySessionId = !info.SessionId.IsEmpty
+                ? info.SessionId.ToStringUtf8()
+                : (NetworkManager.Instance?.Client?.SessionId ?? string.Empty);
+
+            // World::Init에서 전달된 초기 플레이어 목록(팀/스폰 위치)으로 원격 플레이어 초기 생성 및 아군(파랑)/적군(빨강) 색상 1회 설정
+            if (info.Players != null && info.Players.Count > 0)
             {
-                uiController.SetHealth(info.MaxHp, info.MaxHp);
+                foreach (var pInfo in info.Players)
+                {
+                    string pid = pInfo.PlayerId.ToStringUtf8();
+                    if (string.IsNullOrEmpty(pid))
+                        continue;
+
+                    bool isLocal = IsSamePlayerId(pid, mySessionId);
+                    string shortId = pid.Length > 6 ? pid.Substring(0, 6) : pid;
+                    string displayName = isLocal
+                        ? (!string.IsNullOrEmpty(NetworkManager.Instance?.Username) ? NetworkManager.Instance.Username : $"Player_{shortId}")
+                        : $"Player_{shortId}";
+
+                    if (!playerScoreMap.TryGetValue(pid, out ScoreboardRowViewData row))
+                    {
+                        row = new ScoreboardRowViewData
+                        {
+                            PlayerId = pid,
+                            DisplayName = displayName,
+                            TeamId = pInfo.TeamId,
+                            IsLocalPlayer = isLocal
+                        };
+                    }
+                    else
+                    {
+                        row.TeamId = pInfo.TeamId;
+                        row.IsLocalPlayer = isLocal;
+                        row.DisplayName = displayName;
+                    }
+                    playerScoreMap[pid] = row;
+
+                    if (isLocal)
+                        continue;
+
+                    Vector3 initSpawnPos = new Vector3(pInfo.SpawnX, pInfo.SpawnY, pInfo.SpawnZ);
+                    PlayerController remotePlayer = GetOrCreateNetworkPlayer(pid, initSpawnPos);
+                    if (remotePlayer != null)
+                    {
+                        remotePlayer.UpdateNetworkTransform(initSpawnPos, remotePlayer.transform.rotation);
+                        remotePlayer.SetTeamStatus(pInfo.TeamId, info.TeamId);
+                    }
+                }
             }
 
-            Debug.Log($"[GameManager] Applied Server InfoHandshake -> MoveSpeed: {info.MoveSpeed}, SprintSpeed: {info.SprintSpeed}, JumpSpeed: {info.JumpSpeed}, Gravity: {info.Gravity}, HP: {info.MaxHp}, Damage: {info.AttackPower}, Ammo: {info.MaxAmmo}, Team: {info.TeamId}, Spawn: ({info.SpawnX}, {info.SpawnY}, {info.SpawnZ})");
+            if (uiController != null)
+            {
+                if (info.MaxHp > 0)
+                {
+                    uiController.SetHealth(info.MaxHp, info.MaxHp);
+                }
+                uiController.UpdateTopTeamScoreHUD(lastTeamAScore, lastTeamBScore, localTeamId);
+            }
+
+            Debug.Log($"[GameManager] Applied Server InfoHandshake -> MoveSpeed: {info.MoveSpeed}, SprintSpeed: {info.SprintSpeed}, JumpSpeed: {info.JumpSpeed}, Gravity: {info.Gravity}, HP: {info.MaxHp}, Damage: {info.AttackPower}, Ammo: {info.MaxAmmo}, Team: {info.TeamId}, Spawn: ({info.SpawnX}, {info.SpawnY}, {info.SpawnZ}), PlayersCount: {info.Players?.Count ?? 0}");
         }
 
         private static bool IsSamePlayerId(string a, string b)
@@ -328,6 +391,37 @@ namespace FPSGame.Management
                 return guidA == guidB;
             }
             return false;
+        }
+
+        private string GetPlayerDisplayNameAndTeam(string playerId, string localSessionId, out int teamId, out bool isLocal)
+        {
+            isLocal = IsSamePlayerId(playerId, localSessionId);
+            teamId = isLocal ? localTeamId : 0;
+
+            if (!string.IsNullOrEmpty(playerId))
+            {
+                foreach (var kvp in playerScoreMap)
+                {
+                    if (IsSamePlayerId(kvp.Key, playerId))
+                    {
+                        if (kvp.Value.TeamId > 0) teamId = kvp.Value.TeamId;
+                        if (!string.IsNullOrEmpty(kvp.Value.DisplayName))
+                            return kvp.Value.DisplayName;
+                        break;
+                    }
+                }
+            }
+
+            string shortId = !string.IsNullOrEmpty(playerId) && playerId.Length > 6
+                ? playerId.Substring(0, 6)
+                : playerId;
+
+            if (isLocal && !string.IsNullOrEmpty(NetworkManager.Instance?.Username))
+            {
+                return NetworkManager.Instance.Username;
+            }
+
+            return $"Player_{shortId}";
         }
 
         public void ProcessServerIngamePacket(IngamePacket packet, string localSessionId)
@@ -398,8 +492,43 @@ namespace FPSGame.Management
 
                     if (networkPlayers.TryGetValue(hitPlayerId, out PlayerController hitRemote) && hitRemote != null)
                     {
-                        string shortId = hitPlayerId.Length > 6 ? hitPlayerId.Substring(0, 6) : hitPlayerId;
-                        hitRemote.SetPlayerName(hit.IsDead ? $"Player_{shortId} [DEAD]" : $"Player_{shortId} [{hit.CurrentHp} HP]");
+                        hitRemote.UpdateRemoteHealth(hit.CurrentHp, 100f, hit.IsDead);
+                    }
+
+                    // 사망(Kill) 발생 시 즉시 오른쪽 상단 킬 로그 추가 및 중앙 상단 팀 스코어 갱신
+                    if (hit.IsDead)
+                    {
+                        string killerName = GetPlayerDisplayNameAndTeam(shooterId, localSessionId, out int killerTeamId, out bool isKillerLocal);
+                        string victimName = GetPlayerDisplayNameAndTeam(hitPlayerId, localSessionId, out int victimTeamId, out bool isVictimLocal);
+
+                        if (playerScoreMap.TryGetValue(shooterId, out ScoreboardRowViewData killerRow))
+                        {
+                            killerRow.Kills += 1;
+                            killerRow.Damage += hit.Damage;
+                            playerScoreMap[shooterId] = killerRow;
+                        }
+
+                        if (playerScoreMap.TryGetValue(hitPlayerId, out ScoreboardRowViewData victimRow))
+                        {
+                            victimRow.Deaths = hit.Deaths > 0 ? hit.Deaths : (victimRow.Deaths + 1);
+                            playerScoreMap[hitPlayerId] = victimRow;
+                        }
+
+                        if (killerTeamId == 1) lastTeamAScore += 1;
+                        else if (killerTeamId == 2) lastTeamBScore += 1;
+
+                        if (uiController != null)
+                        {
+                            uiController.UpdateTopTeamScoreHUD(lastTeamAScore, lastTeamBScore, localTeamId);
+                            uiController.AddKillFeedEntry(
+                                killerName,
+                                killerTeamId,
+                                isKillerLocal,
+                                victimName,
+                                victimTeamId,
+                                isVictimLocal,
+                                localTeamId);
+                        }
                     }
                     break;
                 }
@@ -426,20 +555,137 @@ namespace FPSGame.Management
                 case IngameType.Score:
                 {
                     var scoreboard = ScoreboardPacket.Parser.ParseFrom(packet.Data);
+                    if (scoreboard.WinningTeam > 0) lastWinningTeam = scoreboard.WinningTeam;
+
+                    int sumTeamAKills = 0;
+                    int sumTeamBKills = 0;
+
                     foreach (var entry in scoreboard.Scores)
                     {
                         string scorePlayerId = entry.PlayerId.ToStringUtf8();
-                        if (scorePlayerId != localSessionId &&
+                        if (string.IsNullOrEmpty(scorePlayerId)) continue;
+
+                        bool isLocal = IsSamePlayerId(scorePlayerId, localSessionId);
+                        string shortId = scorePlayerId.Length > 6 ? scorePlayerId.Substring(0, 6) : scorePlayerId;
+                        string displayName = isLocal
+                            ? (!string.IsNullOrEmpty(NetworkManager.Instance?.Username) ? NetworkManager.Instance.Username : $"Player_{shortId}")
+                            : $"Player_{shortId}";
+
+                        if (!playerScoreMap.TryGetValue(scorePlayerId, out ScoreboardRowViewData row))
+                        {
+                            row = new ScoreboardRowViewData
+                            {
+                                PlayerId = scorePlayerId,
+                                DisplayName = displayName,
+                                TeamId = entry.TeamId,
+                                IsLocalPlayer = isLocal
+                            };
+                        }
+
+                        if (entry.TeamId > 0) row.TeamId = entry.TeamId;
+                        row.IsLocalPlayer = isLocal;
+                        row.DisplayName = displayName;
+                        row.Kills = entry.Kill;
+                        row.Deaths = entry.Death;
+                        row.Damage = entry.Damage;
+                        playerScoreMap[scorePlayerId] = row;
+
+                        if (row.TeamId == 1) sumTeamAKills += row.Kills;
+                        else if (row.TeamId == 2) sumTeamBKills += row.Kills;
+
+                        if (!isLocal &&
                             networkPlayers.TryGetValue(scorePlayerId, out PlayerController remotePlayer) &&
                             remotePlayer != null)
                         {
-                            string shortId = scorePlayerId.Length > 6 ? scorePlayerId.Substring(0, 6) : scorePlayerId;
                             remotePlayer.SetPlayerName($"Player_{shortId} ({entry.Kill}K/{entry.Death}D)");
                         }
                     }
+
+                    lastTeamAScore = scoreboard.TeamAScore > 0 ? scoreboard.TeamAScore : sumTeamAKills;
+                    lastTeamBScore = scoreboard.TeamBScore > 0 ? scoreboard.TeamBScore : sumTeamBKills;
+
+                    if (uiController != null)
+                    {
+                        uiController.UpdateTopTeamScoreHUD(lastTeamAScore, lastTeamBScore, localTeamId);
+                    }
+
+                    if (isMatchEnded)
+                    {
+                        RefreshEndGameScoreboardUI();
+                    }
+                    break;
+                }
+
+                case IngameType.MatchEnd:
+                {
+                    OnMatchEnded();
                     break;
                 }
             }
+        }
+
+        public void OnMatchEnded()
+        {
+            if (isMatchEnded)
+            {
+                RefreshEndGameScoreboardUI();
+                return;
+            }
+
+            isMatchEnded = true;
+            Debug.Log("[GameManager] Match Ended! Displaying Scoreboard and disabling local player controls.");
+
+            if (localPlayer != null)
+            {
+                localPlayer.SetControlEnabled(false);
+            }
+
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            RefreshEndGameScoreboardUI();
+        }
+
+        private void RefreshEndGameScoreboardUI()
+        {
+            EnsureEnvironmentAndUI();
+            if (uiController == null) return;
+
+            var rows = new List<ScoreboardRowViewData>(playerScoreMap.Values);
+            rows.Sort((a, b) =>
+            {
+                int teamCmp = a.TeamId.CompareTo(b.TeamId);
+                if (teamCmp != 0) return teamCmp;
+                int killCmp = b.Kills.CompareTo(a.Kills);
+                if (killCmp != 0) return killCmp;
+                return a.Deaths.CompareTo(b.Deaths);
+            });
+
+            int computedTeamA = 0;
+            int computedTeamB = 0;
+            foreach (var r in rows)
+            {
+                if (r.TeamId == 1) computedTeamA += r.Kills;
+                else if (r.TeamId == 2) computedTeamB += r.Kills;
+            }
+
+            int finalTeamAScore = lastTeamAScore > 0 ? lastTeamAScore : computedTeamA;
+            int finalTeamBScore = lastTeamBScore > 0 ? lastTeamBScore : computedTeamB;
+            int finalWinningTeam = lastWinningTeam;
+            if (finalWinningTeam == 0)
+            {
+                if (finalTeamAScore > finalTeamBScore) finalWinningTeam = 1;
+                else if (finalTeamBScore > finalTeamAScore) finalWinningTeam = 2;
+                else finalWinningTeam = 3;
+            }
+
+            uiController.ShowEndGameScoreboard(
+                rows,
+                localTeamId,
+                finalWinningTeam,
+                finalTeamAScore,
+                finalTeamBScore,
+                () => NetworkManager.EnsureInstance().ReturnToAuthLobby("MenuScene"));
         }
 
         private PlayerController GetOrCreateNetworkPlayer(string remoteSessionId, Vector3 initialPos)

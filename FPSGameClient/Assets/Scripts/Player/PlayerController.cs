@@ -63,9 +63,17 @@ namespace FPSGame.Player
         private Vector3 currentMoveDirection = Vector3.zero;
         private Vector3 lastSentMoveDir = Vector3.zero;
         private bool hasSyncedServerSpawn = false;
+        private int teamId = 0;
+
+        // Remote Overhead Health Bar
+        private Transform healthBarRoot;
+        private Transform healthBarFillPivot;
+        private Renderer healthBarFillRenderer;
+        private Coroutine deathRefillCoroutine;
 
         // Properties
         public int PlayerId => playerId;
+        public int TeamId => teamId;
         public bool IsLocalPlayer => isLocalPlayer;
         public string PlayerName => playerName;
         public bool HasSyncedServerSpawn => hasSyncedServerSpawn;
@@ -249,16 +257,34 @@ namespace FPSGame.Player
             if (firstPersonModel != null) firstPersonModel.SetActive(isLocalPlayer);
             if (thirdPersonModel != null) thirdPersonModel.SetActive(!isLocalPlayer);
 
+            // 이름표 대신 체력바를 사용하므로 기존 TextMesh 이름표는 비활성화
             if (nameTagTextMesh != null)
             {
-                nameTagTextMesh.text = playerName;
-                nameTagTextMesh.gameObject.SetActive(!isLocalPlayer);
+                nameTagTextMesh.gameObject.SetActive(false);
             }
 
             if (!isLocalPlayer)
             {
                 targetNetworkPosition = transform.position;
                 targetNetworkRotation = transform.rotation;
+                EnsureOverheadHealthBar();
+            }
+            else if (healthBarRoot != null)
+            {
+                healthBarRoot.gameObject.SetActive(false);
+            }
+        }
+
+        private bool isControlEnabled = true;
+
+        public void SetControlEnabled(bool enabled)
+        {
+            isControlEnabled = enabled;
+            if (!enabled)
+            {
+                currentMoveDirection = Vector3.zero;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
             }
         }
 
@@ -266,6 +292,16 @@ namespace FPSGame.Player
         {
             if (isLocalPlayer)
             {
+                if (!isControlEnabled)
+                {
+                    if (Cursor.lockState != CursorLockMode.None || !Cursor.visible)
+                    {
+                        Cursor.lockState = CursorLockMode.None;
+                        Cursor.visible = true;
+                    }
+                    return;
+                }
+
                 HandleCursorToggle();
                 HandleMouseLook();
                 HandleMovement();
@@ -311,10 +347,10 @@ namespace FPSGame.Player
                 transform.position = Vector3.Lerp(transform.position, targetNetworkPosition, Time.deltaTime * networkLerpSpeed);
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetNetworkRotation, Time.deltaTime * networkLerpSpeed);
 
-                // Make nametag face local player camera
-                if (nameTagTextMesh != null && Camera.main != null)
+                // 체력바가 항상 로컬 플레이어 카메라를 정면으로 바라보도록 회전(Billboard)
+                if (healthBarRoot != null && Camera.main != null)
                 {
-                    nameTagTextMesh.transform.rotation = Quaternion.LookRotation(nameTagTextMesh.transform.position - Camera.main.transform.position);
+                    healthBarRoot.rotation = Camera.main.transform.rotation;
                 }
             }
         }
@@ -498,13 +534,168 @@ namespace FPSGame.Player
             playerName = newName;
             if (nameTagTextMesh != null)
             {
-                nameTagTextMesh.text = playerName;
+                nameTagTextMesh.gameObject.SetActive(false);
             }
+        }
+
+        private void EnsureOverheadHealthBar()
+        {
+            if (isLocalPlayer) return;
+            if (healthBarRoot != null)
+            {
+                healthBarRoot.gameObject.SetActive(true);
+                return;
+            }
+
+            Transform existing = transform.Find("OverheadHealthBar");
+            if (existing != null)
+            {
+                healthBarRoot = existing;
+                healthBarFillPivot = existing.Find("HealthBarFillPivot");
+                if (healthBarFillPivot != null)
+                {
+                    Transform fillObj = healthBarFillPivot.Find("HealthBarFill");
+                    if (fillObj != null) healthBarFillRenderer = fillObj.GetComponent<Renderer>();
+                }
+                healthBarRoot.gameObject.SetActive(true);
+                return;
+            }
+
+            GameObject rootObj = new GameObject("OverheadHealthBar");
+            rootObj.transform.SetParent(transform, false);
+            rootObj.transform.localPosition = new Vector3(0f, 2.15f, 0f);
+            healthBarRoot = rootObj.transform;
+
+            // 배경 바 (어두운 테두리)
+            GameObject bgObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bgObj.name = "HealthBarBg";
+            bgObj.transform.SetParent(healthBarRoot, false);
+            bgObj.transform.localPosition = Vector3.zero;
+            bgObj.transform.localScale = new Vector3(1.12f, 0.15f, 0.02f);
+            Collider bgCol = bgObj.GetComponent<Collider>();
+            if (bgCol != null) Destroy(bgCol);
+
+            Renderer bgRenderer = bgObj.GetComponent<Renderer>();
+            ApplyColorToRenderer(bgRenderer, new Color(0.12f, 0.12f, 0.12f, 1f), unlit: true);
+
+            // 좌측 정렬 피벗 (체력이 깎일 때 오른쪽에서 왼쪽으로 줄어들도록 설정)
+            GameObject pivotObj = new GameObject("HealthBarFillPivot");
+            pivotObj.transform.SetParent(healthBarRoot, false);
+            pivotObj.transform.localPosition = new Vector3(-0.52f, 0f, 0f);
+            pivotObj.transform.localScale = Vector3.one;
+            healthBarFillPivot = pivotObj.transform;
+
+            // 체력 게이지 채움 바 (양면에서 모두 배경 바보다 바깥으로 돌출되도록 Z 두께를 0.035f로 지정)
+            GameObject fillObjNew = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            fillObjNew.name = "HealthBarFill";
+            fillObjNew.transform.SetParent(healthBarFillPivot, false);
+            fillObjNew.transform.localPosition = new Vector3(0.52f, 0f, 0f);
+            fillObjNew.transform.localScale = new Vector3(1.04f, 0.11f, 0.035f);
+            Collider fillCol = fillObjNew.GetComponent<Collider>();
+            if (fillCol != null) Destroy(fillCol);
+
+            healthBarFillRenderer = fillObjNew.GetComponent<Renderer>();
+            // 기본값은 적군 색상(빨간색), 팀 정보 수신 시 파란색/빨간색으로 갱신됨
+            ApplyColorToRenderer(healthBarFillRenderer, new Color(0.95f, 0.22f, 0.22f, 1f), unlit: true);
+        }
+
+        private static void ApplyColorToRenderer(Renderer renderer, Color color, bool unlit)
+        {
+            if (renderer == null) return;
+
+            Shader shader = null;
+            if (unlit)
+            {
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
+                if (shader == null) shader = Shader.Find("Unlit/Color");
+                if (shader == null) shader = Shader.Find("Sprites/Default");
+            }
+
+            Material mat = shader != null ? new Material(shader) : new Material(renderer.sharedMaterial);
+            mat.color = color;
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+            renderer.material = mat;
+        }
+
+        public void SetTeamStatus(int playerTeamId, int localPlayerTeamId)
+        {
+            if (playerTeamId != 0)
+            {
+                teamId = playerTeamId;
+            }
+
+            if (isLocalPlayer) return;
+
+            EnsureOverheadHealthBar();
+
+            // 같은 팀원이면 파란색, 적팀이면 빨간색
+            bool isTeammate = (teamId != 0 && localPlayerTeamId != 0 && teamId == localPlayerTeamId);
+            Color teamColor = isTeammate
+                ? new Color(0.15f, 0.52f, 1.0f, 1f) // 아군: 파란색
+                : new Color(0.95f, 0.22f, 0.22f, 1f); // 적군: 빨간색
+
+            if (thirdPersonModel != null)
+            {
+                Renderer[] renderers = thirdPersonModel.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    ApplyColorToRenderer(renderers[i], teamColor, unlit: false);
+                }
+            }
+
+            if (healthBarFillRenderer != null)
+            {
+                ApplyColorToRenderer(healthBarFillRenderer, teamColor, unlit: true);
+            }
+        }
+
+        public void UpdateRemoteHealth(float currentHp, float maxHp = 100f, bool isDead = false)
+        {
+            if (isLocalPlayer) return;
+
+            EnsureOverheadHealthBar();
+            if (healthBarFillPivot == null) return;
+
+            if (deathRefillCoroutine != null)
+            {
+                StopCoroutine(deathRefillCoroutine);
+                deathRefillCoroutine = null;
+            }
+
+            if (isDead)
+            {
+                deathRefillCoroutine = StartCoroutine(CoFlashDeathAndRefill());
+            }
+            else
+            {
+                float ratio = maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) : 1f;
+                healthBarFillPivot.localScale = new Vector3(ratio, 1f, 1f);
+            }
+        }
+
+        private System.Collections.IEnumerator CoFlashDeathAndRefill()
+        {
+            if (healthBarFillPivot != null)
+            {
+                healthBarFillPivot.localScale = new Vector3(0f, 1f, 1f);
+            }
+            yield return new WaitForSeconds(0.45f);
+            if (healthBarFillPivot != null)
+            {
+                healthBarFillPivot.localScale = Vector3.one;
+            }
+            deathRefillCoroutine = null;
         }
 
         public void ApplyServerConfig(Protocol.InfoHandshakePacket info)
         {
             if (info == null) return;
+
+            if (info.TeamId != 0)
+            {
+                teamId = info.TeamId;
+            }
 
             playerSO = playerSO != null ? Instantiate(playerSO) : ScriptableObject.CreateInstance<PlayerSO>();
 

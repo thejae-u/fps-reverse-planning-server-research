@@ -11,8 +11,8 @@ namespace FPSGame.UI
     public class MenuUIController : MonoBehaviour
     {
         [Header("Scene Settings")]
-        [SerializeField] private string gameSceneName = "SampleScene";
-        [SerializeField] private string defaultAuthServerUrl = "http://localhost:5000";
+        [SerializeField] private string gameSceneName = "GameScene";
+        [SerializeField] private string defaultAuthServerUrl = "http://localhost:18080";
 
         [Header("Server Config UI")]
         [SerializeField] private InputField serverUrlInput;
@@ -46,13 +46,38 @@ namespace FPSGame.UI
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            _authClient = new AuthApiClient(defaultAuthServerUrl);
-            NetworkManager.EnsureInstance();
+            NetworkManager netMgr = NetworkManager.EnsureInstance();
+            string effectiveUrl = !string.IsNullOrWhiteSpace(netMgr.AuthServerUrl)
+                ? netMgr.AuthServerUrl
+                : defaultAuthServerUrl;
+
+            _authClient = new AuthApiClient(effectiveUrl);
+
+            if (!string.IsNullOrEmpty(netMgr.JwtToken))
+            {
+                _authClient.RestoreSession(netMgr.UserId, netMgr.Username, netMgr.JwtToken, effectiveUrl);
+            }
 
             EnsureUIElements();
             BindUIEvents();
+            if (serverUrlInput != null)
+            {
+                serverUrlInput.text = effectiveUrl;
+            }
             RefreshPanelState();
-            SetStatus("AuthServer에 로그인하거나 새 계정을 등록하세요.", new Color(0.8f, 0.88f, 1f));
+
+            if (_authClient.IsAuthenticated)
+            {
+                SetStatus($"게임 종료 후 AuthServer 로비로 복귀했습니다 ({_authClient.Username}님). 다시 매칭을 시작할 수 있습니다.", new Color(0.35f, 1f, 0.55f));
+                if (matchStateText != null)
+                {
+                    matchStateText.text = "대기 상태: 매칭 시작 버튼을 눌러 큐에 진입하세요.";
+                }
+            }
+            else
+            {
+                SetStatus("AuthServer에 로그인하거나 새 계정을 등록하세요.", new Color(0.8f, 0.88f, 1f));
+            }
         }
 
         private void Update()
@@ -187,7 +212,8 @@ namespace FPSGame.UI
                     NetworkManager.EnsureInstance().SetUserSession(
                         result.Data.userId,
                         result.Data.username,
-                        result.Data.token);
+                        result.Data.token,
+                        _authClient.BaseUrl);
 
                     SetStatus($"환영합니다, {result.Data.username}님! 매칭을 시작할 수 있습니다.", new Color(0.35f, 1f, 0.55f));
                     if (matchStateText != null)
@@ -329,6 +355,7 @@ namespace FPSGame.UI
         {
             CancelMatchmakingWait();
             await _authClient.ClearAuthAsync();
+            NetworkManager.EnsureInstance().SetUserSession(null, null, null);
             SetStatus("로그아웃 되었습니다.", new Color(0.8f, 0.88f, 1f));
             RefreshPanelState();
         }

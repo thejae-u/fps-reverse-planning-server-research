@@ -19,8 +19,11 @@ namespace FPSGame.Player
         [SerializeField] private float recoilRotation = 0f;
         [SerializeField] private float recoilRecoverySpeed = 0f;
 
+        private static readonly Vector3 DefaultViewModelOffset = new Vector3(0.24f, -0.2f, 0.45f);
+
         private Vector3 initialPosition;
-        private Quaternion initialRotation;
+        private Quaternion initialRotation = Quaternion.identity;
+        private bool isInitialized = false;
 
         private Vector3 targetRecoilPos;
         private Vector3 currentRecoilPos;
@@ -29,14 +32,42 @@ namespace FPSGame.Player
 
         private float bobTimer = 0f;
 
+        private void Awake()
+        {
+            EnsureInitialized();
+        }
+
         private void Start()
         {
-            initialPosition = transform.localPosition;
-            initialRotation = transform.localRotation;
+            EnsureInitialized();
+        }
+
+        private void EnsureInitialized()
+        {
+            if (isInitialized) return;
+
+            initialPosition = transform.localPosition.sqrMagnitude > 0.0001f
+                ? transform.localPosition
+                : DefaultViewModelOffset;
+
+            initialRotation = (transform.localRotation.x == 0f &&
+                               transform.localRotation.y == 0f &&
+                               transform.localRotation.z == 0f &&
+                               transform.localRotation.w == 0f)
+                ? Quaternion.identity
+                : transform.localRotation;
+
+            if (swaySmooth <= 0.01f) swaySmooth = 8.0f;
+            if (recoilRecoverySpeed <= 0.01f) recoilRecoverySpeed = 10.0f;
+
+            transform.localPosition = initialPosition;
+            transform.localRotation = initialRotation;
+            isInitialized = true;
         }
 
         public void UpdateSway(Vector2 mouseInput, bool isMoving, bool isSprinting)
         {
+            EnsureInitialized();
             // 1. Mouse Sway
             float mouseX = Mathf.Clamp(mouseInput.x * swayAmount, -maxSwayAmount, maxSwayAmount);
             float mouseY = Mathf.Clamp(mouseInput.y * swayAmount, -maxSwayAmount, maxSwayAmount);

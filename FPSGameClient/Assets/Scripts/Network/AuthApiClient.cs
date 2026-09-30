@@ -117,6 +117,17 @@ namespace FPSGame.Network
             BaseUrl = NormalizeBaseUrl(url);
         }
 
+        public void RestoreSession(string userId, string username, string jwtToken, string baseUrl = null)
+        {
+            UserId = userId;
+            Username = username;
+            JwtToken = jwtToken;
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+            {
+                BaseUrl = NormalizeBaseUrl(baseUrl);
+            }
+        }
+
         public async Task ClearAuthAsync()
         {
             await DisconnectMatchHubWebSocketAsync();
