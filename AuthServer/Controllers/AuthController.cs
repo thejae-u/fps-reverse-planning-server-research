@@ -20,9 +20,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public IActionResult Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var result = _userService.Register(request);
+        var result = await _userService.RegisterAsync(request);
 
         if (!result.IsSuccess)
         {
@@ -42,9 +42,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var result = _userService.Login(request);
+        var result = await _userService.LoginAsync(request);
 
         if (!result.IsSuccess)
         {

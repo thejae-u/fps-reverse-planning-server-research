@@ -1,21 +1,24 @@
+using AuthServer.Data;
 using AuthServer.Dtos;
 using AuthServer.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Services;
 
 public class UserService
 {
-    private readonly List<User> _users = new();
+    private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<UserService> _logger;
 
-    public UserService(ILogger<UserService> logger)
+    public UserService(ApplicationDbContext dbContext, ILogger<UserService> logger)
     {
+        _dbContext = dbContext;
         _logger = logger;
     }
 
-    public Result<User> Register(RegisterRequest request)
+    public async Task<Result<User>> RegisterAsync(RegisterRequest request)
     {
-        if (_users.Any(u => u.Username == request.Username))
+        if (await _dbContext.Users.AnyAsync(u => u.Username == request.Username))
             return Result<User>.Failure("USERNAME_EXISTS", "이미 존재하는 사용자명입니다.");
 
         var user = new User
@@ -24,21 +27,31 @@ public class UserService
             PasswordHash = request.Password
         };
 
-        _users.Add(user);
-        _logger.LogInformation("새 사용자 등록: {Username}", user.Username);
+        _dbContext.Users.Add(user);
 
+        try
+        {
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Result<User>.Failure("USERNAME_EXISTS", "이미 존재하는 사용자명입니다.");
+        }
+
+        _logger.LogInformation("새 사용자 등록: {Username}", user.Username);
         return Result<User>.Success(user);
     }
 
-    public void AddUserDirectly(User user)
+    public async Task AddUserDirectlyAsync(User user)
     {
-        _users.Add(user);
+        _dbContext.Users.Add(user);
+        await _dbContext.SaveChangesAsync();
         _logger.LogWarning("{Role} User {Username} Directly Added", user.Role, user.Username);
     }
 
-    public Result<User> Login(LoginRequest request)
+    public async Task<Result<User>> LoginAsync(LoginRequest request)
     {
-        var user = _users.FirstOrDefault(u =>
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u =>
             u.Username == request.Username &&
             u.PasswordHash == request.Password);
 
@@ -48,13 +61,13 @@ public class UserService
         return Result<User>.Success(user);
     }
 
-    public User? GetById(string userId)
+    public Task<User?> GetByIdAsync(string userId)
     {
-        return _users.FirstOrDefault(u => u.Id == userId);
+        return _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
     }
 
-    public User? GetByUsername(string username)
+    public Task<User?> GetByUsernameAsync(string username)
     {
-        return _users.FirstOrDefault(u => u.Username == username);
+        return _dbContext.Users.FirstOrDefaultAsync(u => u.Username == username);
     }
 }

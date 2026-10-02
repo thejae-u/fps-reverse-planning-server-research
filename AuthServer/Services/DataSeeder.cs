@@ -29,13 +29,13 @@ public class DataSeeder
         await SeedUserIfNotExistsAsync(internalUsername, internalPassword, "Internal");
     }
 
-    private Task SeedUserIfNotExistsAsync(string username, string password, string role)
+    private async Task SeedUserIfNotExistsAsync(string username, string password, string role)
     {
-        var existingUser = _userService.GetByUsername(username);
+        var existingUser = await _userService.GetByUsernameAsync(username);
         if (existingUser != null)
         {
             _logger.LogInformation("[DataSeeder]  {Role} 계정('{Username}')이 이미 존재합니다.", role, username);
-            return Task.CompletedTask;
+            return;
         }
 
         var user = new User
@@ -45,7 +45,6 @@ public class DataSeeder
             Role = role
         };
         
-        _userService.AddUserDirectly(user);
-        return Task.CompletedTask;
+        await _userService.AddUserDirectlyAsync(user);
     }
 }

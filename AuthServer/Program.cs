@@ -69,7 +69,7 @@ builder.Services.Configure<TcpOptions>(builder.Configuration.GetSection("LogicSe
 
 // Service DI
 builder.Services.AddSingleton<IDedicatedServerSpawner, DedicatedServerSpawner>();
-builder.Services.AddSingleton<UserService>();
+builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<MatchService>();
 builder.Services.AddLogging();
@@ -166,7 +166,7 @@ app.MapGet("/info", () => new
 // SignalR Match Hub Route
 app.MapHub<MatchHub>("/hubs/match");
 
-// 구동 직전 인프라 연결 확인 및 시드 데이터 초기화 (Fail-Fast)
+// 구동 직전 인프라 연결 확인, DB 마이그레이션 및 시드 데이터 초기화 (Fail-Fast)
 using (var scope = app.Services.CreateScope())
 {
     // 1. PostgreSQL 연결 확인
@@ -179,6 +179,9 @@ using (var scope = app.Services.CreateScope())
             throw new InvalidOperationException("Failed to connect to PostgreSQL database.");
         }
         Log.Information("[PostgreSQL] Successfully connected to database.");
+
+        await db.Database.MigrateAsync();
+        Log.Information("[PostgreSQL] Database migrations applied.");
     }
     catch (Exception ex) when (ex is not InvalidOperationException)
     {
