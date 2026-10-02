@@ -77,6 +77,9 @@ extern MovePacketDefaultTypeInternal _MovePacket_default_instance_;
 class NetworkPacket;
 struct NetworkPacketDefaultTypeInternal;
 extern NetworkPacketDefaultTypeInternal _NetworkPacket_default_instance_;
+class PingRttPacket;
+struct PingRttPacketDefaultTypeInternal;
+extern PingRttPacketDefaultTypeInternal _PingRttPacket_default_instance_;
 class PlayerInitInfo;
 struct PlayerInitInfoDefaultTypeInternal;
 extern PlayerInitInfoDefaultTypeInternal _PlayerInitInfo_default_instance_;
@@ -100,6 +103,7 @@ enum PacketType : int {
   InfoHandshake = 101,
   Ping = 102,
   EndGame = 103,
+  PingRtt = 104,
   Ingame = 200,
   Authentication = 201,
   PacketType_INT_MIN_SENTINEL_DO_NOT_USE_ =
@@ -263,7 +267,7 @@ class Scoreboard final : public ::google::protobuf::Message
     return reinterpret_cast<const Scoreboard*>(
         &_Scoreboard_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(Scoreboard& a, Scoreboard& b) { a.Swap(&b); }
   inline void Swap(Scoreboard* other) {
     if (other == this) return;
@@ -519,7 +523,7 @@ class PlayerInitInfo final : public ::google::protobuf::Message
     return reinterpret_cast<const PlayerInitInfo*>(
         &_PlayerInitInfo_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 1;
+  static constexpr int kIndexInFileMessages = 2;
   friend void swap(PlayerInitInfo& a, PlayerInitInfo& b) { a.Swap(&b); }
   inline void Swap(PlayerInitInfo* other) {
     if (other == this) return;
@@ -696,6 +700,208 @@ class PlayerInitInfo final : public ::google::protobuf::Message
     float spawnx_;
     float spawny_;
     float spawnz_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_Packet_2eproto;
+};
+// -------------------------------------------------------------------
+
+class PingRttPacket final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:Protocol.PingRttPacket) */ {
+ public:
+  inline PingRttPacket() : PingRttPacket(nullptr) {}
+  ~PingRttPacket() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(PingRttPacket* msg, std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(PingRttPacket));
+  }
+#endif
+
+  template <typename = void>
+  explicit PROTOBUF_CONSTEXPR PingRttPacket(
+      ::google::protobuf::internal::ConstantInitialized);
+
+  inline PingRttPacket(const PingRttPacket& from) : PingRttPacket(nullptr, from) {}
+  inline PingRttPacket(PingRttPacket&& from) noexcept
+      : PingRttPacket(nullptr, std::move(from)) {}
+  inline PingRttPacket& operator=(const PingRttPacket& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PingRttPacket& operator=(PingRttPacket&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields()
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::google::protobuf::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::google::protobuf::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const PingRttPacket& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const PingRttPacket* internal_default_instance() {
+    return reinterpret_cast<const PingRttPacket*>(
+        &_PingRttPacket_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 1;
+  friend void swap(PingRttPacket& a, PingRttPacket& b) { a.Swap(&b); }
+  inline void Swap(PingRttPacket* other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PingRttPacket* other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  PingRttPacket* New(::google::protobuf::Arena* arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<PingRttPacket>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const PingRttPacket& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const PingRttPacket& from) { PingRttPacket::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(
+      ::google::protobuf::MessageLite& to_msg,
+      const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  static ::uint8_t* _InternalSerialize(
+      const MessageLite& msg, ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream);
+
+  public:
+  ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  ::size_t ByteSizeLong() const final;
+  ::uint8_t* _InternalSerialize(
+      ::uint8_t* target,
+      ::google::protobuf::io::EpsCopyOutputStream* stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  int GetCachedSize() const { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(PingRttPacket* other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(
+      ::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "Protocol.PingRttPacket"; }
+
+ protected:
+  explicit PingRttPacket(::google::protobuf::Arena* arena);
+  PingRttPacket(::google::protobuf::Arena* arena, const PingRttPacket& from);
+  PingRttPacket(::google::protobuf::Arena* arena, PingRttPacket&& from) noexcept
+      : PingRttPacket(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* GetClassData() const PROTOBUF_FINAL;
+  static void* PlacementNew_(const void*, void* mem,
+                             ::google::protobuf::Arena* arena);
+  static constexpr auto InternalNewImpl_();
+  static const ::google::protobuf::internal::ClassDataFull _class_data_;
+
+ public:
+  ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSequenceFieldNumber = 1,
+    kMicrosecondsFieldNumber = 2,
+  };
+  // uint64 sequence = 1;
+  void clear_sequence() ;
+  ::uint64_t sequence() const;
+  void set_sequence(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_sequence() const;
+  void _internal_set_sequence(::uint64_t value);
+
+  public:
+  // uint64 microseconds = 2;
+  void clear_microseconds() ;
+  ::uint64_t microseconds() const;
+  void set_microseconds(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_microseconds() const;
+  void _internal_set_microseconds(::uint64_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:Protocol.PingRttPacket)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<
+      1, 2, 0,
+      0, 2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(
+        ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena);
+    inline explicit Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                          ::google::protobuf::Arena* arena, const Impl_& from,
+                          const PingRttPacket& from_msg);
+    ::uint64_t sequence_;
+    ::uint64_t microseconds_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -971,7 +1177,7 @@ class MovePacket final : public ::google::protobuf::Message
     return reinterpret_cast<const MovePacket*>(
         &_MovePacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(MovePacket& a, MovePacket& b) { a.Swap(&b); }
   inline void Swap(MovePacket* other) {
     if (other == this) return;
@@ -1239,7 +1445,7 @@ class LagCompTarget final : public ::google::protobuf::Message
     return reinterpret_cast<const LagCompTarget*>(
         &_LagCompTarget_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(LagCompTarget& a, LagCompTarget& b) { a.Swap(&b); }
   inline void Swap(LagCompTarget* other) {
     if (other == this) return;
@@ -1519,7 +1725,7 @@ class IngamePacket final : public ::google::protobuf::Message
     return reinterpret_cast<const IngamePacket*>(
         &_IngamePacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(IngamePacket& a, IngamePacket& b) { a.Swap(&b); }
   inline void Swap(IngamePacket* other) {
     if (other == this) return;
@@ -1775,7 +1981,7 @@ class HitPacket final : public ::google::protobuf::Message
     return reinterpret_cast<const HitPacket*>(
         &_HitPacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(HitPacket& a, HitPacket& b) { a.Swap(&b); }
   inline void Swap(HitPacket* other) {
     if (other == this) return;
@@ -2037,7 +2243,7 @@ class AuthenticationPacket final : public ::google::protobuf::Message
     return reinterpret_cast<const AuthenticationPacket*>(
         &_AuthenticationPacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(AuthenticationPacket& a, AuthenticationPacket& b) { a.Swap(&b); }
   inline void Swap(AuthenticationPacket* other) {
     if (other == this) return;
@@ -2281,7 +2487,7 @@ class ScoreboardPacket final : public ::google::protobuf::Message
     return reinterpret_cast<const ScoreboardPacket*>(
         &_ScoreboardPacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(ScoreboardPacket& a, ScoreboardPacket& b) { a.Swap(&b); }
   inline void Swap(ScoreboardPacket* other) {
     if (other == this) return;
@@ -2532,7 +2738,7 @@ class LagCompPacket final : public ::google::protobuf::Message
     return reinterpret_cast<const LagCompPacket*>(
         &_LagCompPacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 7;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(LagCompPacket& a, LagCompPacket& b) { a.Swap(&b); }
   inline void Swap(LagCompPacket* other) {
     if (other == this) return;
@@ -2819,7 +3025,7 @@ class InfoHandshakePacket final : public ::google::protobuf::Message
     return reinterpret_cast<const InfoHandshakePacket*>(
         &_InfoHandshakePacket_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 3;
   friend void swap(InfoHandshakePacket& a, InfoHandshakePacket& b) { a.Swap(&b); }
   inline void Swap(InfoHandshakePacket* other) {
     if (other == this) return;
@@ -3202,6 +3408,54 @@ inline void NetworkPacket::set_allocated_data(std::string* value) {
     _impl_.data_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:Protocol.NetworkPacket.data)
+}
+
+// -------------------------------------------------------------------
+
+// PingRttPacket
+
+// uint64 sequence = 1;
+inline void PingRttPacket::clear_sequence() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sequence_ = ::uint64_t{0u};
+}
+inline ::uint64_t PingRttPacket::sequence() const {
+  // @@protoc_insertion_point(field_get:Protocol.PingRttPacket.sequence)
+  return _internal_sequence();
+}
+inline void PingRttPacket::set_sequence(::uint64_t value) {
+  _internal_set_sequence(value);
+  // @@protoc_insertion_point(field_set:Protocol.PingRttPacket.sequence)
+}
+inline ::uint64_t PingRttPacket::_internal_sequence() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.sequence_;
+}
+inline void PingRttPacket::_internal_set_sequence(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sequence_ = value;
+}
+
+// uint64 microseconds = 2;
+inline void PingRttPacket::clear_microseconds() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.microseconds_ = ::uint64_t{0u};
+}
+inline ::uint64_t PingRttPacket::microseconds() const {
+  // @@protoc_insertion_point(field_get:Protocol.PingRttPacket.microseconds)
+  return _internal_microseconds();
+}
+inline void PingRttPacket::set_microseconds(::uint64_t value) {
+  _internal_set_microseconds(value);
+  // @@protoc_insertion_point(field_set:Protocol.PingRttPacket.microseconds)
+}
+inline ::uint64_t PingRttPacket::_internal_microseconds() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.microseconds_;
+}
+inline void PingRttPacket::_internal_set_microseconds(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.microseconds_ = value;
 }
 
 // -------------------------------------------------------------------

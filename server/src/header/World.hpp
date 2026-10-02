@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include "ServerPolicy.hpp"
 #include <memory>
 #include <uuid.h>
 #include <mutex>
@@ -15,16 +16,18 @@
 #include "Player.hpp"
 #include "GameResult.hpp"
 #include "CombatSystem.hpp"
+#include "NetworkGateway.hpp"
 
 class Session;
 class Room;
 
 class World
 {
-public:
-    explicit World(asio::io_context& ioContext, const uuids::uuid roomId)
-    : _roomId(roomId), _combatSystem(roomId), _playerSize(static_cast<std::size_t>(0)), _timer(ioContext), _tickInterval(50), _isUpdating(false), _gen(_rd()),
-      _dis(static_cast<int>(TeamType::TeamA), static_cast<int>(TeamType::TeamB)), _teamACount(0), _teamBCount(0)
+  public:
+    explicit World(asio::io_context &ioContext, asio::io_context::strand strand, const uuids::uuid roomId)
+        : _roomId(roomId), _combatSystem(roomId), _playerSize(static_cast<std::size_t>(0)), _strand(std::move(strand)),
+          _timer(ioContext), _tickInterval(ServerPolicy::TickInterval), _isUpdating(false), _gen(_rd()),
+          _dis(static_cast<int>(TeamType::TeamA), static_cast<int>(TeamType::TeamB)), _teamACount(0), _teamBCount(0)
     {
         _teamInfos.reserve(2);
         _teamInfos.emplace_back(TeamInfo(TeamType::TeamA));
@@ -36,62 +39,66 @@ public:
         spdlog::info("world(room id) {}: world destroyed", uuids::to_string(_roomId));
     }
 
-    void Init(const std::unordered_map<uuids::uuid, std::weak_ptr<Session>>& sessions);
-    bool GetPlayerPosition(uuids::uuid playerId, Vector3& outPosition);
+    void Init(const std::unordered_map<uuids::uuid, Participant> &sessions, std::weak_ptr<Room> room);
+    bool GetPlayerPosition(uuids::uuid playerId, Vector3 &outPosition);
 
-    void StartUpdate(std::weak_ptr<Room> weakRoom, std::chrono::microseconds interval = std::chrono::microseconds(16666));
+    void StartUpdate(std::weak_ptr<Room> weakRoom, std::chrono::microseconds interval = ServerPolicy::TickInterval);
     void StopUpdate();
     void EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet);
 
-    std::size_t GetTickCount() const { return _tickCount.load(); }
+    std::size_t GetTickCount() const
+    {
+        return _tickCount.load();
+    }
+
     std::unique_ptr<std::vector<PlayerStat>> GetPlayerStats()
     {
         std::lock_guard lock(_playerMutex);
         auto playerStats = std::make_unique<std::vector<PlayerStat>>();
         playerStats->reserve(_players.size());
-        for (auto& [id, player] : _players)
+        for (auto &[id, player] : _players)
         {
             PlayerStat playerStat(id, *player);
             playerStats->push_back(playerStat);
         }
-        
+
         return playerStats;
     }
 
-private:
+  private:
     void DivideTeam();
     void ScheduleNextTick();
     void Update();
     void ProcessQueue();
     void UpdateState(float dt);
     void CheckMatchEnd();
-    
-public:
-    void BroadcastScoreboard();
+
+  public:
+    void BroadcastScoreboard(bool coalesce = true);
     void Hit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId);
     std::unique_ptr<GameResult> GetResult();
-    
-private:
+
+  private:
     void Move(uuids::uuid player, Vector3 direction, std::int32_t speed);
     void Jump(uuids::uuid player);
     void Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick);
 
-private:
+  private:
     uuids::uuid _roomId;
     CombatSystem _combatSystem;
-    
+
     // Session Info
-    std::mutex _sessionsMutex;
-    std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
+    std::unordered_map<uuids::uuid, Participant> _sessions;
 
     // Player updates
     std::size_t _playerSize;
     std::unordered_map<uuids::uuid, std::unique_ptr<Player>> _players;
     std::mutex _playerMutex;
-    
+
     std::atomic<std::size_t> _tickCount = 0;
 
     // Tick update details
+    asio::io_context::strand _strand;
     asio::steady_timer _timer;
     std::chrono::microseconds _tickInterval;
     std::chrono::steady_clock::time_point _lastTickTime;
@@ -101,12 +108,12 @@ private:
     // Input queue
     std::queue<std::shared_ptr<Protocol::IngamePacket>> _packetQueue;
     std::mutex _queueMutex;
-    
+
     // Metrics storage
     std::vector<std::int64_t> _tickDurationsUs;
     std::mutex _metricsMutex;
 
-    // random device for team separate 
+    // random device for team separate
     std::random_device _rd;
     std::mt19937_64 _gen;
     std::uniform_int_distribution<> _dis;

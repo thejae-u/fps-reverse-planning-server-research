@@ -578,10 +578,7 @@ namespace FPSGame.Editor
             Text healthText = CreateText(canvasObj.transform, "HealthText", new Vector2(0, 0), new Vector2(0, 0), new Vector2(40, 40), "HP: 100 / 100", 36, TextAnchor.MiddleLeft, new Color(0.2f, 1f, 0.4f), defaultFont);
 
             // Player Count (Top-Center)
-            Text playerCountText = CreateText(canvasObj.transform, "PlayerCountText", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -35), "Players: 1 / 10 (Press F1 to add dummy)", 24, TextAnchor.MiddleCenter, Color.cyan, defaultFont);
-
-            // Guide Text (Top-Left)
-            Text guideText = CreateText(canvasObj.transform, "GuideText", new Vector2(0, 1), new Vector2(0, 1), new Vector2(30, -35), "", 18, TextAnchor.UpperLeft, new Color(0.85f, 0.85f, 0.85f, 0.9f), defaultFont);
+            Text playerCountText = CreateText(canvasObj.transform, "PlayerCountText", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -35), "Players: 1 / 10", 24, TextAnchor.MiddleCenter, Color.cyan, defaultFont);
 
             // Bind UI Controller fields
             SerializedObject uiSO = new SerializedObject(ui);
@@ -590,7 +587,6 @@ namespace FPSGame.Editor
             uiSO.FindProperty("ammoText").objectReferenceValue = ammoText;
             uiSO.FindProperty("healthText").objectReferenceValue = healthText;
             uiSO.FindProperty("playerCountText").objectReferenceValue = playerCountText;
-            uiSO.FindProperty("guideText").objectReferenceValue = guideText;
             uiSO.ApplyModifiedProperties();
 
             // 5. GameManager

@@ -79,24 +79,16 @@ namespace FPSGame.Management
 
         private void HandleTestInputs()
         {
-            bool f1Pressed = false;
             bool f2Pressed = false;
 
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
             {
-                f1Pressed = Keyboard.current.f1Key.wasPressedThisFrame;
                 f2Pressed = Keyboard.current.f2Key.wasPressedThisFrame;
             }
 #else
-            f1Pressed = Input.GetKeyDown(KeyCode.F1);
             f2Pressed = Input.GetKeyDown(KeyCode.F2);
 #endif
-
-            if (f1Pressed)
-            {
-                SpawnRemoteDummyPlayer();
-            }
 
             if (f2Pressed)
             {
@@ -251,49 +243,6 @@ namespace FPSGame.Management
             target.transform.position = position + Vector3.up * 1f;
             target.transform.localScale = new Vector3(0.8f, 1.5f, 0.2f);
             target.AddComponent<Combat.TargetDummy>();
-        }
-
-        public void SpawnRemoteDummyPlayer()
-        {
-            if (activePlayers.Count >= maxPlayers)
-            {
-                Debug.Log($"[GameManager] Maximum player limit ({maxPlayers}) reached!");
-                return;
-            }
-
-            int newId = activePlayers.Count;
-            Vector3 spawnPos = Vector3.zero;
-            Quaternion spawnRot = Quaternion.identity;
-
-            if (spawnPoints != null && spawnPoints.Length > newId && spawnPoints[newId] != null)
-            {
-                spawnPos = spawnPoints[newId].position;
-                spawnRot = spawnPoints[newId].rotation;
-            }
-            else
-            {
-                // Circular offset around origin if not enough spawn points
-                float angle = newId * (360f / maxPlayers);
-                spawnPos = new Vector3(Mathf.Sin(angle * Mathf.Deg2Rad) * 6f, 1.5f, Mathf.Cos(angle * Mathf.Deg2Rad) * 6f);
-                spawnRot = Quaternion.LookRotation(-spawnPos.normalized);
-            }
-
-            GameObject remoteObj = playerPrefab != null 
-                ? Instantiate(playerPrefab, spawnPos, spawnRot) 
-                : CreateDynamicPlayerInstance(spawnPos, spawnRot);
-            PlayerController remotePlayer = remoteObj.GetComponent<PlayerController>();
-
-            if (remotePlayer != null)
-            {
-                remotePlayer.Initialize(newId, isLocal: false, $"RemotePlayer_{newId}");
-                activePlayers.Add(remotePlayer);
-
-                // Add simple dummy bot behaviour for local simulation
-                remoteObj.AddComponent<RemoteDummyBehaviour>();
-
-                Debug.Log($"[GameManager] Spawned Remote Dummy #{newId}. Current count: {activePlayers.Count}/{maxPlayers}");
-                UpdatePlayerCountUI();
-            }
         }
 
         public void RemoveAllRemotePlayers()
@@ -725,27 +674,4 @@ namespace FPSGame.Management
         }
     }
 
-    // Simple script to make remote dummies look around periodically for testing
-    public class RemoteDummyBehaviour : MonoBehaviour
-    {
-        private float nextActionTime = 0f;
-        private Quaternion targetRot;
-
-        private void Start()
-        {
-            targetRot = transform.rotation;
-        }
-
-        private void Update()
-        {
-            if (Time.time >= nextActionTime)
-            {
-                nextActionTime = Time.time + Random.Range(2.0f, 5.0f);
-                float randomAngle = Random.Range(-45f, 45f);
-                targetRot = Quaternion.Euler(0f, transform.eulerAngles.y + randomAngle, 0f);
-            }
-
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 3f);
-        }
-    }
 }

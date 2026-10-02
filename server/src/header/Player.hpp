@@ -1,5 +1,7 @@
 #pragma once
+
 #include "Vector3.hpp"
+#include "GameRules.hpp"
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -30,7 +32,7 @@ constexpr std::int32_t MAX_SPEED = 20;
 struct DamageResult
 {
     bool isDead = false;
-    std::int16_t currentHp = 100;
+    std::int16_t currentHp = GameRules::MaximumHealth;
     std::int16_t deaths = 0;
 };
 
@@ -38,23 +40,32 @@ class Player
 {
 public:
     Player()
-        : teamType(TeamType::None), position(), velocity(), isGrounded(true),
-          hp(100), ammo(30), attackPower(50), kill(0), death(0), assist(0), damage(0), heal(0), guard(0), lastRecordedTick(0)
+        : teamType(TeamType::None), position(), velocity(), isGrounded(true), hp(GameRules::MaximumHealth),
+          ammo(GameRules::MaximumAmmo), attackPower(GameRules::PlayerAttackPower), kill(0), death(0), assist(0),
+          damage(0), heal(0), guard(0), lastRecordedTick(0)
     {
     }
-    
+
 public:
     // Movement & Physics
     void Move(Vector3 direction, std::int32_t speed);
     void Jump();
     void SimulatePhysics(float dt, float gravity = GRAVITY);
-    void RecordSnapshot(std::size_t tick, std::size_t maxHistory = 60);
+    void RecordSnapshot(std::size_t tick, std::size_t maxHistory = GameRules::DefaultHistory);
 
     // Combat & Stats
     DamageResult TakeDamage(std::int32_t amount);
-    void AddDamageDealt(std::int32_t amount) { damage += amount; }
-    void AddKill() { kill++; }
-    
+
+    void AddDamageDealt(std::int32_t amount)
+    {
+        damage += amount;
+    }
+
+    void AddKill()
+    {
+        kill++;
+    }
+
 public:
     TeamType teamType;
     Vector3 position;
@@ -94,7 +105,7 @@ struct PlayerStat
     std::int32_t heal;
     std::int32_t guard;
 
-    PlayerStat(const uuids::uuid id, const Player& player)
+    PlayerStat(const uuids::uuid id, const Player &player)
         : teamType(player.teamType), id(id), kill(player.kill), death(player.death), assist(player.assist),
           damage(player.damage), heal(player.heal), guard(player.guard)
     {

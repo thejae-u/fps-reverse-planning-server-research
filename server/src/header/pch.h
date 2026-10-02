@@ -20,6 +20,7 @@
 #include <utility>
 #include <random>
 #include <condition_variable>
+#include <future>
 
 // 2. Third-Party Library Headers
 #include <asio.hpp>

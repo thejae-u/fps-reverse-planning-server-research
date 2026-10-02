@@ -6,21 +6,17 @@
 #include <cmath>
 #include <algorithm>
 
-void CombatSystem::Shoot(
-    uuids::uuid shooterId,
-    Vector3 direction,
-    std::size_t targetTick,
-    std::unordered_map<uuids::uuid, std::unique_ptr<Player>>& players,
-    std::vector<TeamInfo>& teamInfos,
-    std::weak_ptr<Room> weakRoom)
+void CombatSystem::Shoot(uuids::uuid shooterId, Vector3 direction, std::size_t targetTick,
+                         std::unordered_map<uuids::uuid, std::unique_ptr<Player>> &players,
+                         std::vector<TeamInfo> &teamInfos, std::weak_ptr<Room> weakRoom)
 {
     // player 유효성 확인
     auto shooterIt = players.find(shooterId);
-    if(shooterIt == players.end() || !shooterIt->second)
+    if (shooterIt == players.end() || !shooterIt->second)
         return;
 
     // shooter 접근 가독성을 위한 캐싱
-    auto& [id, shooter] = *shooterIt;
+    auto &[id, shooter] = *shooterIt;
 
     // Rewind All Players
     auto rewinds = _lagCompensator.Rewind(players, id, targetTick);
@@ -30,10 +26,10 @@ void CombatSystem::Shoot(
     Vector3 normalizedDirection = direction.normalized();    // 방향 벡터 정규화
 
     // shooter 미포함 rewind 데이터
-    for(auto& [rewindId, rewindPlayer, originPosition, rewindPosition, isHit] : rewinds)
+    for (auto &[rewindId, rewindPlayer, originPosition, rewindPosition, isHit] : rewinds)
     {
         // 같은 팀 제외
-        if(rewindPlayer->teamType == shooter->teamType)
+        if (rewindPlayer->teamType == shooter->teamType)
             continue;
 
         /*
@@ -46,7 +42,7 @@ void CombatSystem::Shoot(
          *  ||P - C||^2 : P와 C의 최단거리 제곱
          */
 
-        Vector3 targetCenter = rewindPosition + Vector3(0.0f, 0.9f, 0.0f);
+        Vector3 targetCenter = rewindPosition + Vector3(0.0f, CAPSULE_CENTER_OFFSET, 0.0f);
 
         // V = enemy - shooter (shooter로부터 적의 방향 벡터)
         Vector3 v = targetCenter - shootOrigin;
@@ -55,28 +51,29 @@ void CombatSystem::Shoot(
         float t = v.dot(normalizedDirection);
 
         // 음수면 뒤에 있음 (PASS)
-        if(t < 0.0f)
+        if (t < 0.0f)
             continue;
 
         // P = O + t * D
         Vector3 p = normalizedDirection * t + shootOrigin;
 
         // 구(Sphere)를 수직 캡슐(Capsule)로 확장: C의 y좌표를 캡슐 중심축 선분 [y+0.4, y+1.4] 범위 내 P.y로 클램핑
-        targetCenter.y = std::clamp(p.y, rewindPosition.y + CAPSULE_BOTTOM_OFFSET, rewindPosition.y + CAPSULE_TOP_OFFSET);
+        targetCenter.y =
+            std::clamp(p.y, rewindPosition.y + CAPSULE_BOTTOM_OFFSET, rewindPosition.y + CAPSULE_TOP_OFFSET);
 
         // ||P - C||^2
         Vector3 diff = p - targetCenter;     // P - C
         const float distSq = diff.dot(diff); // ||PC||^2 = PC dot PC (자기 자신의 내적 값은 제곱 크기)
 
         // Collide Check
-        if(distSq <= HIT_RADIUS_SQ)
+        if (distSq <= HIT_RADIUS_SQ)
         {
             isHit = true;
         }
     }
 
     // 2. Broadcast Shoot (LagComp) packet first
-    if(auto room = weakRoom.lock())
+    if (auto room = weakRoom.lock())
     {
         Protocol::LagCompPacket lagCompPacket;
         lagCompPacket.set_shooterid(uuids::to_string(shooterId));
@@ -89,9 +86,9 @@ void CombatSystem::Shoot(
         lagCompPacket.set_diry(normalizedDirection.y);
         lagCompPacket.set_dirz(normalizedDirection.z);
 
-        for(const auto& [id, player, op, rp, isHit] : rewinds)
+        for (const auto &[id, player, op, rp, isHit] : rewinds)
         {
-            auto* targetMsg = lagCompPacket.add_targets();
+            auto *targetMsg = lagCompPacket.add_targets();
             targetMsg->set_targetid(uuids::to_string(id));
 
             // 현재 위치
@@ -108,7 +105,7 @@ void CombatSystem::Shoot(
         }
 
         std::string serializedLagComp;
-        if(lagCompPacket.SerializeToString(&serializedLagComp))
+        if (lagCompPacket.SerializeToString(&serializedLagComp))
         {
             auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
             ingamePacket->set_sessionid(uuids::to_string(shooterId));
@@ -117,75 +114,69 @@ void CombatSystem::Shoot(
             ingamePacket->set_data(serializedLagComp);
 
             std::string serializedIngame;
-            if(ingamePacket->SerializeToString(&serializedIngame))
+            if (ingamePacket->SerializeToString(&serializedIngame))
             {
-                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
-                sendPacket->set_type(Protocol::PacketType::Ingame);
-                sendPacket->set_data(serializedIngame);
-                room->Broadcast(std::move(sendPacket));
+                room->Broadcast(Protocol::PacketType::Ingame, std::move(serializedIngame));
             }
         }
     }
 
     // 3. Process Hits and Broadcast HitPackets after Shoot packet
-    for(const auto& [id, player, op, rp, isHit] : rewinds)
+    for (const auto &[id, player, op, rp, isHit] : rewinds)
     {
-        if(isHit)
+        if (isHit)
         {
             OnHit(id, shooter->attackPower, shooterId, players, teamInfos, weakRoom);
         }
     }
 }
 
-void CombatSystem::OnHit(
-    uuids::uuid hitId,
-    std::int32_t damage,
-    uuids::uuid shooterId,
-    std::unordered_map<uuids::uuid, std::unique_ptr<Player>>& players,
-    std::vector<TeamInfo>& teamInfos,
-    std::weak_ptr<Room> weakRoom)
+void CombatSystem::OnHit(uuids::uuid hitId, std::int32_t damage, uuids::uuid shooterId,
+                         std::unordered_map<uuids::uuid, std::unique_ptr<Player>> &players,
+                         std::vector<TeamInfo> &teamInfos, std::weak_ptr<Room> weakRoom)
 {
     auto shooterIt = players.find(shooterId);
-    if(shooterIt == players.end() || !shooterIt->second)
+    if (shooterIt == players.end() || !shooterIt->second)
     {
-        spdlog::warn("world(room id) {}: shooter {} not found on hit", uuids::to_string(_roomId), uuids::to_string(shooterId));
+        spdlog::warn("world(room id) {}: shooter {} not found on hit", uuids::to_string(_roomId),
+                     uuids::to_string(shooterId));
         return;
     }
 
     auto hitIt = players.find(hitId);
-    if(hitIt == players.end() || !hitIt->second)
+    if (hitIt == players.end() || !hitIt->second)
     {
         spdlog::warn("world(room id) {}: hit target {} not found", uuids::to_string(_roomId), uuids::to_string(hitId));
         return;
     }
 
-    if(damage < 0)
+    if (damage < 0)
     {
         spdlog::warn("world(room id) {}: invalid damage (damage is negative)", uuids::to_string(_roomId));
         return;
     }
 
-    const auto& shooter = shooterIt->second;
+    const auto &shooter = shooterIt->second;
     const int shooterTeamIdx = static_cast<int>(shooter->teamType) - 1;
-    const auto& targetPlayer = hitIt->second;
+    const auto &targetPlayer = hitIt->second;
 
     // 1. Damage 처리 (Player 내부 상태 및 팀 대미지 누적)
     DamageResult damageResult = targetPlayer->TakeDamage(damage);
     shooter->AddDamageDealt(damage);
 
-    if(shooterTeamIdx >= 0 && shooterTeamIdx < static_cast<int>(teamInfos.size()))
+    if (shooterTeamIdx >= 0 && shooterTeamIdx < static_cast<int>(teamInfos.size()))
     {
         teamInfos[shooterTeamIdx].damages += damage;
     }
 
     // 2. 사망 시 Kill 처리 위임
-    if(damageResult.isDead)
+    if (damageResult.isDead)
     {
         OnKill(shooterId, *shooter, hitId, *targetPlayer, teamInfos);
     }
 
     // 3. Broadcast Hit Packet
-    if(auto room = weakRoom.lock())
+    if (auto room = weakRoom.lock())
     {
         Protocol::HitPacket hitPacket;
         hitPacket.set_hitplayerid(uuids::to_string(hitId));
@@ -196,7 +187,7 @@ void CombatSystem::OnHit(
         hitPacket.set_damage(damage);
 
         std::string serializedData;
-        if(hitPacket.SerializeToString(&serializedData))
+        if (hitPacket.SerializeToString(&serializedData))
         {
             auto ingamePacket = IngamePacketPool::GetInstance()->Rent();
             ingamePacket->set_sessionid(uuids::to_string(hitId));
@@ -205,38 +196,31 @@ void CombatSystem::OnHit(
             ingamePacket->set_data(serializedData);
 
             std::string serializedIngame;
-            if(ingamePacket->SerializeToString(&serializedIngame))
+            if (ingamePacket->SerializeToString(&serializedIngame))
             {
-                auto sendPacket = NetworkPacketPool::GetInstance()->Rent();
-                sendPacket->set_type(Protocol::PacketType::Ingame);
-                sendPacket->set_data(serializedIngame);
-                room->Broadcast(std::move(sendPacket));
+                room->Broadcast(Protocol::PacketType::Ingame, std::move(serializedIngame));
             }
         }
     }
 }
 
-void CombatSystem::OnKill(
-    uuids::uuid shooterId,
-    Player& shooter,
-    uuids::uuid victimId,
-    const Player& victim,
-    std::vector<TeamInfo>& teamInfos)
+void CombatSystem::OnKill(uuids::uuid shooterId, Player &shooter, uuids::uuid victimId, const Player &victim,
+                          std::vector<TeamInfo> &teamInfos)
 {
     const int shooterTeamIdx = static_cast<int>(shooter.teamType) - 1;
     const int victimTeamIdx = static_cast<int>(victim.teamType) - 1;
 
-    if(victimTeamIdx >= 0 && victimTeamIdx < static_cast<int>(teamInfos.size()))
+    if (victimTeamIdx >= 0 && victimTeamIdx < static_cast<int>(teamInfos.size()))
     {
         teamInfos[victimTeamIdx].deaths++;
     }
 
     shooter.AddKill();
-    if(shooterTeamIdx >= 0 && shooterTeamIdx < static_cast<int>(teamInfos.size()))
+    if (shooterTeamIdx >= 0 && shooterTeamIdx < static_cast<int>(teamInfos.size()))
     {
         teamInfos[shooterTeamIdx].kills++;
     }
 
-    spdlog::info("world {}: player {} killed player {}",
-                 uuids::to_string(_roomId), uuids::to_string(shooterId), uuids::to_string(victimId));
+    spdlog::info("world {}: player {} killed player {}", uuids::to_string(_roomId), uuids::to_string(shooterId),
+                 uuids::to_string(victimId));
 }

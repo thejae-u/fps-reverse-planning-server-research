@@ -1,20 +1,17 @@
 #pragma once
 
-#include <functional>
+#include <asio.hpp>
+#include "ServerPolicy.hpp"
 #include <memory>
-#include <mutex>
 #include <unordered_map>
-#include <uuid.h>
 #include <nlohmann/json.hpp>
-
-#include "Packet.pb.h"
+#include "ExecutionContext.hpp"
+#include "BlockingExecutor.hpp"
+#include "NetworkGateway.hpp"
 #include "World.hpp"
 
 using namespace Protocol;
 using json = nlohmann::json;
-
-class IOManager;
-class Session;
 
 class Room : public std::enable_shared_from_this<Room>
 {
@@ -24,50 +21,67 @@ private:
     };
 
 public:
+    explicit Room(SecretKey, std::shared_ptr<ExecutionContext>, std::shared_ptr<BlockingExecutor>, uuids::uuid,
+                  const std::string &, std::size_t);
     using ShutdownCallback = std::function<void()>;
 
-    explicit Room(SecretKey, std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string& authToken, const std::size_t expectedPlayerCount);
-    ~Room();
-
-    static auto Create(std::shared_ptr<IOManager> ioManager, uuids::uuid matchId, const std::string& authToken, const std::size_t expectedPlayerCount)
+    static std::shared_ptr<Room> Create(std::shared_ptr<ExecutionContext> game,
+                                        std::shared_ptr<BlockingExecutor> blocking, uuids::uuid matchId,
+                                        const std::string &token, std::size_t expected)
     {
-        auto newRoom = std::make_shared<Room>(SecretKey{}, ioManager, matchId, authToken, expectedPlayerCount);
-        return newRoom;
+        return std::make_shared<Room>(SecretKey{}, std::move(game), std::move(blocking), matchId, token, expected);
     }
-    
-public:
-    void SetShutdownCallback(ShutdownCallback callback) { _shutdownCallback = std::move(callback); }
+
+    void SetShutdownCallback(ShutdownCallback callback)
+    {
+        _shutdownCallback = std::move(callback);
+    }
+
+    void SetGateway(std::weak_ptr<NetworkGateway> gateway)
+    {
+        _gateway = std::move(gateway);
+    }
+
+    void PostInput(std::string payload, Recipient sender);
+    void PostHandshake(Recipient recipient, std::int32_t preset);
+    void AddSession(uuids::uuid id, Participant participant);
+    void RemoveSession(uuids::uuid id, std::uint64_t generation);
+    void EnqueuePacket(std::shared_ptr<IngamePacket> packet, Recipient sender);
+    // Called only on the shared Room/World game strand.
     void OnMatchFinished();
-    void TryStartGameNoLock();
-    void WorldInitNoLock();
-    void Stop();
-    void AddSession(uuids::uuid sessionId, std::weak_ptr<Session> session);
-    void RemoveSession(std::weak_ptr<Session> removeSession);
-    void Broadcast(const std::shared_ptr<NetworkPacket>& packet) const;
-    void EnqueuePacket(const std::shared_ptr<IngamePacket>& packet) const;
+    void Broadcast(PacketType type, std::string payload, Transport transport = Transport::Udp,
+                   std::optional<StateKey> stateKey = {}) const;
+    void SendTo(Recipient recipient, PacketType type, std::string payload, Transport transport) const;
+    void Stop(); // Main lifecycle thread only; waits for the game barrier.
+
+    World *GetWorld() const
+    {
+        return _world.get();
+    }
 
     uuids::uuid GetId() const
     {
         return _matchId;
     }
 
-    World* GetWorld() const { return _world.get(); }
-
 private:
-    std::shared_ptr<IOManager> _ioManager;
+    std::shared_ptr<ExecutionContext> _game;
+    std::shared_ptr<BlockingExecutor> _blocking;
+    asio::io_context::strand _strand;
+    std::weak_ptr<NetworkGateway> _gateway;
     uuids::uuid _matchId;
     std::string _authToken;
-    const std::string _serverHost = "127.0.0.1"; // 인증 서버 호스트
-    const std::uint16_t _serverPort = 18080; // 인증 서버 포트
-
-    std::size_t _expectedPlayerCount{ 0 }; // 방에 들어와야 할 총 유저 수
-    std::atomic<bool> _isWorldStarted{ false }; // 중복 실행 방지 플래그
-    std::atomic<bool> _isMatchFinished{ false }; // 매치 종료 중복 실행 방지 플래그
+    const std::string _serverHost = "127.0.0.1";
+    const std::uint16_t _serverPort = ServerPolicy::AuthServerPort;
+    std::size_t _expectedPlayerCount;
+    bool _isWorldStarted = false;
+    bool _isMatchFinished = false;
+    bool _stopped = false;
+    // Prevent a producer from posting after the Game executor drain barrier.
+    std::mutex _submissionMutex;
+    bool _acceptingPosts = true;
+    std::atomic<std::size_t> _pendingInputs{0};
     ShutdownCallback _shutdownCallback;
-
-    std::unordered_map<uuids::uuid, std::weak_ptr<Session>> _sessions;
-    std::mutex _sessionsMutex;
-
-    // World information
+    std::unordered_map<uuids::uuid, Participant> _sessions;
     std::unique_ptr<World> _world;
 };

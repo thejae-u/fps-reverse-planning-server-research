@@ -12,6 +12,7 @@ enum PacketType {
   InfoHandshake = 101;
   Ping = 102;
   EndGame = 103;
+  PingRtt = 104;
 
   // Udp
   Ingame = 200;
@@ -37,6 +38,12 @@ enum AuthenticationType {
 message NetworkPacket {
   PacketType type = 1;
   bytes data = 2;
+}
+
+// Network 제어 메시지. 서버 관측 RTT에는 큐 대기와 양쪽 처리 시간이 포함된다.
+message PingRttPacket {
+  uint64 sequence = 1;
+  uint64 microseconds = 2;
 }
 
 message PlayerInitInfo {

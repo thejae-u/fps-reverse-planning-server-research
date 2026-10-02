@@ -15,6 +15,21 @@ public class NetworkClient
     private IPEndPoint _ep;
     private IPEndPoint _udpServerEp;
     private CancellationTokenSource _sessionCts;
+    private readonly SemaphoreSlim _tcpSendLock = new SemaphoreSlim(1, 1);
+    private long _rttMicroseconds = -1;
+    private long _rttUpdatedAt;
+    private const double RttStaleSeconds = 10;
+    public double? RttMilliseconds
+    {
+        get
+        {
+            long value = Interlocked.Read(ref _rttMicroseconds);
+            long updated = Interlocked.Read(ref _rttUpdatedAt);
+            double age = (System.Diagnostics.Stopwatch.GetTimestamp() - updated) /
+                         (double)System.Diagnostics.Stopwatch.Frequency;
+            return value >= 0 && age < RttStaleSeconds ? (double?)(value / 1000.0) : null;
+        }
+    }
 
     public bool IsConnected => _client != null && _client.Connected;
     public bool IsUdpAuthenticated { get; private set; }
@@ -195,7 +210,16 @@ public class NetworkClient
         if (!IsConnected || _tcpStream == null) return;
 
         byte[] frame = SerializeWithHeader(packet);
-        await _tcpStream.WriteAsync(frame, 0, frame.Length, ct);
+        await _tcpSendLock.WaitAsync(ct);
+        try
+        {
+            if (!IsConnected || _tcpStream == null) return;
+            await _tcpStream.WriteAsync(frame, 0, frame.Length, ct);
+        }
+        finally
+        {
+            _tcpSendLock.Release();
+        }
     }
 
     public async Task SendUdpPacketAsync(PacketType type, IMessage innerMessage)
@@ -320,6 +344,22 @@ public class NetworkClient
                 if (!bodyRead) break;
 
                 NetworkPacket packet = NetworkPacket.Parser.ParseFrom(bodyBuffer, 0, bodySize);
+                if (packet.Type == PacketType.Ping)
+                {
+                    // 서버가 보낸 식별값을 그대로 반사한다. 게임/main thread를 거치지 않는다.
+                    await SendTcpPacketAsync(packet, ct);
+                    continue;
+                }
+                if (packet.Type == PacketType.PingRtt)
+                {
+                    PingRttPacket report = PingRttPacket.Parser.ParseFrom(packet.Data);
+                    if (report.Microseconds <= long.MaxValue)
+                    {
+                        Interlocked.Exchange(ref _rttUpdatedAt, System.Diagnostics.Stopwatch.GetTimestamp());
+                        Interlocked.Exchange(ref _rttMicroseconds, (long)report.Microseconds);
+                    }
+                    continue;
+                }
                 HandleTcpPacket(packet);
             }
         }
@@ -333,6 +373,10 @@ public class NetworkClient
             {
                 Debug.LogWarning($"[NetworkClient] TCP Receive Loop ended: {ex.Message}");
             }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _rttMicroseconds, -1);
         }
     }
 
@@ -475,6 +519,7 @@ public class NetworkClient
 
     public void Disconnect()
     {
+        Interlocked.Exchange(ref _rttMicroseconds, -1);
         _sessionCts?.Cancel();
         _sessionCts?.Dispose();
         _sessionCts = null;

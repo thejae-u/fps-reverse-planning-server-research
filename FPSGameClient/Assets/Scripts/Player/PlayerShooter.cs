@@ -42,6 +42,8 @@ namespace FPSGame.Player
         [SerializeField] private PlayerWeaponSway weaponSway;
         [SerializeField] private AudioSource audioSource;
         [SerializeField] private AudioClip shootSoundClip;
+        [SerializeField] private AudioClip reloadSoundClip;
+        private static AudioClip generatedReloadClip;
 
         // Current state
         private int currentAmmo;
@@ -416,6 +418,15 @@ namespace FPSGame.Player
             if (isReloading || (!IsUnlimitedAmmo && reserveAmmo <= 0) || currentAmmo >= MagazineSize) yield break;
 
             isReloading = true;
+            if (audioSource != null)
+            {
+                if (reloadSoundClip == null)
+                {
+                    if (generatedReloadClip == null) generatedReloadClip = CreateProceduralReloadClip();
+                    reloadSoundClip = generatedReloadClip;
+                }
+                audioSource.PlayOneShot(reloadSoundClip, 0.55f);
+            }
             yield return new WaitForSeconds(ReloadTime);
 
             if (IsUnlimitedAmmo)
@@ -448,6 +459,37 @@ namespace FPSGame.Player
         public void PlayRemoteFireEffect(Vector3 targetPoint)
         {
             PlayShootEffects();
+        }
+
+        private static AudioClip CreateProceduralReloadClip()
+        {
+            const int sampleRate = 22050;
+            const float duration = 1.0f;
+            const float clickDuration = 0.12f;
+            float[] samples = new float[(int)(sampleRate * duration)];
+            float[] clickTimes = { 0.02f, 0.42f, 0.78f };
+            var noise = new System.Random(17);
+
+            // 탄창 분리·삽입·장전의 세 번의 짧은 기계음. 게임의 Random 상태는 건드리지 않는다.
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float time = i / (float)sampleRate;
+                float value = 0f;
+                float random = (float)(noise.NextDouble() * 2.0 - 1.0);
+                foreach (float click in clickTimes)
+                {
+                    float age = time - click;
+                    if (age < 0f || age >= clickDuration) continue;
+                    float envelope = Mathf.Exp(-age * 65f);
+                    float metal = Mathf.Sin(2f * Mathf.PI * 850f * age);
+                    value += (random * 0.55f + metal * 0.25f) * envelope;
+                }
+                samples[i] = Mathf.Clamp(value, -1f, 1f);
+            }
+
+            AudioClip clip = AudioClip.Create("ProceduralReload", samples.Length, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         private AudioClip CreateProceduralGunshotClip()

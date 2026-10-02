@@ -1,55 +1,59 @@
 #include "Base.hpp"
-#include "IOManager.hpp"
+#include "ServerPolicy.hpp"
+#include "ExecutionContext.hpp"
 #include "Listener.hpp"
 #include "PacketPool.hpp"
 #include "Room.hpp"
+#include "BlockingExecutor.hpp"
 
-int main(const int argc, char** argv)
+int main(const int argc, char **argv)
 {
     // 실행인자 파싱 및 검증
-    if(argc == 1)
+    if (argc == 1)
     {
         spdlog::error("no options");
         exit(0);
     }
 
     const ServerConfig config = ServerConfig::Parse(argc, argv);
-    if(config.matchId.empty())
+    if (config.matchId.empty())
     {
         spdlog::error("invalid match id");
         exit(0);
     }
-    
-    if(config.authToken.empty())
+
+    if (config.authToken.empty())
     {
         spdlog::error("invalid auth token");
         exit(0);
     }
-    
-    if(config.tcpPort == 0 || config.udpPort == 0)
+
+    if (config.tcpPort == 0 || config.udpPort == 0)
     {
         spdlog::error("invalid port");
         exit(0);
     }
-    
-    if(config.allowedPlayers.size() == 0)
+
+    if (config.allowedPlayers.empty() || config.allowedPlayers.size() > ServerPolicy::MaximumPlayers)
     {
-        spdlog::error("no players specified");
+        spdlog::error("player count must be between 1 and {}", ServerPolicy::MaximumPlayers);
         exit(0);
     }
-    
+
     // 서버 시작
     spdlog::info("type 'quit' to stop server");
     const auto threadCount = std::thread::hardware_concurrency();
-    constexpr auto blockingThreadCount = 4;
-    const auto ioManager = IOManager::Create("I/O Manager", threadCount, blockingThreadCount);
-    
-    if(!ioManager)
-        throw std::runtime_error("failed to create io manager");
-    
-    constexpr auto ingamePacketPoolSize = 500;
-    constexpr auto networkPacketPoolSize = 500;
-    constexpr auto byteBufferPoolSize = 500;
+    constexpr auto blockingThreadCount = ServerPolicy::BlockingWorkers;
+    const auto ioManager = ExecutionContext::Create("Network", threadCount);
+    const auto gameManager = ExecutionContext::Create("Game Simulation", ServerPolicy::GameWorkers);
+    const auto blocking = std::make_shared<BlockingExecutor>(blockingThreadCount);
+
+    if (!ioManager)
+        throw std::runtime_error("failed to create Network execution context");
+
+    constexpr auto ingamePacketPoolSize = ServerPolicy::PoolCapacity;
+    constexpr auto networkPacketPoolSize = ServerPolicy::PoolCapacity;
+    constexpr auto byteBufferPoolSize = ServerPolicy::PoolCapacity;
 
     IngamePacketPool::Init(ingamePacketPoolSize);
     NetworkPacketPool::Init(networkPacketPoolSize);
@@ -60,44 +64,47 @@ int main(const int argc, char** argv)
     {
         std::mutex mutex;
         std::condition_variable cv;
-        std::atomic<bool> isShuttingDown{ false };
+        std::atomic<bool> isShuttingDown{false};
 
         void RequestShutdown()
         {
-            if(!isShuttingDown.exchange(true))
+            if (!isShuttingDown.exchange(true))
             {
                 std::lock_guard<std::mutex> lock(mutex);
                 cv.notify_all();
             }
         }
     };
+
     const auto shutdownState = std::make_shared<ShutdownState>();
 
     // broadcast용 room
     auto matchId = uuids::uuid::from_string(config.matchId).value_or(uuids::uuid_system_generator{}());
-    const auto dedicatedRoom = Room::Create(ioManager, matchId, config.authToken, config.allowedPlayers.size());
+    const auto dedicatedRoom =
+        Room::Create(gameManager, blocking, matchId, config.authToken, config.allowedPlayers.size());
     dedicatedRoom->SetShutdownCallback([shutdownState]() {
         shutdownState->RequestShutdown();
     });
 
     const auto listener = Listener::Create(ioManager, config.tcpPort, config.udpPort, config.allowedPlayers);
     listener->SetDedicatedRoom(dedicatedRoom);
+    dedicatedRoom->SetGateway(listener);
 
     // Start, Stop을 처리하기 위한 컨테이너
     std::vector<std::shared_ptr<IBase>> components;
     components.emplace_back(listener);
 
-    for(const auto& component : components)
+    for (const auto &component : components)
         component->Start();
 
     // 콘솔 입력 스레드는 shared_ptr<ShutdownState>만 값으로 캡처하여
     // Main Thread 종료 후에도 스택 댕글링 참조가 발생하지 않도록 보장
     std::thread consoleThread([shutdownState]() {
         std::string tmp;
-        while(std::cin >> tmp)
+        while (std::cin >> tmp)
         {
             spdlog::info("[Main] Received console input: '{}'", tmp);
-            if(tmp == "quit")
+            if (tmp == "quit")
             {
                 shutdownState->RequestShutdown();
                 break;
@@ -109,15 +116,29 @@ int main(const int argc, char** argv)
     // Main Thread: 매치 종료(OnMatchFinished) 또는 콘솔 종료(quit) 신호 대기
     {
         std::unique_lock<std::mutex> lock(shutdownState->mutex);
-        shutdownState->cv.wait(lock, [&]() { return shutdownState->isShuttingDown.load(); });
+        shutdownState->cv.wait(lock, [&]() {
+            return shutdownState->isShuttingDown.load();
+        });
     }
 
     spdlog::info("[Main] Shutting down server components on Main Thread...");
-    for(auto it = components.rbegin(); it != components.rend(); ++it)
-        (*it)->Stop();
+    listener->StopInput();
+    dedicatedRoom->Stop();
+    gameManager->Drain();
+    blocking->Join();
 
-    ioManager->Stop();
-    
+    // Game has submitted its last messages. Network remains alive during bounded drain.
+    const auto deadline = std::chrono::steady_clock::now() + ServerPolicy::NetworkDrainTimeout;
+    while (!listener->IsDrained() && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(ServerPolicy::DrainPollInterval);
+
+    if (!listener->IsDrained())
+        spdlog::warn("Network drain deadline reached; canceling remaining socket operations");
+
+    listener->Stop();
+    listener->SetDedicatedRoom(nullptr);
+    ioManager->Drain();
+
     IngamePacketPool::Release();
     NetworkPacketPool::Release();
     ByteBufferPool::Release();

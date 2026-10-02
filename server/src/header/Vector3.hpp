@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 
 struct Vector3
@@ -7,27 +8,27 @@ struct Vector3
     float y;
     float z;
 
-    Vector3 operator+(const Vector3& other) const
+    Vector3 operator+(const Vector3 &other) const
     {
-        return { x + other.x, y + other.y, z + other.z };
+        return {x + other.x, y + other.y, z + other.z};
     }
 
     Vector3 operator*(float scalar) const
     {
-        return { x * scalar, y * scalar, z * scalar };
-    }
-    
-    Vector3 operator*(const Vector3& other) const
-    {
-        return { x * other.x, y * other.y, z * other.z };
+        return {x * scalar, y * scalar, z * scalar};
     }
 
-    Vector3 operator-(const Vector3& other) const
+    Vector3 operator*(const Vector3 &other) const
     {
-        return { x - other.x, y - other.y, z - other.z };
+        return {x * other.x, y * other.y, z * other.z};
     }
 
-    Vector3& operator+=(const Vector3& other)
+    Vector3 operator-(const Vector3 &other) const
+    {
+        return {x - other.x, y - other.y, z - other.z};
+    }
+
+    Vector3 &operator+=(const Vector3 &other)
     {
         x += other.x;
         y += other.y;
@@ -36,12 +37,12 @@ struct Vector3
         return *this;
     }
 
-    bool operator==(const Vector3& other) const
+    bool operator==(const Vector3 &other) const
     {
         return this->x == other.x && this->y == other.y && this->z == other.z;
     }
 
-    bool operator!=(const Vector3& other) const
+    bool operator!=(const Vector3 &other) const
     {
         return this->x != other.x || this->y != other.y || this->z != other.z;
     }
@@ -54,10 +55,10 @@ struct Vector3
     Vector3 normalized() const
     {
         const float mag = this->magnitude();
-        return mag > 0.0f ? Vector3{ x / mag, y / mag, z / mag } : Vector3(0, 0, 1);
+        return mag > 0.0f ? Vector3{x / mag, y / mag, z / mag} : Vector3(0, 0, 1);
     }
 
-    float dot(const Vector3& other) const
+    float dot(const Vector3 &other) const
     {
         return x * other.x + y * other.y + z * other.z;
     }

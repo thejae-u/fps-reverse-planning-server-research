@@ -1,5 +1,7 @@
 #pragma once
-#include <queue>
+
+#include <vector>
+#include "ServerPolicy.hpp"
 #include <mutex>
 #include <memory>
 #include <new>
@@ -7,33 +9,27 @@
 
 #include "Packet.pb.h"
 
-template <typename T>
-class ObjectPool : public std::enable_shared_from_this<ObjectPool<T>>
+template <typename T> class ObjectPool : public std::enable_shared_from_this<ObjectPool<T>>
 {
 private:
-    struct SecretKey {};
+    struct SecretKey
+    {
+    };
+
     inline static std::shared_ptr<ObjectPool<T>> _instance = nullptr;
     inline static std::mutex _initMutex;
 
 public:
-    explicit ObjectPool(SecretKey, const std::size_t maxSize) : _maxSize(maxSize) {}
-    ~ObjectPool()
+    explicit ObjectPool(SecretKey, const std::size_t maxSize)
+        : _maxSize(maxSize)
     {
-        Node* current = _head.load(std::memory_order_acquire);
-        while(current != nullptr)
-        {
-            Node* nextNode = current->next;
-            delete current;
-            current = nextNode;
-        }
-        _head.store(nullptr, std::memory_order_relaxed);
-        _poolSize.store(0, std::memory_order_relaxed);
+        _items.reserve(maxSize);
     }
 
     static void Init(const std::size_t maxSize)
     {
         std::lock_guard lock(_initMutex);
-        if(_instance == nullptr)
+        if (_instance == nullptr)
             _instance = std::make_shared<ObjectPool<T>>(SecretKey{}, maxSize);
         spdlog::info("ObjectPool<{}> init complete (maxSize : {})", typeid(T).name(), maxSize);
     }
@@ -41,7 +37,7 @@ public:
     static void Release()
     {
         std::lock_guard lock(_initMutex);
-        if(_instance != nullptr)
+        if (_instance != nullptr)
         {
             spdlog::info("ObjectPool<{}> release requested", typeid(T).name());
             _instance = nullptr;
@@ -50,36 +46,28 @@ public:
 
     static std::shared_ptr<ObjectPool<T>> GetInstance()
     {
+        std::lock_guard lock(_initMutex);
         assert(_instance != nullptr && "ObjectPool has NOT been initialized. Call Init() first");
         return _instance;
     }
 
     std::shared_ptr<T> Rent()
     {
-        Node* oldHead = _head.load(std::memory_order_acquire);
-        while(oldHead && !_head.compare_exchange_weak(
-                         oldHead,
-                         oldHead->next,
-                         std::memory_order_release,
-                         std::memory_order_acquire))
-        {
-        }
-
         std::unique_ptr<T> item;
-        if(oldHead == nullptr)
         {
+            std::lock_guard lock(_poolMutex);
+            if (!_items.empty())
+            {
+                item = std::move(_items.back());
+                _items.pop_back();
+            }
+        }
+        if (!item)
             item = std::make_unique<T>();
-        }
-        else
-        {
-            item = std::move(oldHead->item);
-            delete oldHead;
-            _poolSize.fetch_sub(1, std::memory_order_relaxed);
-        }
 
         auto self(this->shared_from_this());
-        T* raw = item.release();
-        return std::shared_ptr<T>(raw, [self, raw](T*) {
+        T *raw = item.release();
+        return std::shared_ptr<T>(raw, [self, raw](T *) {
             self->Return(std::unique_ptr<T>(raw));
         });
     }
@@ -88,43 +76,26 @@ private:
     void Return(std::unique_ptr<T> item)
     {
         // C++20 스마트 리셋
-        if constexpr(requires(T& obj) { obj.Clear(); })
+        if constexpr (requires(T &obj) { obj.Clear(); })
         {
             item->Clear(); // Protobuf message
         }
-        else if constexpr(requires(T& obj) { obj.clear(); })
+        else if constexpr (requires(T &obj) { obj.clear(); })
         {
             item->clear(); // std::vector, std::string 등
         }
 
-        // 최대 크기 초과 -> 자동 소멸
-        if(_poolSize.load(std::memory_order_relaxed) >= _maxSize)
-            return;
-
-        Node* newNode = new Node();
-        newNode->item = std::move(item);
-
-        Node* oldHead = _head.load(std::memory_order_acquire);
-        do
-        {
-            newNode->next = oldHead;
-        } while(!_head.compare_exchange_weak(
-            oldHead,
-            newNode,
-            std::memory_order_release,
-            std::memory_order_acquire));
-
-        _poolSize.fetch_add(1, std::memory_order_relaxed);
+        std::lock_guard lock(_poolMutex);
+        if (_items.size() < _maxSize)
+            _items.push_back(std::move(item));
     }
 
 private:
-    struct Node {
-        std::unique_ptr<T> item;
-        Node* next = nullptr;
-    };
-
-    alignas(std::hardware_destructive_interference_size) std::atomic<Node*> _head{ nullptr };
-    alignas(std::hardware_destructive_interference_size) std::atomic<std::size_t> _poolSize{ 0 };
+    // CAS는 Node 수명을 보장하지 않는다. 기존 즉시 삭제는 경쟁 Rent에 UAF/ABA를 만든다.
+    // 안전한 회수 기법 없이 복원하지 않는다. 생성/Clear는 잠금 밖에서 수행한다.
+    // 생성 시 reserve하여 반환 잠금 구간의 vector 재할당도 피한다.
+    std::mutex _poolMutex;
+    std::vector<std::unique_ptr<T>> _items;
     const std::size_t _maxSize;
 };
 

@@ -30,6 +30,8 @@ namespace FPSGame.UI
         [SerializeField] private Text healthText;
         [SerializeField] private Text playerCountText;
         [SerializeField] private Text guideText;
+        private Text rttText;
+        private int lastDisplayedRtt = int.MinValue;
 
         private Coroutine hitMarkerCoroutine;
 
@@ -96,7 +98,7 @@ namespace FPSGame.UI
         {
             if (playerCountText != null)
             {
-                playerCountText.text = $"Players: {currentCount} / {maxCount} (Press F1 to add dummy)";
+                playerCountText.text = $"Players: {currentCount} / {maxCount}";
             }
         }
 
@@ -148,8 +150,11 @@ namespace FPSGame.UI
 
             if (guideText != null)
             {
-                guideText.text = "[WASD] 이동  |  [Shift] 달리기  |  [Space] 점프\n[좌클릭] 사격  |  [R] 재장전  |  [ESC] 커서 잠금 토글\n[F1] 리모트 플레이어 더미 소환 (최대 10명 멀티플레이어 환경 테스트)";
+                guideText.text = string.Empty;
+                guideText.gameObject.SetActive(false);
             }
+
+            EnsureRttHUD();
 
             EnsureIngameScoreAndKillFeedHUD();
             UpdateTopTeamScoreHUD(0, 0, 0);
@@ -157,7 +162,37 @@ namespace FPSGame.UI
 
         private void Update()
         {
+            UpdateRttHUD();
             UpdateKillFeedLifetimes();
+        }
+
+        private void EnsureRttHUD()
+        {
+            if (rttText != null) return;
+
+            GameObject root = new GameObject("RttText", typeof(RectTransform), typeof(Text));
+            root.transform.SetParent(GetOrCreateMainCanvas().transform, false);
+            rttText = root.GetComponent<Text>();
+            rttText.font = GetDefaultFont();
+            rttText.fontSize = 20;
+            rttText.color = Color.white;
+            rttText.alignment = TextAnchor.UpperLeft;
+            rttText.raycastTarget = false;
+            RectTransform rect = rttText.rectTransform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(20, -20);
+            rect.sizeDelta = new Vector2(240, 32);
+            rttText.text = "RTT: -- ms";
+        }
+
+        private void UpdateRttHUD()
+        {
+            EnsureRttHUD();
+            double? milliseconds = NetworkManager.Instance?.Client?.RttMilliseconds;
+            int value = milliseconds.HasValue ? Mathf.RoundToInt((float)milliseconds.Value) : -1;
+            if (value == lastDisplayedRtt) return;
+            lastDisplayedRtt = value;
+            rttText.text = value >= 0 ? $"RTT: {value} ms" : "RTT: -- ms";
         }
 
         /// <summary>
