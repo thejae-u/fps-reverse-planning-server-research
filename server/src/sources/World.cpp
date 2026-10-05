@@ -96,12 +96,12 @@ void World::DivideTeam()
     std::ranges::shuffle(playersTemp, gen);
 
     int i = 0;
-    for (i; i < playersTemp.size() / GameRules::TeamCount; ++i)
+    for (; i < playersTemp.size() / GameRules::TeamCount; ++i)
     {
         playersTemp[i]->teamType = TeamType::TeamA;
     }
 
-    for (i; i < playersTemp.size(); ++i)
+    for (; i < playersTemp.size(); ++i)
     {
         playersTemp[i]->teamType = TeamType::TeamB;
     }
