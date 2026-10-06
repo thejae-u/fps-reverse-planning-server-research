@@ -21,6 +21,52 @@ python3 server/tests/fixed_rate_benchmark.py \
 
 단일 서버도 `--server <실행 파일>`로 실행할 수 있습니다. 선택 사항인 `--sample-resources`는 Unix에서 서버 RSS와 `ps`의 CPU 값을 1초 간격으로 수집합니다. CPU 값은 프로세스 수명 평균이며 순간 사용률이 아닙니다. Windows의 프로세스 자원 수집은 미지원입니다. 자원 수집 및 계측 비용도 있으므로 비교하는 실행에서는 동일한 옵션을 사용하세요.
 
+### Windows (PowerShell)
+
+Visual Studio의 **x64 Native Tools Command Prompt**에서 프로젝트 루트로 이동한 뒤 두 구성을 빌드합니다. `CMakePresets.json`의 Windows 설정은 `C:/vcpkg`를 사용합니다.
+
+Windows preset은 `vcpkg-overlay-ports/asio`의 패치된 Asio를 설치합니다. Windows 10 1803 이상에서는 IOCP 타이머를 고해상도 waitable timer로 생성하며, 플래그가 지원되지 않는 구형 Windows에서는 일반 타이머를 사용합니다. 기존 `steady_timer`와 strand 구조를 유지하며 heartbeat 등 같은 context의 다른 타이머에도 적용됩니다. 자세한 적용 범위와 버전 관리 방법은 [overlay 설명](../vcpkg-overlay-ports/asio/README.md)을 참고하세요.
+
+```bat
+cd server
+cmake --preset x64-debug
+cmake --build build/x64-debug --parallel 4
+cmake --preset x64-release
+cmake --build build/x64-release --parallel 4
+cd ..
+```
+
+PowerShell용 `run_fixed_rate_windows.ps1`은 스크립트 위치를 기준으로 두 `main.exe`를 찾아 기존 `fixed_rate_benchmark.py`를 호출합니다. Python 표준 라이브러리만 필요하며 기본 수신 모드는 Windows에서도 사용할 수 있는 `spawn` 프로세스입니다. 실행 위치에 관계없이 기본 결과는 `server/tests/latency_results`에 저장됩니다.
+
+프로젝트 루트에서 짧은 동작 확인:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File server/tests/run_fixed_rate_windows.ps1 -Quick
+```
+
+`-Quick`은 전송률 60 pps, warmup 1초, 측정 3초, 반복 1회로 설정합니다. Debug/Release 각 1회를 실행하며 성능 결론에 사용할 설정은 아닙니다. 정식 측정은 기본값(30/60/120 pps, warmup 10초, 측정 120초, 반복 5회, 약 66분)을 사용합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File server/tests/run_fixed_rate_windows.ps1
+```
+
+PowerShell 세션에서 60 pps만 비교하거나 매개변수를 조절하려면:
+
+```powershell
+& ./server/tests/run_fixed_rate_windows.ps1 -Rates 60 -Warmup 10 -Duration 120 -Repetitions 5
+# 여러 전송률은 PowerShell 배열로 지정합니다.
+& ./server/tests/run_fixed_rate_windows.ps1 -Rates 30,60,120 -ReceiverMode process -PlayerTiming spread
+```
+
+필요하면 현재 세션에서만 `Set-ExecutionPolicy -Scope Process Bypass`를 적용한 뒤 직접 실행할 수 있습니다. `-Output`, `-Players`, `-Timeout`, `-PhaseOffsetsMs`, `-PythonExecutable`도 지정할 수 있습니다. Python 실행 파일 경로에 공백이 있으면 따옴표로 감싸세요. 실행 파일의 실제 Debug/Release 설정과 benchmark protocol v2 확인 및 종료 코드는 Python 벤치마크가 관리합니다. 종료 코드 1이면 오류 메시지와 결과의 `valid_for_comparison`을 확인하세요. Windows CPU/RSS 수집은 지원하지 않아 실행 파일에는 자원 수집 옵션을 제공하지 않습니다.
+
+Windows에서 그래프를 만들려면:
+
+```powershell
+python -m pip install matplotlib
+python server/tests/plot_fixed_rate.py --input server/tests/latency_results/<측정 버전 폴더>
+```
+
 ## 전송 위상과 생성기 간섭 제어
 
 기본 설정은 `--receiver-mode process --player-timing spread --phase-offsets-ms 0 4 8 12`입니다. 송신과 UDP 수신을 별도 Python 프로세스로 실행해 두 작업 사이의 GIL 경쟁을 줄입니다. 수신기는 디코딩 전에 `perf_counter_ns` 시각을 기록하고 버퍼링한 CSV에 저장합니다. 측정 종료 후 송신 기록과 병합하므로 입력마다 프로세스 간 메시지를 주고받지 않습니다. 같은 호스트의 monotonic clock을 사용합니다.

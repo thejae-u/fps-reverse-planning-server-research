@@ -1,0 +1,21 @@
+diff --git a/asio/include/asio/detail/impl/win_iocp_io_context.ipp b/asio/include/asio/detail/impl/win_iocp_io_context.ipp
+--- a/asio/include/asio/detail/impl/win_iocp_io_context.ipp
++++ b/asio/include/asio/detail/impl/win_iocp_io_context.ipp
+@@ -556,6 +556,16 @@ void win_iocp_io_context::do_add_timer_queue(timer_queue_base& queue)
+   if (!waitable_timer_.handle)
+   {
+-    waitable_timer_.handle = ::CreateWaitableTimer(0, FALSE, 0);
++    // CREATE_WAITABLE_TIMER_HIGH_RESOLUTION (Windows 10 1803+).
++    // Use its documented value so older Windows SDK headers still compile.
++    const DWORD high_resolution_flag = 0x00000002;
++    waitable_timer_.handle = ::CreateWaitableTimerExW(0, 0,
++        high_resolution_flag, TIMER_MODIFY_STATE | SYNCHRONIZE);
++    if (waitable_timer_.handle == 0
++        && ::GetLastError() == ERROR_INVALID_PARAMETER)
++    {
++      // Older Windows versions do not support the high-resolution flag.
++      waitable_timer_.handle = ::CreateWaitableTimerW(0, FALSE, 0);
++    }
+     if (waitable_timer_.handle == 0)
+     {
+       DWORD last_error = ::GetLastError();
