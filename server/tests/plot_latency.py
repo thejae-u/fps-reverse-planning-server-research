@@ -2,7 +2,8 @@
 
 필요 패키지 설치: python3 -m pip install matplotlib
 실행: python3 server/tests/plot_latency.py --input server/tests/latency_results
-입력 폴더에 latency_charts.png와 latency_report.html을 저장합니다.
+입력 버전 폴더에 latency_charts_<버전>.png와 latency_report_<버전>.html을 저장합니다.
+결과 루트를 지정하면 최신 closed-loop 측정 버전을 선택합니다.
 """
 import argparse
 import base64
@@ -13,12 +14,13 @@ import math
 from pathlib import Path
 
 from latency_percentiles import summarize
+from result_artifacts import artifact_path, find_artifact, resolve_result_directory
 
 
 def load_results(directory):
-    metadata = json.loads((directory / 'summary.json').read_text(encoding='utf-8'))
+    metadata = json.loads(find_artifact(directory, 'summary.json').read_text(encoding='utf-8'))
     rows = []
-    with (directory / 'samples.csv').open(newline='', encoding='utf-8') as stream:
+    with find_artifact(directory, 'samples.csv').open(newline='', encoding='utf-8') as stream:
         for raw in csv.DictReader(stream):
             row = {'sample': int(raw['sample']), 'player': int(raw['player']),
                    'status': raw['status'], 'latency_ms': None}
@@ -51,6 +53,49 @@ def format_value(value):
     return 'N/A' if value is None else f'{value:.3f}'
 
 
+def environment_html(metadata):
+    environment = metadata.get('environment')
+    if not environment:
+        return '<h2>측정 환경</h2><p>이 결과에는 측정 당시 환경 정보가 없습니다. 새 테스트를 실행하면 자동으로 기록됩니다.</p>'
+    build = environment.get('build', {})
+    system = environment.get('system', {})
+    runtime = environment.get('runtime', {})
+    memory = system.get('total_memory_bytes')
+    entries = [
+        ('측정 시작 (UTC)', environment.get('recorded_at_utc')),
+        ('Build configuration', build.get('configuration')),
+        ('빌드 정보 출처', build.get('source')),
+        ('Compiler', ' '.join(str(build.get(key) or '') for key in ('compiler', 'compiler_version')).strip()),
+        ('Compiler path', build.get('compiler_path')),
+        ('CMake / Generator', ' / '.join(str(build.get(key) or 'Unknown') for key in ('cmake_version', 'generator'))),
+        ('CMake CXX flags', build.get('cmake_cxx_flags')),
+        ('C++ standard', build.get('cxx_standard')),
+        ('Assertions enabled', build.get('assertions_enabled')),
+        ('Build target OS / Architecture', ' / '.join(str(build.get(key) or 'Unknown') for key in ('target_os', 'target_arch'))),
+        ('Executable SHA-256', build.get('executable_sha256')),
+        ('OS', system.get('os')),
+        ('Architecture', system.get('architecture')),
+        ('CPU model', system.get('cpu_model')),
+        ('Logical CPUs', system.get('logical_cpus')),
+        ('Total RAM', f'{memory / 1024 ** 3:.2f} GiB' if memory is not None else None),
+        ('Python', ' '.join(str(system.get(key) or '') for key in ('python_implementation', 'python_version')).strip()),
+        ('측정 시작 시 Load average (1 / 5 / 15 min)', system.get('load_average_at_start')),
+        ('Network workers / Game workers / Blocking workers',
+         ' / '.join(str(build.get(key) if build.get(key) is not None else 'Unknown')
+                    for key in ('network_workers', 'game_workers', 'blocking_workers'))),
+        ('Network', runtime.get('network')),
+        ('SERVER_METRICS', runtime.get('server_metrics_env')),
+    ]
+    rows = ''.join('<tr><th>' + html.escape(label) + '</th><td>'
+                   + html.escape('Unknown (미기록)' if value is None or value == '' else str(value))
+                   + '</td></tr>' for label, value in entries)
+    return ('<h2>측정 환경</h2><p>테스트 시작 시 수집한 환경입니다. Build configuration은 실행 파일의 '
+            '--build-info 응답으로 확인하며 폴더 이름으로 추정하지 않습니다. '
+            'CMake CXX flags는 기본·구성별 설정이며 모든 target 옵션을 나열한 값은 아닙니다. '
+            '측정 시 다른 프로세스의 부하나 전원 상태도 성능에 영향을 줄 수 있습니다.</p>'
+            '<div class="scroll"><table class="environment"><tbody>' + rows + '</tbody></table></div>')
+
+
 def render(directory):
     try:
         import matplotlib
@@ -58,11 +103,15 @@ def render(directory):
         import matplotlib.pyplot as plt
     except ImportError:
         raise SystemExit('먼저 matplotlib을 설치하세요: python3 -m pip install matplotlib')
+    directory = resolve_result_directory(directory, 'summary.json')
+    metadata = json.loads(find_artifact(directory, 'summary.json').read_text(encoding='utf-8'))
+    if metadata.get('test_kind') == 'fixed_rate_run':
+        raise SystemExit('고정 전송률 결과는 plot_fixed_rate.py로 suite 폴더를 지정하세요.')
     metadata, rows, overall, players = load_results(directory)
     values = sorted(row['latency_ms'] for row in rows if row['status'] == 'ok')
     plt.rcParams.update({'font.family': 'DejaVu Sans', 'font.size': 10})
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), layout='constrained')
-    fig.suptitle('UDP Move round-trip latency', fontsize=20, fontweight='bold')
+    fig.suptitle(f'UDP Move round-trip latency\nVersion: {metadata.get("version") or "Legacy"}', fontsize=20, fontweight='bold')
     colors = {'p50_ms': '#64748b', 'p95_ms': '#0891b2', 'p99_ms': '#ea580c'}
     ax = axes[0, 0]
     if values:
@@ -103,7 +152,7 @@ def render(directory):
     for ax in axes.flat:
         ax.grid(axis='y', alpha=0.2)
         ax.set_axisbelow(True)
-    png = directory / 'latency_charts.png'
+    png = artifact_path(directory, 'latency_charts.png')
     fig.savefig(png, dpi=150)
     plt.close(fig)
     columns = [('sent', 'Sent'), ('received', 'Received'), ('timeouts', 'Timeouts'),
@@ -117,7 +166,8 @@ def render(directory):
     cards = ''.join(f'<div class="card"><span>{label}</span><strong>{format_value(overall[key])} ms</strong></div>'
                     for key, label in [('mean_ms', 'Mean'), ('p95_ms', 'p95'), ('p99_ms', 'p99')])
     encoded = base64.b64encode(png.read_bytes()).decode('ascii')
-    report = directory / 'latency_report.html'
+    report = artifact_path(directory, 'latency_report.html')
+    environment_section = environment_html(metadata)
     report.write_text(f'''<!doctype html><html lang="ko"><meta charset="utf-8">
 <title>UDP 지연 시간 보고서</title><style>
 body{{font:15px system-ui,sans-serif;background:#f1f5f9;color:#0f172a;margin:0;padding:32px}}
@@ -126,7 +176,8 @@ main{{max-width:1200px;margin:auto}}h1{{margin-bottom:8px}}p{{line-height:1.6}}
 .card span{{display:block;color:#64748b}}.card strong{{font-size:28px}}img{{width:100%;margin-top:24px;border-radius:12px}}
 .scroll{{overflow:auto}}table{{width:100%;border-collapse:collapse;background:white;font-variant-numeric:tabular-nums}}
 th,td{{padding:12px;text-align:right;border-bottom:1px solid #e2e8f0}}th:first-child{{text-align:left}}
-</style><main><h1>UDP Move 왕복 지연 시간</h1>
+.environment td{{text-align:left;overflow-wrap:anywhere}}.environment th{{width:32%}}
+</style><main><h1>UDP Move 왕복 지연 시간</h1><p>측정 버전: {html.escape(metadata.get("version") or "미기록")}</p>
 <p>가상 플레이어 {metadata['players']}명 · 플레이어별 {metadata['rounds']}회 측정 ·
 워밍업 {metadata['warmup_rounds']}회 제외 · 응답 {overall['received']}/{overall['sent']}건 ·
 타임아웃 {overall['timeouts']}건 ({overall['timeout_percent']:.3f}%)</p>
@@ -138,6 +189,7 @@ Percentile은 성공한 응답만 대상으로 nearest rank 방식으로 계산�
 이 결과는 one-way latency나 고정 전송률의 포화 부하를 나타내지 않습니다.
 Debug/Release 빌드 설정에 따라 결과가 달라질 수 있습니다.</p>
 <p>서버 실행 파일: {html.escape(metadata['server'])}<br>타임아웃: {metadata['timeout_seconds']}초</p>
+{environment_section}
 <img alt="지연 시간 분포, 누적 분포, 측정 회차별 지연 시간, 플레이어별 percentile 그래프" src="data:image/png;base64,{encoded}">
 <h2>플레이어별 요약</h2><div class="scroll"><table><thead><tr><th>Scope</th>
 {''.join(f'<th>{label}</th>' for _, label in columns)}</tr></thead><tbody>
@@ -155,5 +207,5 @@ if __name__ == '__main__':
                                      add_help=False)
     parser.add_argument('-h', '--help', action='help', help='사용 안내를 출력하고 종료합니다.')
     parser.add_argument('--input', type=Path, default=Path(__file__).resolve().parent / 'latency_results',
-                        help='samples.csv와 summary.json이 있는 폴더 (기본값: server/tests/latency_results)')
+                        help='버전 폴더 또는 결과 루트 (기본값: server/tests/latency_results, 최신 버전 선택)')
     render(parser.parse_args().input.resolve())

@@ -74,3 +74,19 @@ target_link_libraries(main PRIVATE
         nlohmann_json::nlohmann_json
         ${PLATFORM_LIBS}
 )
+
+# 실행 파일 자체에서 실제 빌드 설정을 조회할 수 있도록 구성별 헤더 생성
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/build_info/$<CONFIG>/ServerBuildInfo.hpp"
+    CONTENT "#pragma once
+namespace ServerBuildInfo {
+inline constexpr auto Configuration = R\"build($<CONFIG>)build\";
+inline constexpr auto Compiler = R\"build(${CMAKE_CXX_COMPILER_ID})build\";
+inline constexpr auto CompilerVersion = R\"build(${CMAKE_CXX_COMPILER_VERSION})build\";
+inline constexpr auto CompilerPath = R\"build(${CMAKE_CXX_COMPILER})build\";
+inline constexpr auto System = R\"build(${CMAKE_SYSTEM_NAME})build\";
+inline constexpr auto Processor = R\"build(${CMAKE_SYSTEM_PROCESSOR})build\";
+inline constexpr auto Generator = R\"build(${CMAKE_GENERATOR})build\";
+inline constexpr auto CmakeVersion = R\"build(${CMAKE_VERSION})build\";
+inline constexpr auto Flags = R\"build(${CMAKE_CXX_FLAGS} $<$<CONFIG:Debug>:${CMAKE_CXX_FLAGS_DEBUG}>$<$<CONFIG:Release>:${CMAKE_CXX_FLAGS_RELEASE}>$<$<CONFIG:RelWithDebInfo>:${CMAKE_CXX_FLAGS_RELWITHDEBINFO}>$<$<CONFIG:MinSizeRel>:${CMAKE_CXX_FLAGS_MINSIZEREL}>)build\";
+}")
+target_include_directories(main PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/build_info/$<CONFIG>")

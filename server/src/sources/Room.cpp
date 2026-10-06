@@ -163,6 +163,8 @@ void Room::OnMatchFinished()
 
 void Room::PostInput(std::string payload, Recipient sender)
 {
+    const auto submitted = BenchmarkSupport::Enabled() ? BenchmarkSupport::Clock::now()
+                                                       : BenchmarkSupport::Clock::time_point{};
     std::lock_guard lock(_submissionMutex);
     if (!_acceptingPosts)
         return;
@@ -171,7 +173,7 @@ void Room::PostInput(std::string payload, Recipient sender)
         _pendingInputs.fetch_sub(1);
         return;
     }
-    asio::post(_strand, [self = shared_from_this(), payload = std::move(payload), sender] {
+    asio::post(_strand, [self = shared_from_this(), payload = std::move(payload), sender, submitted] {
         self->_pendingInputs.fetch_sub(1);
         if (self->_stopped || self->_isMatchFinished || !self->_isWorldStarted)
             return;
@@ -185,7 +187,7 @@ void Room::PostInput(std::string payload, Recipient sender)
         const auto roomId = uuids::uuid::from_string(packet->roomid());
         if (!playerId || !roomId || *playerId != sender.id || *roomId != self->_matchId)
             return;
-        self->_world->EnqueuePacket(std::move(packet));
+        self->_world->EnqueuePacket(std::move(packet), submitted);
     });
 }
 

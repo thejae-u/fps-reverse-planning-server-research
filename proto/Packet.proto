@@ -17,6 +17,8 @@ enum PacketType {
   // Udp
   Ingame = 200;
   Authentication = 201;
+  // SERVER_BENCHMARK=1인 테스트 서버만 반환하는 입력 처리 확인 응답
+  BenchmarkAck = 202;
 }
 
 enum IngameType {
@@ -77,6 +79,8 @@ message IngamePacket {
   IngameType method = 3;
   bytes data = 4;
   uint64 clientTick = 5;
+  // 기본값 0은 일반 게임 입력. 벤치마크에서만 사용하는 식별자
+  uint64 benchmarkSequence = 6;
 }
 
 message AuthenticationPacket {
@@ -142,4 +146,25 @@ message ScoreboardPacket {
   int32 winningTeam = 3;
   int32 teamAScore = 4;
   int32 teamBScore = 5;
+}
+
+// 모든 시간은 서버의 steady_clock으로 측정한 구간 길이이며 클라이언트 시계와 비교하지 않음.
+message BenchmarkAckPacket {
+  bytes sessionId = 1;
+  uint64 sequence = 2;
+  uint64 gameDispatchUs = 3;
+  uint64 inputQueueUs = 4;
+  uint64 inputProcessingUs = 5;
+  uint64 tickExecutionUs = 6;
+  bool accepted = 7;
+  uint64 queueDepth = 8;
+  uint64 tick = 9;
+  bool stateSuperseded = 10;
+  // World 큐 등록 시 다음 tick 예정 시각과의 차이를 양수 구간으로 분리
+  uint64 nextTickRemainingUs = 11;
+  uint64 tickOverdueAtEnqueueUs = 12;
+  uint64 queueToTickStartUs = 13;
+  uint64 tickStartLatenessUs = 14;
+  uint64 withinTickWaitUs = 15;
+  bool tickAnchorReset = 16;
 }

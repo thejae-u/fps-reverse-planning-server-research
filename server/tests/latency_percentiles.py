@@ -11,6 +11,10 @@ Percentiles use nearest rank over successful samples only; losses are separate.
 import argparse
 from collections import deque
 import csv
+from datetime import datetime, timezone
+import hashlib
+import os
+import platform
 import json
 import math
 from pathlib import Path
@@ -22,6 +26,7 @@ import threading
 import time
 import uuid
 
+from result_artifacts import artifact_path, create_result_directory
 from network_game_smoke import blob, decode, frame, integer, number, port, read_tcp
 
 
@@ -49,6 +54,72 @@ def default_server():
     return root / "build/x64-debug/main.exe"
 
 
+def command_output(command):
+    try:
+        return subprocess.check_output(command, text=True, encoding="utf-8",
+                                       errors="replace", timeout=5, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def collect_environment(executable):
+    # 측정 시점의 환경을 저장하고 보고서 생성 시에는 다시 수집하지 않음.
+    system = platform.system()
+    cpu = platform.processor() or None
+    memory = None
+    if system == "Darwin":
+        cpu = command_output(["sysctl", "-n", "machdep.cpu.brand_string"]) or cpu
+        memory = command_output(["sysctl", "-n", "hw.memsize"])
+    elif system == "Linux":
+        try:
+            for line in Path("/proc/cpuinfo").read_text().splitlines():
+                if line.startswith("model name"):
+                    cpu = line.split(":", 1)[1].strip()
+                    break
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith("MemTotal:"):
+                    memory = int(line.split()[1]) * 1024
+                    break
+        except OSError:
+            pass
+    elif system == "Windows":
+        raw = command_output(["powershell", "-NoProfile", "-Command",
+                              "@{cpu=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name; "
+                              "memory=(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory} | ConvertTo-Json"])
+        if raw:
+            try:
+                windows = json.loads(raw)
+                cpu, memory = windows.get("cpu"), windows.get("memory")
+            except ValueError:
+                pass
+    digest = hashlib.sha256()
+    with executable.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    raw_build = command_output([str(executable), "--build-info"])
+    build = {"configuration": None, "source": "unavailable"}
+    if raw_build:
+        try:
+            candidate = json.loads(raw_build)
+            if isinstance(candidate, dict) and "configuration" in candidate:
+                build = dict(candidate, source="executable --build-info")
+        except ValueError:
+            pass
+    build["executable_sha256"] = digest.hexdigest()
+    return {
+        "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
+        "build": build,
+        "system": {"os": platform.platform(), "architecture": platform.machine(),
+                   "cpu_model": cpu, "logical_cpus": os.cpu_count(),
+                   "total_memory_bytes": int(memory) if memory is not None else None,
+                   "python_version": platform.python_version(),
+                   "python_implementation": platform.python_implementation(),
+                   "load_average_at_start": list(os.getloadavg()) if hasattr(os, "getloadavg") else None},
+        "runtime": {"network": "loopback; server and clients on the same host",
+                    "server_metrics_env": os.environ.get("SERVER_METRICS", "unset")}
+    }
+
+
 def summarize(rows):
     values = sorted(row["latency_ms"] for row in rows if row["status"] == "ok")
     def percentile(percent):
@@ -66,7 +137,8 @@ def run(args):
     executable = args.server.resolve()
     if not executable.is_file():
         raise RuntimeError(f"server executable not found: {executable}; use --server")
-    args.output.mkdir(parents=True, exist_ok=True)
+    environment = collect_environment(executable)
+    directory, version = create_result_directory(args.output)
     tcp_port, udp_port = port(socket.SOCK_STREAM), port(socket.SOCK_DGRAM)
     match = str(uuid.uuid4())
     ids = [str(uuid.uuid4()) for _ in range(args.players)]
@@ -186,7 +258,8 @@ def run(args):
             if measured > 0 and measured % 100 == 0:
                 print(f"Completed {measured}/{args.samples} rounds", flush=True)
         elapsed = time.perf_counter() - started
-        summary = {"metric": "UDP Move input to matching authoritative state round trip",
+        summary = {"version": version, "test_kind": "closed_loop", "metric": "UDP Move input to matching authoritative state round trip",
+                   "environment": environment,
                    "host": "127.0.0.1", "server": str(executable), "players": args.players,
                    "rounds": args.samples, "warmup_rounds": args.warmup,
                    "timeout_seconds": args.timeout, "percentile_method": "nearest_rank",
@@ -195,7 +268,7 @@ def run(args):
                    "overall": summarize(rows),
                    "per_player": {str(i): summarize([row for row in rows if row["player"] == i])
                                   for i in range(args.players)}}
-        csv_path, json_path = args.output / "samples.csv", args.output / "summary.json"
+        csv_path, json_path = artifact_path(directory, "samples.csv"), artifact_path(directory, "summary.json")
         with csv_path.open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=("sample", "player", "status", "latency_ms",
                                                        "sent_bytes", "received_bytes"))

@@ -1,4 +1,6 @@
 #include "Base.hpp"
+#include "ServerBuildInfo.hpp"
+#include <nlohmann/json.hpp>
 #include "ServerPolicy.hpp"
 #include "ExecutionContext.hpp"
 #include "Listener.hpp"
@@ -8,6 +10,38 @@
 
 int main(const int argc, char **argv)
 {
+    // 네트워크를 시작하지 않고 실행 파일에 포함된 빌드 정보를 반환
+    if (argc == 2 && std::string_view(argv[1]) == "--build-info")
+    {
+#ifdef NDEBUG
+        constexpr bool assertionsEnabled = false;
+#else
+        constexpr bool assertionsEnabled = true;
+#endif
+        const nlohmann::json info = {
+            {"configuration", ServerBuildInfo::Configuration},
+            {"benchmark_protocol_version", 2},
+            {"tick_interval_us", ServerPolicy::TickInterval.count()},
+            {"connection_input_rate_limit", ServerPolicy::ConnectionInputRate},
+            {"global_udp_rate_limit", ServerPolicy::GlobalUdpRate},
+            {"compiler", ServerBuildInfo::Compiler},
+            {"compiler_version", ServerBuildInfo::CompilerVersion},
+            {"compiler_path", ServerBuildInfo::CompilerPath},
+            {"target_os", ServerBuildInfo::System},
+            {"target_arch", ServerBuildInfo::Processor},
+            {"generator", ServerBuildInfo::Generator},
+            {"cmake_version", ServerBuildInfo::CmakeVersion},
+            {"cmake_cxx_flags", ServerBuildInfo::Flags},
+            {"cxx_standard", 20},
+            {"assertions_enabled", assertionsEnabled},
+            {"network_workers", std::thread::hardware_concurrency()},
+            {"game_workers", ServerPolicy::GameWorkers},
+            {"blocking_workers", ServerPolicy::BlockingWorkers}
+        };
+        std::cout << info.dump() << '\n';
+        return 0;
+    }
+
     // 실행인자 파싱 및 검증
     if (argc == 1)
     {

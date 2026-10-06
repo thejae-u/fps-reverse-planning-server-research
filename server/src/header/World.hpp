@@ -12,6 +12,7 @@
 #include <chrono>
 
 #include "Packet.pb.h"
+#include "BenchmarkSupport.hpp"
 #include "Vector3.hpp"
 #include "Player.hpp"
 #include "GameResult.hpp"
@@ -44,7 +45,8 @@ class World
 
     void StartUpdate(std::weak_ptr<Room> weakRoom, std::chrono::microseconds interval = ServerPolicy::TickInterval);
     void StopUpdate();
-    void EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet);
+    void EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet,
+                       BenchmarkSupport::Clock::time_point submitted = {});
 
     std::size_t GetTickCount() const
     {
@@ -68,8 +70,12 @@ class World
   private:
     void DivideTeam();
     void ScheduleNextTick();
-    void Update();
-    void ProcessQueue();
+    void Update(BenchmarkSupport::Clock::time_point scheduledTick, bool tickAnchorReset);
+    void ProcessQueue(BenchmarkSupport::Clock::time_point tickStarted,
+                      BenchmarkSupport::Clock::time_point scheduledTick, bool tickAnchorReset);
+    bool ProcessInputPacket(const std::shared_ptr<Protocol::IngamePacket> &packet);
+    void FinishBenchmarkTick(BenchmarkSupport::Clock::time_point tickStarted);
+
     void UpdateState(float dt);
     void CheckMatchEnd();
 
@@ -106,7 +112,14 @@ class World
     std::atomic<bool> _isUpdating;
 
     // Input queue
-    std::queue<std::shared_ptr<Protocol::IngamePacket>> _packetQueue;
+    struct QueuedInput
+    {
+        std::shared_ptr<Protocol::IngamePacket> packet;
+        std::unique_ptr<BenchmarkSupport::Sample> benchmark;
+    };
+    std::queue<QueuedInput> _packetQueue;
+    std::vector<std::unique_ptr<BenchmarkSupport::Sample>> _benchmarkReplies;
+    std::unordered_map<uuids::uuid, std::uint64_t> _benchmarkStateSequences;
     std::mutex _queueMutex;
 
     // Metrics storage

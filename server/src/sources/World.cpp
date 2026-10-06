@@ -171,11 +171,27 @@ void World::StopUpdate()
     _timer.cancel();
 }
 
-void World::EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet)
+void World::EnqueuePacket(std::shared_ptr<Protocol::IngamePacket> packet,
+                          BenchmarkSupport::Clock::time_point submitted)
 {
     std::lock_guard lock(_queueMutex);
-    if (_packetQueue.size() < ServerPolicy::WorldInputs)
-        _packetQueue.push(packet);
+    if (_packetQueue.size() >= ServerPolicy::WorldInputs)
+        return;
+    std::unique_ptr<BenchmarkSupport::Sample> sample;
+    if (BenchmarkSupport::Enabled() && packet->benchmarksequence() != 0)
+    {
+        const auto queued = BenchmarkSupport::Clock::now();
+        sample = std::make_unique<BenchmarkSupport::Sample>();
+        sample->submitted = submitted == BenchmarkSupport::Clock::time_point{} ? queued : submitted;
+        sample->queued = queued;
+        const auto nextTick = _timer.expiry();
+        sample->reply.set_nexttickremainingus(BenchmarkSupport::NonnegativeMicroseconds(nextTick - queued));
+        sample->reply.set_tickoverdueatenqueueus(BenchmarkSupport::NonnegativeMicroseconds(queued - nextTick));
+        sample->reply.set_sessionid(packet->sessionid());
+        sample->reply.set_sequence(packet->benchmarksequence());
+        sample->reply.set_gamedispatchus(BenchmarkSupport::Microseconds(queued - sample->submitted));
+    }
+    _packetQueue.push({std::move(packet), std::move(sample)});
 }
 
 void World::ScheduleNextTick()
@@ -203,12 +219,15 @@ void World::ScheduleNextTick()
             if (const auto world = room->GetWorld())
             {
                 auto now = std::chrono::steady_clock::now();
+                const auto scheduledTick = world->_timer.expiry();
+                bool tickAnchorReset = false;
                 constexpr int MAX_CATCHUP_TICKS = ServerPolicy::MaximumCatchupTicks;
 
                 // 극단적인 랙 발생 시에만 강제 리셋
                 if (now - world->_timer.expiry() > world->_tickInterval * MAX_CATCHUP_TICKS)
                 {
                     world->_timer.expires_at(now);
+                    tickAnchorReset = true;
                     spdlog::warn("world(room id) {}: heavy lag detected. resetting timer anchor.",
                                  uuids::to_string(roomId));
                 }
@@ -216,7 +235,7 @@ void World::ScheduleNextTick()
                 // StopUpdate 이후 완료된 handler는 world state를 변경하지 않는다.
                 if (world->_isUpdating)
                 {
-                    world->Update();
+                    world->Update(scheduledTick, tickAnchorReset);
                     world->ScheduleNextTick();
                 }
             }
@@ -224,7 +243,7 @@ void World::ScheduleNextTick()
     }));
 }
 
-void World::Update()
+void World::Update(BenchmarkSupport::Clock::time_point scheduledTick, bool tickAnchorReset)
 {
     const auto now = std::chrono::steady_clock::now();
     float actualDt = std::chrono::duration<float>(now - _lastTickTime).count();
@@ -237,7 +256,7 @@ void World::Update()
         actualDt = GameRules::MaximumTickDeltaSeconds;
 
     // 1. Process queued inputs from clients
-    ProcessQueue();
+    ProcessQueue(now, scheduledTick, tickAnchorReset);
 
     // 2. Update world/physics state using actual elapsed delta time
     UpdateState(actualDt);
@@ -266,6 +285,12 @@ void World::Update()
             ingamePacket->set_roomid(uuids::to_string(_roomId));
             ingamePacket->set_method(Protocol::IngameType::Move);
             ingamePacket->set_clienttick(_tickCount.load());
+            if (BenchmarkSupport::Enabled())
+            {
+                const auto sequence = _benchmarkStateSequences.find(id);
+                if (sequence != _benchmarkStateSequences.end())
+                    ingamePacket->set_benchmarksequence(sequence->second);
+            }
 
             // Serialize MovePacket to bytes data
             Protocol::MovePacket movePacket;
@@ -302,6 +327,7 @@ void World::Update()
     // 4. Check match end condition after all tick updates and broadcasts complete
     CheckMatchEnd();
     RuntimeMetrics::Observe("tick", std::chrono::steady_clock::now() - now);
+    FinishBenchmarkTick(now);
 }
 
 void World::CheckMatchEnd()
@@ -332,143 +358,201 @@ void World::CheckMatchEnd()
     }
 }
 
-void World::ProcessQueue()
+void World::ProcessQueue(BenchmarkSupport::Clock::time_point tickStarted,
+                         BenchmarkSupport::Clock::time_point scheduledTick, bool tickAnchorReset)
 {
-    std::queue<std::shared_ptr<Protocol::IngamePacket>> localQueue;
+    std::queue<QueuedInput> localQueue;
     {
         std::lock_guard lock(_queueMutex);
         std::swap(localQueue, _packetQueue);
     }
-
+    const auto depth = localQueue.size();
     while (!localQueue.empty())
     {
-        auto packet = localQueue.front();
+        auto input = std::move(localQueue.front());
         localQueue.pop();
-
-        auto playerIdOpt = uuids::uuid::from_string(packet->sessionid());
-        if (!playerIdOpt.has_value())
+        const auto started = input.benchmark ? BenchmarkSupport::Clock::now()
+                                             : BenchmarkSupport::Clock::time_point{};
+        const bool accepted = ProcessInputPacket(input.packet);
+        if (input.benchmark)
         {
-            spdlog::warn("world(room id) {}: invalid session id in packet", uuids::to_string(_roomId));
-            continue;
-        }
-
-        uuids::uuid playerId = playerIdOpt.value();
-
-        switch (packet->method())
-        {
-        case Protocol::IngameType::Move: {
-            Protocol::MovePacket movePacket;
-            if (movePacket.ParseFromString(packet->data()))
+            input.benchmark->reply.set_queuetotickstartus(BenchmarkSupport::Microseconds(tickStarted - input.benchmark->queued));
+            input.benchmark->reply.set_tickstartlatenessus(BenchmarkSupport::NonnegativeMicroseconds(tickStarted - scheduledTick));
+            input.benchmark->reply.set_withintickwaitus(BenchmarkSupport::Microseconds(started - tickStarted));
+            input.benchmark->reply.set_tickanchorreset(tickAnchorReset);
+            input.benchmark->reply.set_inputqueueus(BenchmarkSupport::Microseconds(started - input.benchmark->queued));
+            input.benchmark->reply.set_inputprocessingus(BenchmarkSupport::Microseconds(BenchmarkSupport::Clock::now() - started));
+            input.benchmark->reply.set_accepted(accepted);
+            input.benchmark->reply.set_queuedepth(depth);
+            if (accepted && input.packet->method() == Protocol::IngameType::Move)
             {
-                Vector3 origin(movePacket.originx(), movePacket.originy(), movePacket.originz());
-                Vector3 direction(movePacket.dirx(), movePacket.diry(), movePacket.dirz());
-                if (!std::isfinite(origin.x) || !std::isfinite(origin.y) || !std::isfinite(origin.z) ||
-                    !std::isfinite(direction.x) || !std::isfinite(direction.y) || !std::isfinite(direction.z))
-                    break;
-
-                const auto packetNow = std::chrono::steady_clock::now();
-                constexpr float defaultDt = GameRules::DefaultDeltaSeconds;
-
-                bool isValid = true;
-
-                {
-                    std::lock_guard playerLock(_playerMutex);
-                    if (_players.contains(playerId) && _players[playerId])
-                    {
-                        auto &player = _players[playerId];
-
-                        float packetDt = defaultDt;
-                        if (player->hasReceivedMovePacket)
-                        {
-                            packetDt = std::chrono::duration<float>(packetNow - player->lastMovePacketTime).count();
-                            if (packetDt < defaultDt)
-                                packetDt = defaultDt;
-                            else if (packetDt > GameRules::MaximumInputDeltaSeconds)
-                                packetDt = GameRules::MaximumInputDeltaSeconds;
-                        }
-                        player->lastMovePacketTime = packetNow;
-                        player->hasReceivedMovePacket = true;
-
-                        // 패킷 간 실제 경과 시간(packetDt) 기준 최대 이동 가능 거리 계산 (스프린트 속도 포함)
-                        float maxSpeed = static_cast<float>(MAX_SPEED);
-                        float theoreticalDist = maxSpeed * packetDt;
-
-                        float tolerance =
-                            GameRules::MovementDistanceTolerance; // 네트워크 지터 및 프레임 간격 완충 거리
-                        float maxAllowedDist = theoreticalDist + tolerance;
-
-                        // 서버 위치와 클라이언트 신규 위치 간 수평 거리 측정 (수직 Y축은 점프/중력 및
-                        // CharacterController 높이 오프셋 분리)
-                        float dx = player->position.x - origin.x;
-                        float dz = player->position.z - origin.z;
-                        float actualDist = std::sqrt(dx * dx + dz * dz);
-
-                        // 차이가 허용된 수치를 넘음
-                        if (actualDist > maxAllowedDist)
-                        {
-                            isValid = false;
-                            player->velocity.x = 0.0f;
-                            player->velocity.z = 0.0f;
-                            spdlog::warn("world(room id) {}: player {} teleport suspected. Dist: {}m, Allowed: {}m "
-                                         "(packetDt: {:.4f}s)",
-                                         uuids::to_string(_roomId), uuids::to_string(playerId), actualDist,
-                                         maxAllowedDist, packetDt);
-                        }
-                        else
-                        {
-                            player->position = origin;
-                            player->updatedByPacketThisTick = true;
-                            player->needsStateBroadcast = true;
-                        }
-                    }
-                }
-
-                if (isValid)
-                {
-                    float magnitude =
-                        std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-                    Vector3 normDirection(0.0f, 0.0f, 0.0f);
-                    std::int32_t moveSpeed = 0;
-
-                    if (magnitude > GameRules::MovementEpsilon)
-                    {
-                        normDirection.x = direction.x / magnitude;
-                        normDirection.y = direction.y / magnitude;
-                        normDirection.z = direction.z / magnitude;
-                        moveSpeed = (magnitude > GameRules::SprintMagnitudeThreshold)
-                                        ? MAX_SPEED
-                                        : static_cast<std::int32_t>(BASE_MOVE_SPEED);
-                    }
-
-                    Move(playerId, normDirection, moveSpeed);
-                }
+                if (const auto id = uuids::uuid::from_string(input.packet->sessionid()))
+                    _benchmarkStateSequences[*id] = input.packet->benchmarksequence();
             }
-            break;
-        }
-        case Protocol::IngameType::Jump: {
-            Jump(playerId);
-            break;
-        }
-        case Protocol::IngameType::Shoot: {
-            Vector3 direction(0.0f, 0.0f, 1.0f); // Test forward
-
-            if (packet->data().size() >= sizeof(Vector3))
-            {
-                std::memcpy(&direction.x, packet->data().data(), sizeof(Vector3));
-            }
-
-            if (std::isfinite(direction.x) && std::isfinite(direction.y) && std::isfinite(direction.z))
-                Shoot(playerId, direction, packet->clienttick());
-            break;
-        }
-        case Protocol::IngameType::Hit: {
-            spdlog::info("world(room id) {}: player {} hit", uuids::to_string(_roomId), uuids::to_string(playerId));
-            break;
-        }
-        default:
-            break;
+            _benchmarkReplies.push_back(std::move(input.benchmark));
         }
     }
+}
+
+bool World::ProcessInputPacket(const std::shared_ptr<Protocol::IngamePacket> &packet)
+{
+    auto playerIdOpt = uuids::uuid::from_string(packet->sessionid());
+    if (!playerIdOpt.has_value())
+    {
+        spdlog::warn("world(room id) {}: invalid session id in packet", uuids::to_string(_roomId));
+        return false;
+    }
+
+    uuids::uuid playerId = playerIdOpt.value();
+
+    bool accepted = false;
+    switch (packet->method())
+    {
+    case Protocol::IngameType::Move: {
+        Protocol::MovePacket movePacket;
+        if (movePacket.ParseFromString(packet->data()))
+        {
+            Vector3 origin(movePacket.originx(), movePacket.originy(), movePacket.originz());
+            Vector3 direction(movePacket.dirx(), movePacket.diry(), movePacket.dirz());
+            if (!std::isfinite(origin.x) || !std::isfinite(origin.y) || !std::isfinite(origin.z) ||
+                !std::isfinite(direction.x) || !std::isfinite(direction.y) || !std::isfinite(direction.z))
+                break;
+
+            const auto packetNow = std::chrono::steady_clock::now();
+            constexpr float defaultDt = GameRules::DefaultDeltaSeconds;
+
+            bool isValid = true;
+
+            {
+                std::lock_guard playerLock(_playerMutex);
+                if (_players.contains(playerId) && _players[playerId])
+                {
+                    auto &player = _players[playerId];
+
+                    float packetDt = defaultDt;
+                    if (player->hasReceivedMovePacket)
+                    {
+                        packetDt = std::chrono::duration<float>(packetNow - player->lastMovePacketTime).count();
+                        if (packetDt < defaultDt)
+                            packetDt = defaultDt;
+                        else if (packetDt > GameRules::MaximumInputDeltaSeconds)
+                            packetDt = GameRules::MaximumInputDeltaSeconds;
+                    }
+                    player->lastMovePacketTime = packetNow;
+                    player->hasReceivedMovePacket = true;
+
+                    // 패킷 간 실제 경과 시간(packetDt) 기준 최대 이동 가능 거리 계산 (스프린트 속도 포함)
+                    float maxSpeed = static_cast<float>(MAX_SPEED);
+                    float theoreticalDist = maxSpeed * packetDt;
+
+                    float tolerance =
+                        GameRules::MovementDistanceTolerance; // 네트워크 지터 및 프레임 간격 완충 거리
+                    float maxAllowedDist = theoreticalDist + tolerance;
+
+                    // 서버 위치와 클라이언트 신규 위치 간 수평 거리 측정 (수직 Y축은 점프/중력 및
+                    // CharacterController 높이 오프셋 분리)
+                    float dx = player->position.x - origin.x;
+                    float dz = player->position.z - origin.z;
+                    float actualDist = std::sqrt(dx * dx + dz * dz);
+
+                    // 차이가 허용된 수치를 넘음
+                    if (actualDist > maxAllowedDist)
+                    {
+                        isValid = false;
+                        player->velocity.x = 0.0f;
+                        player->velocity.z = 0.0f;
+                        spdlog::warn("world(room id) {}: player {} teleport suspected. Dist: {}m, Allowed: {}m "
+                                     "(packetDt: {:.4f}s)",
+                                     uuids::to_string(_roomId), uuids::to_string(playerId), actualDist,
+                                     maxAllowedDist, packetDt);
+                    }
+                    else
+                    {
+                        player->position = origin;
+                        player->updatedByPacketThisTick = true;
+                        player->needsStateBroadcast = true;
+                    }
+                }
+            }
+
+            if (isValid)
+            {
+                float magnitude =
+                    std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+                Vector3 normDirection(0.0f, 0.0f, 0.0f);
+                std::int32_t moveSpeed = 0;
+
+                if (magnitude > GameRules::MovementEpsilon)
+                {
+                    normDirection.x = direction.x / magnitude;
+                    normDirection.y = direction.y / magnitude;
+                    normDirection.z = direction.z / magnitude;
+                    moveSpeed = (magnitude > GameRules::SprintMagnitudeThreshold)
+                                    ? MAX_SPEED
+                                    : static_cast<std::int32_t>(BASE_MOVE_SPEED);
+                }
+
+                Move(playerId, normDirection, moveSpeed);
+                accepted = true;
+            }
+        }
+        break;
+    }
+    case Protocol::IngameType::Jump: {
+        Jump(playerId);
+        accepted = true;
+        break;
+    }
+    case Protocol::IngameType::Shoot: {
+        Vector3 direction(0.0f, 0.0f, 1.0f); // Test forward
+
+        if (packet->data().size() >= sizeof(Vector3))
+        {
+            std::memcpy(&direction.x, packet->data().data(), sizeof(Vector3));
+        }
+
+        if (std::isfinite(direction.x) && std::isfinite(direction.y) && std::isfinite(direction.z))
+        {
+            Shoot(playerId, direction, packet->clienttick());
+            accepted = true;
+        }
+        break;
+    }
+    case Protocol::IngameType::Hit: {
+        spdlog::info("world(room id) {}: player {} hit", uuids::to_string(_roomId), uuids::to_string(playerId));
+        break;
+    }
+    default:
+        break;
+    }
+    return accepted;
+}
+
+void World::FinishBenchmarkTick(BenchmarkSupport::Clock::time_point tickStarted)
+{
+    if (!BenchmarkSupport::Enabled() || _benchmarkReplies.empty())
+        return;
+    const auto elapsed = BenchmarkSupport::Microseconds(BenchmarkSupport::Clock::now() - tickStarted);
+    if (const auto room = _weakRoom.lock())
+    {
+        for (auto &sample : _benchmarkReplies)
+        {
+            const auto id = uuids::uuid::from_string(sample->reply.sessionid());
+            if (!id)
+                continue;
+            const auto session = _sessions.find(*id);
+            if (session == _sessions.end())
+                continue;
+            sample->reply.set_tickexecutionus(elapsed);
+            sample->reply.set_tick(_tickCount.load());
+            const auto latest = _benchmarkStateSequences.find(*id);
+            sample->reply.set_statesuperseded(sample->reply.accepted() && latest != _benchmarkStateSequences.end()
+                                              && latest->second != sample->reply.sequence());
+            room->SendTo({*id, session->second.generation}, Protocol::PacketType::BenchmarkAck,
+                         sample->reply.SerializeAsString(), Transport::Udp);
+        }
+    }
+    _benchmarkReplies.clear();
 }
 
 void World::UpdateState(float dt)
