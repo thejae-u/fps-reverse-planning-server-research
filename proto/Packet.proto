@@ -167,4 +167,7 @@ message BenchmarkAckPacket {
   uint64 tickStartLatenessUs = 14;
   uint64 withinTickWaitUs = 15;
   bool tickAnchorReset = 16;
+  uint64 timerHandlerLatenessUs = 17;
+  uint64 strandDispatchUs = 18;
+  uint64 tickEntryUs = 19;
 }

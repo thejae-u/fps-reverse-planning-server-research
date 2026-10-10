@@ -10,7 +10,6 @@ Python 표준 라이브러리만 사용하며, 실행별 CSV/JSON/log와 비교 
 import argparse
 from collections import defaultdict
 import csv
-from datetime import datetime, timezone
 import html
 import json
 import math
@@ -18,29 +17,28 @@ import multiprocessing
 import os
 from pathlib import Path
 import random
-import select
 import socket
-import struct
 import subprocess
 import threading
 import time
 import uuid
 
 from benchmark_receiver import receive_worker, merge_events
-from latency_percentiles import collect_environment, positive_int, positive_seconds
-from result_artifacts import artifact_path, create_result_directory, version_for
+from benchmark_environment import collect_environment, positive_int, positive_seconds
+from result_artifacts import artifact_path, create_result_directory, version_for, environment_html
 from network_game_smoke import blob, decode, frame, integer, number, port, read_tcp
 
 
 STAGES = {3: 'game_dispatch_ms', 4: 'input_queue_ms', 5: 'input_processing_ms', 6: 'tick_execution_ms',
           11: 'next_tick_remaining_ms', 12: 'tick_overdue_at_enqueue_ms',
-          13: 'queue_to_tick_start_ms', 14: 'tick_start_lateness_ms', 15: 'within_tick_wait_ms'}
+          13: 'queue_to_tick_start_ms', 14: 'tick_start_lateness_ms', 15: 'within_tick_wait_ms',
+          17: 'timer_handler_lateness_ms', 18: 'strand_dispatch_ms', 19: 'tick_entry_ms'}
 FIELDS = ('sequence', 'player', 'phase', 'scheduled_ms', 'sent_ms', 'send_lag_ms', 'status',
           'rtt_ms', 'scheduled_latency_ms', 'game_dispatch_ms', 'input_queue_ms',
           'input_processing_ms', 'tick_execution_ms', 'queue_depth', 'tick',
           'state_superseded', 'state_rtt_ms', 'next_tick_remaining_ms',
           'tick_overdue_at_enqueue_ms', 'queue_to_tick_start_ms', 'tick_start_lateness_ms',
-          'within_tick_wait_ms', 'tick_anchor_reset', 'player_offset_ms')
+          'within_tick_wait_ms', 'tick_anchor_reset', 'player_offset_ms', 'timer_handler_lateness_ms', 'strand_dispatch_ms', 'tick_entry_ms')
 
 
 def distribution(values):
@@ -76,7 +74,7 @@ def summarize_records(records, duration):
         for threshold in (33.3, 50, 100)}
     # Tick duration repeats in each input ACK. Deduplicate by server tick before aggregation.
     ticks = {row['tick']: row for row in success}
-    for metric in ('tick_execution_ms', 'tick_start_lateness_ms'):
+    for metric in ('tick_execution_ms', 'tick_start_lateness_ms', 'timer_handler_lateness_ms', 'strand_dispatch_ms', 'tick_entry_ms'):
         stats[metric] = distribution([row[metric] for row in ticks.values() if row[metric] is not None])
     stats['tick_anchor_resets'] = sum(row.get('tick_anchor_reset') is True for row in ticks.values())
     stats['phase_buckets'] = []
@@ -90,6 +88,10 @@ def summarize_records(records, duration):
     stats['queue_decomposition_error_ms'] = distribution([
         abs(row['input_queue_ms'] - row['queue_to_tick_start_ms'] - row['within_tick_wait_ms'])
         for row in success if row.get('queue_to_tick_start_ms') is not None and row.get('within_tick_wait_ms') is not None])
+    stats['timer_decomposition_error_ms'] = distribution([
+        abs(row['tick_start_lateness_ms'] - row['timer_handler_lateness_ms'] - row['strand_dispatch_ms'] - row['tick_entry_ms'])
+        for row in success if all(row.get(key) is not None for key in
+            ('tick_start_lateness_ms', 'timer_handler_lateness_ms', 'strand_dispatch_ms', 'tick_entry_ms'))])
     stats['phase_relation_error_ms'] = distribution([
         abs(row['queue_to_tick_start_ms'] - row['next_tick_remaining_ms']
             - row['tick_start_lateness_ms'] + row['tick_overdue_at_enqueue_ms'])
@@ -115,6 +117,7 @@ class TestServer:
         self.tcp_port, self.udp_port = port(socket.SOCK_STREAM), port(socket.SOCK_DGRAM)
         self.log = artifact_path(directory, 'server.log').open('w', encoding='utf-8')
         env = dict(os.environ, SERVER_BENCHMARK='1' if benchmark else '0', SERVER_METRICS='0')
+        env.pop('SERVER_EXECUTOR_TRACE', None)
         self.process = subprocess.Popen(
             [str(executable), '--match-id', self.match, '--auth-token', 'fixed-rate-local',
              '--tcp-port', str(self.tcp_port), '--udp-port', str(self.udp_port),
@@ -196,69 +199,6 @@ class TestServer:
             self.log.close()
 
 
-def receive_packets(server, records, lock, stop, start_ns, counters):
-    indices = {sock: index for index, sock in enumerate(server.udp)}
-    try:
-        while not stop.is_set():
-            ready, _, _ = select.select(server.udp, [], [], 0.05)
-            for sock in ready:
-                wire = sock.recv(65535)
-                received_ns = time.perf_counter_ns()
-                if len(wire) < 2 or struct.unpack('!H', wire[:2])[0] != len(wire) - 2:
-                    raise RuntimeError('UDP frame length 오류')
-                packet = decode(wire[2:])
-                kind = packet.get(1, [0])[0]
-                if kind not in (200, 202):
-                    continue
-                payload = decode(packet[2][0])
-                player = indices[sock]
-                if payload.get(1, [b''])[0].decode() != server.ids[player]:
-                    continue
-                if kind == 200 and (payload.get(3, [0])[0] != 1 or payload.get(2, [b''])[0].decode() != server.match):
-                    continue
-                sequence = payload.get(2 if kind == 202 else 6, [0])[0]
-                with lock:
-                    row = records.get((player, sequence))
-                    if row is None or row['sent_ms'] is None:
-                        counters['unmatched'] += 1
-                        continue
-                    elapsed = (received_ns - start_ns) / 1e6
-                    if kind == 200:
-                        if row['state_rtt_ms'] is None:
-                            row['state_rtt_ms'] = elapsed - row['sent_ms']
-                        continue
-                    if row['status'] in ('accepted', 'rejected'):
-                        counters['duplicate_acks'] += 1
-                        continue
-                    row['status'] = 'accepted' if payload.get(7, [0])[0] else 'rejected'
-                    row['rtt_ms'] = elapsed - row['sent_ms']
-                    row['scheduled_latency_ms'] = elapsed - row['scheduled_ms']
-                    for field, name in STAGES.items():
-                        row[name] = payload.get(field, [0])[0] / 1000
-                    row['queue_depth'] = payload.get(8, [0])[0]
-                    row['tick'] = payload.get(9, [0])[0]
-                    row['state_superseded'] = bool(payload.get(10, [0])[0])
-                    row['tick_anchor_reset'] = bool(payload.get(16, [0])[0])
-    except Exception as error:
-        server.errors.append(f'UDP receiver: {error}')
-
-
-def sample_resources(server, stop, samples):
-    # Unix ps의 CPU 값은 프로세스 수명 평균이며 순간 CPU 사용률로 해석하지 않음.
-    if os.name == 'nt':
-        return
-    while not stop.is_set():
-        try:
-            result = subprocess.check_output(['ps', '-p', str(server.process.pid), '-o', '%cpu=', '-o', 'rss='],
-                                             text=True, timeout=2, stderr=subprocess.DEVNULL).split()
-            if len(result) == 2:
-                samples.append({'recorded_at_utc': datetime.now(timezone.utc).isoformat(),
-                                'ps_lifetime_cpu_percent': float(result[0]), 'rss_bytes': int(result[1]) * 1024})
-        except (OSError, subprocess.SubprocessError, ValueError):
-            pass
-        stop.wait(1)
-
-
 def scheduled_events(players, rounds, interval_ns, player_timing):
     """각 플레이어의 전송률은 유지하며 한 주기 안에서 전송 시점만 분산합니다."""
     for round_index in range(rounds):
@@ -278,51 +218,39 @@ def run_once(executable, args, rate, directory, phase_offset_ms=0):
     directory.mkdir(parents=True)
     environment = collect_environment(executable)
     build = environment['build']
-    if build.get('benchmark_protocol_version') != 2:
-        raise RuntimeError(f'{executable}: benchmark protocol v2이 없습니다. 서버를 다시 빌드하세요.')
+    if build.get('benchmark_protocol_version') != 3:
+        raise RuntimeError(f'{executable}: benchmark protocol v3이 없습니다. 서버를 다시 빌드하세요.')
     environment['runtime'].update(server_benchmark='1', server_metrics_env='0')
     server = TestServer(executable, args.players, args.timeout, directory)
-    records, lock, receiver_stop = {}, threading.Lock(), threading.Event()
+    context = multiprocessing.get_context('spawn')
+    records, receiver_stop = {}, context.Event()
     counters = defaultdict(int)
     reader = None
-    resource_reader = None
-    resource_samples = []
-    resource_stop = threading.Event()
     receiver_connection = None
     try:
         server.connect()
-        if args.sample_resources:
-            resource_reader = threading.Thread(target=sample_resources, args=(server, resource_stop, resource_samples), daemon=True)
-            resource_reader.start()
-        if args.receiver_mode == 'process':
-            context = multiprocessing.get_context('spawn')
-            receiver_stop = context.Event()
-            receiver_connection, child_connection = context.Pipe(duplex=True)
-            events_path = artifact_path(directory, 'receiver_events.csv')
-            reader = context.Process(target=receive_worker,
-                                     args=(server.udp, server.ids, server.match, str(events_path),
-                                           tuple(STAGES), receiver_stop, child_connection), name='UDP receiver')
-            reader.start()
-            child_connection.close()
-            if not receiver_connection.poll(10):
-                raise RuntimeError('수신 프로세스 준비 시간 초과')
-            ready = receiver_connection.recv()
-            if not ready.get('ready'):
-                raise RuntimeError(f'수신 프로세스 준비 실패: {ready}')
+        receiver_connection, child_connection = context.Pipe(duplex=True)
+        events_path = artifact_path(directory, 'receiver_events.csv')
+        reader = context.Process(target=receive_worker,
+                                 args=(server.udp, server.ids, server.match, str(events_path),
+                                       tuple(STAGES), receiver_stop, child_connection), name='UDP receiver')
+        reader.start()
+        child_connection.close()
+        if not receiver_connection.poll(10):
+            raise RuntimeError('수신 프로세스 준비 시간 초과')
+        ready = receiver_connection.recv()
+        if not ready.get('ready'):
+            raise RuntimeError(f'수신 프로세스 준비 실패: {ready}')
         start_ns = time.perf_counter_ns() + 100_000_000 + round(phase_offset_ms * 1e6)
         interval_ns = round(1e9 / rate)
         warmup_rounds = math.ceil(args.warmup * rate)
         measured_rounds = math.ceil(args.duration * rate)
         measurement_start_ns = start_ns + warmup_rounds * interval_ns
         measured_duration = measured_rounds * interval_ns / 1e9
-        if args.receiver_mode == 'thread':
-            reader = threading.Thread(target=receive_packets,
-                                      args=(server, records, lock, receiver_stop, measurement_start_ns, counters), daemon=True)
-            reader.start()
         for round_index, player, relative_ns, player_offset in scheduled_events(
                 args.players, warmup_rounds + measured_rounds, interval_ns, args.player_timing):
             if (server.process.poll() is not None or server.errors
-                    or (args.receiver_mode == 'process' and not reader.is_alive())):
+                    or not reader.is_alive()):
                 raise RuntimeError(f'서버/수신 연결 오류: {server.errors}')
             scheduled_ns = start_ns + relative_ns
             phase = 'warmup' if round_index < warmup_rounds else 'measurement'
@@ -343,18 +271,16 @@ def run_once(executable, args, rate, directory, phase_offset_ms=0):
                        scheduled_ms=(scheduled_ns - measurement_start_ns) / 1e6,
                        player_offset_ms=player_offset / 1e6,
                        status='missed_schedule' if missed else 'unacked')
-            # process 모드에서는 기록·lock을 수신기와 공유하지 않음. thread 모드는 비교용.
-            with lock:
-                if not missed:
-                    sent_ns = time.perf_counter_ns()
-                    row['sent_ms'] = (sent_ns - measurement_start_ns) / 1e6
-                    row['send_lag_ms'] = (sent_ns - scheduled_ns) / 1e6
-                records[player, sequence] = row
-                if not missed:
-                    try:
-                        server.udp[player].send(wire)
-                    except OSError:
-                        row['status'] = 'send_error'
+            if not missed:
+                sent_ns = time.perf_counter_ns()
+                row['sent_ms'] = (sent_ns - measurement_start_ns) / 1e6
+                row['send_lag_ms'] = (sent_ns - scheduled_ns) / 1e6
+            records[player, sequence] = row
+            if not missed:
+                try:
+                    server.udp[player].send(wire)
+                except OSError:
+                    row['status'] = 'send_error'
             if (player == args.players - 1 and phase == 'measurement'
                     and (round_index - warmup_rounds + 1) % rate == 0):
                 seconds = (round_index - warmup_rounds + 1) / rate
@@ -365,24 +291,20 @@ def run_once(executable, args, rate, directory, phase_offset_ms=0):
         until = end_ns / 1e9 + args.timeout
         while time.perf_counter() < until:
             if (server.errors or server.process.poll() is not None
-                    or (args.receiver_mode == 'process' and not reader.is_alive())):
+                    or not reader.is_alive()):
                 raise RuntimeError(f'수신 오류: {server.errors}')
             time.sleep(min(0.05, max(0, until - time.perf_counter())))
         receiver_stop.set()
         reader.join(timeout=10)
         if reader.is_alive() or server.errors:
             raise RuntimeError(f'수신기 종료 오류: {server.errors}')
-        if args.receiver_mode == 'process':
-            if reader.exitcode != 0 or not receiver_connection.poll(2):
-                raise RuntimeError(f'수신 프로세스 실패: exitcode={reader.exitcode}')
-            result = receiver_connection.recv()
-            if not result.get('finished'):
-                raise RuntimeError(f'수신 프로세스 실패: {result}')
-            counters.update(result['counters'])
-            merge_events(events_path, records, measurement_start_ns, STAGES, counters)
-        resource_stop.set()
-        if resource_reader:
-            resource_reader.join(timeout=3)
+        if reader.exitcode != 0 or not receiver_connection.poll(2):
+            raise RuntimeError(f'수신 프로세스 실패: exitcode={reader.exitcode}')
+        result = receiver_connection.recv()
+        if not result.get('finished'):
+            raise RuntimeError(f'수신 프로세스 실패: {result}')
+        counters.update(result['counters'])
+        merge_events(events_path, records, measurement_start_ns, STAGES, counters)
         rows = list(records.values())
         stats = summarize_records(rows, measured_duration)
         validity = []
@@ -395,7 +317,7 @@ def run_once(executable, args, rate, directory, phase_offset_ms=0):
             validity.append('처리 확인 응답 없음')
         limits = {'per_player_pps': build.get('connection_input_rate_limit'),
                   'global_pps': build.get('global_udp_rate_limit')}
-        summary = {'version': version_for(directory), 'test_kind': 'fixed_rate_run', 'schema_version': 2, 'server': str(executable), 'environment': environment,
+        summary = {'version': version_for(directory), 'test_kind': 'fixed_rate_run', 'schema_version': 3, 'server': str(executable), 'environment': environment,
                    'players': args.players, 'rate_per_player': rate, 'offered_pps': rate * args.players,
                    'duration_seconds': measured_duration, 'warmup_seconds': warmup_rounds / rate,
                    'response_grace_seconds': args.timeout, 'workload': f'open_loop_{args.player_timing}_players',
@@ -407,10 +329,7 @@ def run_once(executable, args, rate, directory, phase_offset_ms=0):
                    'valid_for_comparison': not validity, 'validity_notes': validity,
                    'overall': stats, 'per_player': {str(p): summarize_records([r for r in rows if r['player'] == p], measured_duration)
                                                   for p in range(args.players)},
-                   'receiver_counters': dict(counters),
-                   'resource_sampling': {'enabled': args.sample_resources,
-                                         'note': 'Unix ps CPU는 수명 평균; warmup/응답 수집 포함. Windows는 미지원.',
-                                         'samples': resource_samples}}
+                   'receiver_counters': dict(counters)}
         with artifact_path(directory, 'samples.csv').open('w', newline='', encoding='utf-8') as stream:
             writer = csv.DictWriter(stream, fieldnames=FIELDS)
             writer.writeheader()
@@ -423,14 +342,11 @@ def run_once(executable, args, rate, directory, phase_offset_ms=0):
         receiver_stop.set()
         if reader:
             reader.join(timeout=3)
-            if args.receiver_mode == 'process' and reader.is_alive():
+            if reader.is_alive():
                 reader.terminate()
                 reader.join(timeout=3)
         if receiver_connection:
             receiver_connection.close()
-        resource_stop.set()
-        if resource_reader:
-            resource_reader.join(timeout=3)
         server.close()
 
 
@@ -443,7 +359,7 @@ def paired_comparison(runs):
             if run['rate'] == rate and run['summary']['valid_for_comparison']:
                 pairs[run['repetition']][run['label']] = run['summary']['overall']
         for metric in ('rtt_ms', 'scheduled_latency_ms', 'input_processing_ms', 'tick_execution_ms',
-                       'next_tick_remaining_ms', 'queue_to_tick_start_ms', 'tick_start_lateness_ms', 'within_tick_wait_ms'):
+                       'next_tick_remaining_ms', 'queue_to_tick_start_ms', 'tick_start_lateness_ms', 'within_tick_wait_ms', 'timer_handler_lateness_ms', 'strand_dispatch_ms', 'tick_entry_ms'):
             for percentile in ('mean', 'p95', 'p99'):
                 differences = [pair['Release'][metric][percentile] - pair['Debug'][metric][percentile]
                                for pair in pairs.values() if 'Debug' in pair and 'Release' in pair
@@ -497,9 +413,8 @@ def save_suite(directory, runs, args):
         phase_rows.append(f"<tr><td>{html.escape(run['label'])}</td><td>{run['repetition']}</td>"
                           + ''.join(f'<td>{fmt(stats[key]["mean"])}</td>' for key in
                                     ('next_tick_remaining_ms', 'tick_overdue_at_enqueue_ms', 'queue_to_tick_start_ms',
-                                     'tick_start_lateness_ms', 'within_tick_wait_ms'))
+                                     'tick_start_lateness_ms', 'within_tick_wait_ms', 'timer_handler_lateness_ms', 'strand_dispatch_ms', 'tick_entry_ms'))
                           + f"<td>{stats['tick_anchor_resets']}</td></tr>")
-    from plot_latency import environment_html
     environments = ''.join(f"<h3>{html.escape(label)}</h3>{environment_html(next(r['summary'] for r in runs if r['label'] == label))}"
                            for label in dict.fromkeys(r['label'] for r in runs))
     report = artifact_path(directory, 'comparison_report.html')
@@ -517,8 +432,10 @@ ACK는 입력마다 추가되는 벤치마크 트래픽이므로 일반 게임 �
 <h2>tick 타이밍과 큐 대기 분해 (평균 ms)</h2>
 <p>큐 대기 = 큐 등록부터 tick 시작까지의 대기 + tick 시작 후 해당 입력 처리까지의 대기입니다.
 예정 시각까지 남은 시간은 tick의 입력 도착 phase를 보여줍니다. 이미 예정 시각을 지난 경우 Remaining은 0이고 Overdue에 초과 시간을 기록합니다.
-Tick lateness는 처리 tick의 원래 예정 시각 대비 실제 시작 지연이며 동일 tick은 중복 집계하지 않습니다.</p>
-<div class="scroll"><table><tr><th>Build</th><th>Run</th><th>Next tick remaining</th><th>Overdue at enqueue</th><th>Queue to tick start</th><th>Tick lateness</th><th>Within tick wait</th><th>Anchor resets</th></tr>{''.join(phase_rows)}</table></div>
+Tick lateness는 처리 tick의 원래 예정 시각 대비 실제 시작 지연이며 동일 tick은 중복 집계하지 않습니다.
+Timer handler lateness는 OS 깨우기와 reactor/io_context 실행 대기를 포함하며 순수 타이머 지연이 아닙니다.
+Strand dispatch는 완료 handler부터 strand 진입까지, Tick entry는 strand 진입부터 Update 시작까지입니다.</p>
+<div class="scroll"><table><tr><th>Build</th><th>Run</th><th>Next tick remaining</th><th>Overdue at enqueue</th><th>Queue to tick start</th><th>Tick lateness</th><th>Within tick wait</th><th>Timer handler lateness</th><th>Strand dispatch</th><th>Tick entry</th><th>Anchor resets</th></tr>{''.join(phase_rows)}</table></div>
 <h2>실행 쌍 비교</h2><p>차이는 Release − Debug이며 음수면 Release 지연이 낮습니다.
 CI는 실행 쌍을 재표집한 탐색적 95% bootstrap 구간이며, 5쌍 미만이면 표시하지 않습니다.
 미응답을 percentile 계산에서 제외하므로 Unacked와 생성하지 못한 부하도 함께 확인해야 합니다.</p>
@@ -538,13 +455,12 @@ def main():
     parser.add_argument('--warmup', type=positive_seconds, default=10)
     parser.add_argument('--repetitions', type=positive_int, default=5)
     parser.add_argument('--timeout', type=positive_seconds, default=2)
-    parser.add_argument('--receiver-mode', choices=('process', 'thread'), default='process',
-                        help='기본 process: 송신/수신 GIL 분리; thread: 이전 방식 비교')
+    parser.add_argument('--receiver-mode', choices=('process',), default='process',
+                        help='별도 수신 프로세스 사용 (Windows 실행 인자 호환)')
     parser.add_argument('--player-timing', choices=('spread', 'burst'), default='spread',
                         help='기본 spread: 플레이어별 전송 시점 분산; burst: 동시 전송')
     parser.add_argument('--phase-offsets-ms', type=nonnegative_ms, nargs='+', default=[0, 4, 8, 12],
                         help='반복마다 순환할 초기 전송 지연(ms). 각 Debug/Release 쌍에 동일 값 적용')
-    parser.add_argument('--sample-resources', action='store_true', help='Unix 서버 CPU(수명 평균)/RSS를 1초 간격으로 수집')
     parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parent / 'latency_results')
     args = parser.parse_args()
     if bool(args.server) == bool(args.debug or args.release) or (not args.server and not (args.debug and args.release)):
@@ -557,8 +473,8 @@ def main():
         if not path.is_file():
             parser.error(f'실행 파일 없음: {path}')
         build = collect_environment(path)['build']
-        if build.get('benchmark_protocol_version') != 2:
-            parser.error(f'{path}를 다시 빌드하세요: benchmark protocol v2 필요')
+        if build.get('benchmark_protocol_version') != 3:
+            parser.error(f'{path}를 다시 빌드하세요: benchmark protocol v3 필요')
         if label in ('Debug', 'Release') and build.get('configuration') != label:
             parser.error(f'{label}로 지정한 실행 파일의 실제 설정이 {build.get("configuration")}입니다.')
     directory, version = create_result_directory(args.output)

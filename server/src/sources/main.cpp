@@ -20,7 +20,7 @@ int main(const int argc, char **argv)
 #endif
         const nlohmann::json info = {
             {"configuration", ServerBuildInfo::Configuration},
-            {"benchmark_protocol_version", 2},
+            {"benchmark_protocol_version", 3},
             {"tick_interval_us", ServerPolicy::TickInterval.count()},
             {"connection_input_rate_limit", ServerPolicy::ConnectionInputRate},
             {"global_udp_rate_limit", ServerPolicy::GlobalUdpRate},

@@ -1,3 +1,4 @@
+#include "ExecutorTrace.hpp"
 #include "Room.hpp"
 #include "GameRules.hpp"
 #include "ServerPolicy.hpp"
@@ -17,7 +18,7 @@ void Room::AddSession(uuids::uuid id, Participant participant)
     std::lock_guard lock(_submissionMutex);
     if (!_acceptingPosts)
         return;
-    asio::post(_strand, [self = shared_from_this(), id, participant] {
+    ExecutorTrace::Post(_strand, "room_task", [self = shared_from_this(), id, participant] {
         if (self->_stopped || self->_isMatchFinished || self->_isWorldStarted)
             return;
         self->_sessions.insert_or_assign(id, participant);
@@ -35,7 +36,7 @@ void Room::RemoveSession(uuids::uuid id, std::uint64_t generation)
     std::lock_guard lock(_submissionMutex);
     if (!_acceptingPosts)
         return;
-    asio::post(_strand, [self = shared_from_this(), id, generation] {
+    ExecutorTrace::Post(_strand, "room_task", [self = shared_from_this(), id, generation] {
         if (self->_stopped)
             return;
         auto it = self->_sessions.find(id);
@@ -52,7 +53,7 @@ void Room::EnqueuePacket(std::shared_ptr<IngamePacket> packet, Recipient sender)
     std::lock_guard lock(_submissionMutex);
     if (!_acceptingPosts)
         return;
-    asio::post(_strand, [self = shared_from_this(), packet = std::move(packet), sender] {
+    ExecutorTrace::Post(_strand, "room_task", [self = shared_from_this(), packet = std::move(packet), sender] {
         if (self->_stopped || self->_isMatchFinished || !self->_isWorldStarted)
             return;
         auto it = self->_sessions.find(sender.id);
@@ -96,7 +97,7 @@ void Room::Stop()
         if (_strand.running_in_this_thread())
             stop();
         else
-            asio::post(_strand, std::move(stop));
+            ExecutorTrace::Post(_strand, "room_task", std::move(stop));
     }
     future.get();
 }
@@ -173,7 +174,7 @@ void Room::PostInput(std::string payload, Recipient sender)
         _pendingInputs.fetch_sub(1);
         return;
     }
-    asio::post(_strand, [self = shared_from_this(), payload = std::move(payload), sender, submitted] {
+    ExecutorTrace::Post(_strand, "room_input", [self = shared_from_this(), payload = std::move(payload), sender, submitted] {
         self->_pendingInputs.fetch_sub(1);
         if (self->_stopped || self->_isMatchFinished || !self->_isWorldStarted)
             return;
@@ -196,7 +197,7 @@ void Room::PostHandshake(Recipient recipient, std::int32_t preset)
     std::lock_guard lock(_submissionMutex);
     if (!_acceptingPosts)
         return;
-    asio::post(_strand, [self = shared_from_this(), recipient, preset] {
+    ExecutorTrace::Post(_strand, "room_task", [self = shared_from_this(), recipient, preset] {
         if (self->_stopped)
             return;
         InfoHandshakePacket response;

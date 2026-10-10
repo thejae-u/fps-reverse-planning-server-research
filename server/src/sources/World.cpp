@@ -1,3 +1,4 @@
+#include "ExecutorTrace.hpp"
 #include "World.hpp"
 #include "GameRules.hpp"
 #include "ServerPolicy.hpp"
@@ -200,7 +201,10 @@ void World::ScheduleNextTick()
         return;
 
     _timer.expires_at(_timer.expiry() + _tickInterval);
-    _timer.async_wait(asio::bind_executor(_strand, [weakRoom = _weakRoom, roomId = _roomId](const std::error_code &ec) {
+    const auto scheduled = _timer.expiry();
+    auto tickHandler = [weakRoom = _weakRoom, roomId = _roomId, scheduled](
+                           const std::error_code &ec, BenchmarkSupport::Clock::time_point timerReady) {
+        const auto strandEntered = BenchmarkSupport::Clock::now();
         if (ec)
         {
             if (ec == asio::error::operation_aborted)
@@ -214,12 +218,15 @@ void World::ScheduleNextTick()
             return;
         }
 
+        ExecutorTrace::Scope trace("tick", scheduled);
         if (const auto room = weakRoom.lock())
         {
             if (const auto world = room->GetWorld())
             {
                 auto now = std::chrono::steady_clock::now();
-                const auto scheduledTick = world->_timer.expiry();
+                const auto scheduledTick = scheduled;
+                world->_benchmarkTimerReady = timerReady;
+                world->_benchmarkStrandEntered = strandEntered;
                 bool tickAnchorReset = false;
                 constexpr int MAX_CATCHUP_TICKS = ServerPolicy::MaximumCatchupTicks;
 
@@ -240,7 +247,22 @@ void World::ScheduleNextTick()
                 }
             }
         }
-    }));
+    };
+    if (BenchmarkSupport::Enabled())
+    {
+        // 완료 handler는 game io_context에서 관측. World 접근은 strand 안에서만 수행.
+        // 이 시각에는 OS 깨우기뿐 아니라 reactor/io_context 실행 대기도 포함됨.
+        _timer.async_wait([strand = _strand, tickHandler](const std::error_code &ec) {
+            const auto timerReady = BenchmarkSupport::Clock::now();
+            asio::dispatch(strand, [tickHandler, ec, timerReady] { tickHandler(ec, timerReady); });
+        });
+    }
+    else
+    {
+        _timer.async_wait(asio::bind_executor(_strand, [tickHandler](const std::error_code &ec) {
+            tickHandler(ec, BenchmarkSupport::Clock::now());
+        }));
+    }
 }
 
 void World::Update(BenchmarkSupport::Clock::time_point scheduledTick, bool tickAnchorReset)
@@ -380,6 +402,9 @@ void World::ProcessQueue(BenchmarkSupport::Clock::time_point tickStarted,
             input.benchmark->reply.set_tickstartlatenessus(BenchmarkSupport::NonnegativeMicroseconds(tickStarted - scheduledTick));
             input.benchmark->reply.set_withintickwaitus(BenchmarkSupport::Microseconds(started - tickStarted));
             input.benchmark->reply.set_tickanchorreset(tickAnchorReset);
+            input.benchmark->reply.set_timerhandlerlatenessus(BenchmarkSupport::NonnegativeMicroseconds(_benchmarkTimerReady - scheduledTick));
+            input.benchmark->reply.set_stranddispatchus(BenchmarkSupport::NonnegativeMicroseconds(_benchmarkStrandEntered - _benchmarkTimerReady));
+            input.benchmark->reply.set_tickentryus(BenchmarkSupport::NonnegativeMicroseconds(tickStarted - _benchmarkStrandEntered));
             input.benchmark->reply.set_inputqueueus(BenchmarkSupport::Microseconds(started - input.benchmark->queued));
             input.benchmark->reply.set_inputprocessingus(BenchmarkSupport::Microseconds(BenchmarkSupport::Clock::now() - started));
             input.benchmark->reply.set_accepted(accepted);

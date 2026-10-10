@@ -21,7 +21,7 @@ param(
     [int]$Repetitions = 5,
     [ValidateRange(0.001, 86400)]
     [double]$Timeout = 2,
-    [ValidateSet('process', 'thread')]
+    [ValidateSet('process')]
     [string]$ReceiverMode = 'process',
     [ValidateSet('spread', 'burst')]
     [string]$PlayerTiming = 'spread',

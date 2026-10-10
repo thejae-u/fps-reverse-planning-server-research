@@ -105,6 +105,8 @@ class World
 
     // Tick update details
     asio::io_context::strand _strand;
+    BenchmarkSupport::Clock::time_point _benchmarkTimerReady;
+    BenchmarkSupport::Clock::time_point _benchmarkStrandEntered;
     asio::steady_timer _timer;
     std::chrono::microseconds _tickInterval;
     std::chrono::steady_clock::time_point _lastTickTime;
